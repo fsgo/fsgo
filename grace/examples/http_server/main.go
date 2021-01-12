@@ -8,11 +8,11 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"strconv"
+	"time"
 
 	"github.com/fsgo/fsnet/grace"
 )
@@ -22,13 +22,18 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("pid=" + pid))
 }
 
-func main() {
-	log.SetPrefix(fmt.Sprintf("pid=%d ", os.Getpid()))
+func handlerSlow(w http.ResponseWriter, r *http.Request) {
+	time.Sleep(5 * time.Second)
+	w.Write([]byte("hello"))
+}
 
+func main() {
 	http.HandleFunc("/test", handler)
+	http.HandleFunc("/slow", handlerSlow)
 
 	g := &grace.Grace{
-		PIDFilePath: "./ss.pid",
+		PIDFilePath:     "./ss.pid",
+		ShutdownTimeout: 30 * time.Second,
 	}
 
 	// server 1
@@ -52,5 +57,5 @@ func main() {
 	}
 
 	err := g.Start(context.Background())
-	log.Println("exit", err)
+	log.Println("process exit", err, "pid=", os.Getpid())
 }

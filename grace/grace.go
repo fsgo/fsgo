@@ -169,7 +169,7 @@ func (g *Grace) mainStart(ctx context.Context, servers []Resource) error {
 			case syscall.SIGINT,
 				syscall.SIGQUIT,
 				syscall.SIGTERM:
-				g.actionStop(context.Background())
+				g.actionStop(context.Background(), g.processCmd)
 				return fmt.Errorf("shutdown by signal(%v)", sig)
 			case syscall.SIGUSR2:
 				g.actionReload(context.Background())
@@ -191,11 +191,18 @@ func (g *Grace) actionReload(ctx context.Context) (err error) {
 
 	lastSubCancel := g.subProcessClose
 
+	g.mux.Lock()
+	lastCmd := g.processCmd
+	g.mux.Unlock()
+
 	ctxN, cancel := context.WithCancel(ctx)
 	g.subProcessClose = cancel
-	if err := g.forkAndStart(ctxN); err != nil {
-		return err
+	if errFork := g.forkAndStart(ctxN); errFork != nil {
+		return errFork
 	}
+
+	// 优雅 关闭老的子进程
+	_ = g.actionStop(ctx, lastCmd)
 
 	if lastSubCancel != nil {
 		lastSubCancel()
@@ -209,35 +216,32 @@ func (g *Grace) withLock(fn func() error) error {
 	return fn()
 }
 
-func (g *Grace) subProcessExited() bool {
-	if g.processCmd.ProcessState != nil && g.processCmd.ProcessState.Exited() {
+func (g *Grace) subProcessExited(cmd *exec.Cmd) bool {
+	if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
 		return true
 	}
 	return false
 }
 
-func (g *Grace) actionStop(ctx context.Context) error {
-	err := g.withLock(func() error {
-		if g.processCmd == nil {
-			return fmt.Errorf("no subprecess need shutdown")
-		}
+func (g *Grace) actionStop(ctx context.Context, cmd *exec.Cmd) error {
+	if cmd == nil {
+		return nil
+	}
 
-		if g.subProcessExited() {
-			return nil
-		}
+	if cmd == nil {
+		return fmt.Errorf("no subprecess need shutdown")
+	}
 
-		// 发送信号给子进程，让其退出
-		if err := g.processCmd.Process.Signal(syscall.SIGQUIT); err != nil {
-			return err
-		}
+	if g.subProcessExited(cmd) {
+		return nil
+	}
 
-		if g.subProcessExited() {
-			return nil
-		}
-		return fmt.Errorf("need wait")
-	})
+	// 发送信号给子进程，让其退出
+	if err := cmd.Process.Signal(syscall.SIGQUIT); err != nil {
+		return err
+	}
 
-	if err == nil {
+	if g.subProcessExited(cmd) {
 		return nil
 	}
 
@@ -247,20 +251,12 @@ func (g *Grace) actionStop(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			return g.withLock(func() error {
-				if g.subProcessExited() {
-					return nil
-				}
-				return g.processCmd.Process.Kill()
-			})
+			if g.subProcessExited(cmd) {
+				return nil
+			}
+			return cmd.Process.Kill()
 		case <-time.After(50 * time.Millisecond):
-			errWait := g.withLock(func() error {
-				if g.subProcessExited() {
-					return nil
-				}
-				return fmt.Errorf("need wait")
-			})
-			if errWait == nil {
+			if g.subProcessExited(cmd) {
 				return nil
 			}
 
