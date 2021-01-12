@@ -33,8 +33,13 @@ func (sp *subProcess) logit(msgs ...interface{}) {
 
 func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 	sp.logit("Start() start")
+	start := time.Now()
 	defer func() {
-		sp.logit("Start() finish, error=", errLast)
+		cost := time.Since(start)
+		sp.logit("Start() finish, error=", errLast,
+			", start_at=", start.Format("2006-01-02 15:04:05"),
+			", duration=", cost,
+		)
 	}()
 
 	var errChan chan error

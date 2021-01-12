@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"sync"
 	"syscall"
@@ -22,21 +23,29 @@ import (
 )
 
 const (
-	ActionStart  = "start"
-	ActionReload = "reload"
-	ActionStop   = "stop"
+	actionStart  = "start"
+	actionReload = "reload"
+	actionStop   = "stop"
 
-	ActionSubStart = "sub_process_start"
+	actionSubStart = "sub_process_start"
 )
 
 const envActionKey = "fsgo_fsnet_grace_action"
 
 // Grace 安全的stop、reload
 type Grace struct {
-	PIDFilePath     string
-	ShutdownTimeout time.Duration
+	// PIDFilePath 保存pid的文件路径
+	PIDFilePath string
 
-	// Log 日志打印
+	// StopTimeout 停止服务的超时时间，默认10s
+	StopTimeout time.Duration
+
+	// Keep 是否保持子进程常在，默认 false
+	// 若为true，当子进程退出后将立即重新启动新的进程
+	Keep bool
+
+	// Log logger，若为空，
+	// 将使用默认的使用标准库的log.Writer作为输出
 	Log *log.Logger
 
 	processCmd      *exec.Cmd
@@ -46,8 +55,12 @@ type Grace struct {
 
 	mux sync.Mutex
 	sub *subProcess
+
+	event   chan string
+	stopped bool
 }
 
+// Register 注册资源
 func (g *Grace) Register(res Resource) {
 	g.resources = append(g.resources, res)
 }
@@ -56,9 +69,11 @@ func (g *Grace) init() {
 	if g.Log == nil {
 		g.Log = log.New(log.Writer(), log.Prefix(), log.Flags())
 	}
-	if g.ShutdownTimeout < 1 {
-		g.ShutdownTimeout = 10 * time.Second
+	if g.StopTimeout < 1 {
+		g.StopTimeout = 10 * time.Second
 	}
+
+	g.event = make(chan string, 1)
 
 	if g.PIDFilePath == "" {
 		panic("PIDFilePath required")
@@ -66,7 +81,7 @@ func (g *Grace) init() {
 
 	g.sub = &subProcess{
 		resources:       g.resources,
-		shutDownTimeout: g.ShutdownTimeout,
+		shutDownTimeout: g.StopTimeout,
 		Log:             g.Log,
 	}
 }
@@ -80,7 +95,7 @@ func (g *Grace) logit(msgs ...interface{}) {
 func (g *Grace) Start(ctx context.Context) error {
 	g.init()
 
-	action := ActionStart
+	action := actionStart
 	if len(os.Args) > 1 {
 		action = os.Args[1]
 	}
@@ -91,13 +106,13 @@ func (g *Grace) Start(ctx context.Context) error {
 	g.logit("action=", action)
 
 	switch action {
-	case ActionStart:
+	case actionStart:
 		return g.actionStart(ctx)
-	case ActionReload: // 给主进程发送信号
+	case actionReload: // 给主进程发送信号
 		return g.fireSignal(syscall.SIGUSR2)
-	case ActionStop:
+	case actionStop:
 		return g.fireSignal(syscall.SIGQUIT) // 给主进程发送 退出信号
-	case ActionSubStart: // 子进程:启动
+	case actionSubStart: // 子进程:启动
 		return g.sub.Start(ctx)
 	default:
 		return fmt.Errorf("not support action %q", action)
@@ -122,11 +137,12 @@ func (g *Grace) fireSignal(sig os.Signal) error {
 
 func (g *Grace) actionStart(ctx context.Context) error {
 	defer func() {
-		if g.PIDFilePath != "" {
-			os.Remove(g.PIDFilePath)
-		}
+		os.Remove(g.PIDFilePath)
 	}()
 	pidStr := strconv.Itoa(os.Getpid())
+	if err := keepDir(filepath.Dir(g.PIDFilePath)); err != nil {
+		return err
+	}
 	if err := ioutil.WriteFile(g.PIDFilePath, []byte(pidStr), 0644); err != nil {
 		return err
 	}
@@ -169,25 +185,37 @@ func (g *Grace) mainStart(ctx context.Context, servers []Resource) error {
 			case syscall.SIGINT,
 				syscall.SIGQUIT,
 				syscall.SIGTERM:
+				g.stopped = true
 				g.actionStop(context.Background(), g.processCmd)
 				return fmt.Errorf("shutdown by signal(%v)", sig)
 			case syscall.SIGUSR2:
-				g.actionReload(context.Background())
+				g.keepSubProcess(context.Background())
+			}
+		case e := <-g.event:
+			switch e {
+			case actionSubStart:
+				if !g.stopped {
+					g.keepSubProcess(context.Background())
+				}
 			}
 		}
 	}
 	return fmt.Errorf("shutdown")
 }
 
-// actionReload 主进程-执行reload 动作
+// keepSubProcess 主进程-执行reload 动作
 //
 // 	1. fork 新子进程
 // 	2. stop 旧的子进程
-func (g *Grace) actionReload(ctx context.Context) (err error) {
-	g.logit("actionReload start")
+func (g *Grace) keepSubProcess(ctx context.Context) (err error) {
+	g.logit("keepSubProcess start")
 	defer func() {
-		g.logit("actionReload finish, error=", err)
+		g.logit("keepSubProcess finish, error=", err)
 	}()
+
+	if err1 := ctx.Err(); err != nil {
+		return err1
+	}
 
 	lastSubCancel := g.subProcessClose
 
@@ -223,6 +251,7 @@ func (g *Grace) subProcessExited(cmd *exec.Cmd) bool {
 	return false
 }
 
+// actionStop 停止服务
 func (g *Grace) actionStop(ctx context.Context, cmd *exec.Cmd) error {
 	if cmd == nil {
 		return nil
@@ -245,9 +274,10 @@ func (g *Grace) actionStop(ctx context.Context, cmd *exec.Cmd) error {
 		return nil
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, g.ShutdownTimeout)
+	ctx, cancel := context.WithTimeout(ctx, g.StopTimeout)
 	defer cancel()
 
+	// 等待程序优雅退出
 	for {
 		select {
 		case <-ctx.Done():
@@ -255,7 +285,7 @@ func (g *Grace) actionStop(ctx context.Context, cmd *exec.Cmd) error {
 				return nil
 			}
 			return cmd.Process.Kill()
-		case <-time.After(50 * time.Millisecond):
+		case <-time.After(5 * time.Millisecond):
 			if g.subProcessExited(cmd) {
 				return nil
 			}
@@ -284,7 +314,7 @@ func (g *Grace) forkAndStart(ctx context.Context) (ret error) {
 
 	g.logit("fork new sub_process, cmd=", cmd.String())
 
-	cmd.Env = append(os.Environ(), envActionKey+"="+ActionSubStart)
+	cmd.Env = append(os.Environ(), envActionKey+"="+actionSubStart)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.ExtraFiles = files
@@ -297,7 +327,10 @@ func (g *Grace) forkAndStart(ctx context.Context) (ret error) {
 		start := time.Now()
 		errWait := cmd.Wait()
 		cost := time.Since(start)
-		g.logit("cmd.Wait, error=", errWait, ",cost=", cost)
+		g.logit("cmd.Wait, error=", errWait, ", duration=", cost)
+		if g.Keep {
+			g.event <- actionSubStart
+		}
 	}()
 
 	_ = g.withLock(func() error {

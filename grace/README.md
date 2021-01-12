@@ -38,3 +38,9 @@
 kill -USR2 40332
 ```
 40332 是主进程pid。
+
+3. restart：
+```
+./http_server reload
+./http_server
+```

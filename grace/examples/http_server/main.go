@@ -11,7 +11,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"syscall"
 	"time"
 
 	"github.com/fsgo/fsnet/grace"
@@ -26,15 +28,29 @@ func handlerSlow(w http.ResponseWriter, r *http.Request) {
 	time.Sleep(5 * time.Second)
 	w.Write([]byte("hello"))
 }
+func handlerPanic(w http.ResponseWriter, r *http.Request) {
+	panic("must panic")
+}
 
 func main() {
 	http.HandleFunc("/test", handler)
 	http.HandleFunc("/slow", handlerSlow)
+	http.HandleFunc("/panic", handlerPanic)
 
 	g := &grace.Grace{
-		PIDFilePath:     "./ss.pid",
-		ShutdownTimeout: 30 * time.Second,
+		PIDFilePath: "./ss.pid",
+		StopTimeout: 30 * time.Second,
+		Keep:        true,
 	}
+
+	go func() {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+		select {
+		case <-ch:
+			log.Println("signal exiting...")
+		}
+	}()
 
 	// server 1
 	{
