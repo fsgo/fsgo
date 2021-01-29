@@ -52,25 +52,9 @@ func main() {
 		}
 	}()
 
-	// server 1
-	{
-		res := &grace.ServerResource{
-			Server:  &http.Server{},
-			NetWork: "tcp",
-			Address: "127.0.0.1:8909",
-		}
-		g.Register(res)
-	}
+	g.RegisterByDSN("tcp@127.0.0.1:8909", grace.NewServerConsumer(&http.Server{}))
 
-	// server 2
-	{
-		res := &grace.ServerResource{
-			Server:  &http.Server{},
-			NetWork: "tcp",
-			Address: "127.0.0.1:8910",
-		}
-		g.Register(res)
-	}
+	g.RegisterByDSN("tcp@127.0.0.1:8910", grace.NewServerConsumer(&http.Server{}))
 
 	err := g.Start(context.Background())
 	log.Println("process exit", err, "pid=", os.Getpid())

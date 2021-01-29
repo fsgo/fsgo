@@ -19,10 +19,15 @@ import (
 	"time"
 )
 
+type resourceServer struct {
+	Resource Resource
+	Consumer Consumer
+}
+
 // subProcess 子进程的逻辑
 type subProcess struct {
 	shutDownTimeout time.Duration
-	resources       []Resource
+	resources       []*resourceServer
 	Log             *log.Logger
 }
 
@@ -32,6 +37,7 @@ func (sp *subProcess) logit(msgs ...interface{}) {
 }
 
 func (sp *subProcess) Start(ctx context.Context) (errLast error) {
+
 	sp.logit("Start() start")
 	start := time.Now()
 	defer func() {
@@ -45,11 +51,11 @@ func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 	var errChan chan error
 	for idx, s := range sp.resources {
 		f := os.NewFile(uintptr(3+idx), "")
-		s.SetFile(f)
+		s.Resource.SetFile(f)
 
-		go func(res Resource) {
-			errChan <- res.Start(ctx)
-		}(s)
+		go func(c Consumer) {
+			errChan <- c.Start(ctx)
+		}(s.Consumer)
 	}
 
 	ch := make(chan os.Signal, 1)
@@ -85,7 +91,7 @@ func (sp *subProcess) Stop(ctx context.Context) (errStop error) {
 	for idx, s := range sp.resources {
 		wg.Add(1)
 
-		go func(idx int, res Resource) {
+		go func(idx int, res Consumer) {
 			defer wg.Done()
 
 			if err := res.Stop(ctx); err != nil {
@@ -93,7 +99,7 @@ func (sp *subProcess) Stop(ctx context.Context) (errStop error) {
 			} else {
 				errChans <- nil
 			}
-		}(idx, s)
+		}(idx, s.Consumer)
 	}
 	wg.Wait()
 

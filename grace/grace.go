@@ -37,6 +37,11 @@ type Grace struct {
 	// PIDFilePath 保存pid的文件路径
 	PIDFilePath string
 
+	// SubProcessCommand 子进程的命令，可选
+	// 若为空则使用当前进程的命令
+	// 如 []string{"./bin/user","-conf","conf/app.toml"}
+	SubProcessCommand []string
+
 	// StopTimeout 停止服务的超时时间，默认10s
 	StopTimeout time.Duration
 
@@ -51,7 +56,7 @@ type Grace struct {
 	processCmd      *exec.Cmd
 	subProcessClose context.CancelFunc
 
-	resources []Resource
+	resources []*resourceServer
 
 	mux sync.Mutex
 	sub *subProcess
@@ -61,8 +66,24 @@ type Grace struct {
 }
 
 // Register 注册资源
-func (g *Grace) Register(res Resource) {
-	g.resources = append(g.resources, res)
+func (g *Grace) Register(res Resource, c Consumer) error {
+	ss := &resourceServer{
+		Resource: res,
+		Consumer: c,
+	}
+	if c != nil {
+		c.Bind(res)
+	}
+	g.resources = append(g.resources, ss)
+	return nil
+}
+
+func (g *Grace) RegisterByDSN(dsn string, c Consumer) error {
+	res, err := GenResourceByDSN(dsn)
+	if err != nil {
+		return err
+	}
+	return g.Register(res, c)
 }
 
 func (g *Grace) init() {
@@ -154,10 +175,10 @@ func (g *Grace) actionStart(ctx context.Context) error {
 }
 
 // mainStart 主进程开启开始
-func (g *Grace) mainStart(ctx context.Context, servers []Resource) error {
+func (g *Grace) mainStart(ctx context.Context, servers []*resourceServer) error {
 	for _, info := range servers {
-		err := info.Open(ctx)
-		g.logit("open resource ", info.String(), ", error=", err)
+		err := info.Resource.Open(ctx)
+		g.logit("open resource ", info.Resource.String(), ", error=", err)
 		if err != nil {
 			return err
 		}
@@ -299,18 +320,15 @@ func (g *Grace) actionStop(ctx context.Context, cmd *exec.Cmd) error {
 func (g *Grace) forkAndStart(ctx context.Context) (ret error) {
 	files := make([]*os.File, len(g.resources))
 	for idx, s := range g.resources {
-		f, err := s.File()
+		f, err := s.Resource.File()
 		if err != nil {
 			return fmt.Errorf("listener[%d].File() has error: %w", idx, err)
 		}
 		files[idx] = f
 	}
-	var args []string
-	if len(os.Args) > 1 {
-		args = os.Args[1:]
-	}
 
-	cmd := exec.CommandContext(ctx, os.Args[0], args...)
+	cmdName, args := g.getSubProcessCmds()
+	cmd := exec.CommandContext(ctx, cmdName, args...)
 
 	g.logit("fork new sub_process, cmd=", cmd.String())
 
@@ -339,4 +357,15 @@ func (g *Grace) forkAndStart(ctx context.Context) (ret error) {
 	})
 
 	return nil
+}
+
+func (g *Grace) getSubProcessCmds() (string, []string) {
+	if len(g.SubProcessCommand) > 0 {
+		return g.SubProcessCommand[0], g.SubProcessCommand[1:]
+	}
+	var args []string
+	if len(os.Args) > 1 {
+		args = os.Args[1:]
+	}
+	return os.Args[0], args
 }

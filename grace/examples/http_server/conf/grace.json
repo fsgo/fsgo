@@ -1,0 +1,7 @@
+{
+   "Resource":["tcp@127.0.0.1:8909","tcp@127.0.0.1:8910"],
+   "Cmd":"./http_server",
+    "PIDFilePath":"./var/pid",
+   "Keep":true,
+   "StopTimeout":3000
+}
