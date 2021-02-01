@@ -8,15 +8,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
-	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/fsgo/fsnet/grace"
 )
@@ -25,26 +21,25 @@ var confName = flag.String("conf", "conf/grace.json", "")
 
 func main() {
 	flag.Parse()
-	c, err := loadConf(*confName)
+	cf, g, err := grace.NewWithConfigName(*confName)
 	if err != nil {
 		log.Printf(" load config %q failed, error=%v\n", *confName, err)
 		os.Exit(1)
 	}
 
-	g := &grace.Grace{
-		PIDFilePath: c.PIDFilePath,
-		Keep:        c.Keep,
-		StopTimeout: time.Duration(c.StopTimeout) * time.Millisecond,
-		Log:         nil,
-	}
-
-	if c.Cmd != "" {
-		// todo  解析 cmd
-		g.SubProcessCommand = []string{c.Cmd}
-	}
-
-	for _, r := range c.Resource {
-		g.RegisterByDSN(r, nil)
+	for name, wcf := range cf.Workers {
+		opt := &grace.WorkerOption{
+			Cmd:         wcf.Cmd,
+			CmdArgs:     wcf.CmdArgs,
+			StopTimeout: wcf.StopTimeout,
+		}
+		group := grace.NewWorker(opt)
+		for _, dsn := range wcf.Listen {
+			if err := group.Register(dsn, nil); err != nil {
+				panic(err.Error())
+			}
+		}
+		g.Register(name, group)
 	}
 
 	go func() {
@@ -57,36 +52,5 @@ func main() {
 	}()
 
 	err = g.Start(context.Background())
-	log.Println("gracemaster exit:", err)
-}
-
-type Config struct {
-	Resource    []string
-	Cmd         string
-	PIDFilePath string
-	Keep        bool
-	StopTimeout int
-}
-
-func (c *Config) Check() error {
-	if len(c.Resource) == 0 {
-		return fmt.Errorf("empty resource")
-	}
-	if c.PIDFilePath == "" {
-		return fmt.Errorf("empty PIDFilePath")
-	}
-	return nil
-}
-
-func loadConf(name string) (*Config, error) {
-	bf, err := ioutil.ReadFile(name)
-	if err != nil {
-		return nil, err
-	}
-
-	var c *Config
-	if e := json.Unmarshal(bf, &c); e != nil {
-		return nil, e
-	}
-	return c, c.Check()
+	log.Println("grace_master exit:", err)
 }

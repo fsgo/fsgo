@@ -10,7 +10,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"strings"
@@ -26,18 +25,15 @@ type resourceServer struct {
 
 // subProcess 子进程的逻辑
 type subProcess struct {
-	shutDownTimeout time.Duration
-	resources       []*resourceServer
-	Log             *log.Logger
+	group *Worker
 }
 
 func (sp *subProcess) logit(msgs ...interface{}) {
-	msg := fmt.Sprintf("[grace][sub_process] pid=%d ppid=%d %s", os.Getpid(), os.Getppid(), fmt.Sprint(msgs...))
-	sp.Log.Output(1, msg)
+	msg := fmt.Sprintf("[grace][worker.process] pid=%d ppid=%d %s", os.Getpid(), os.Getppid(), fmt.Sprint(msgs...))
+	sp.group.main.Logger.Output(1, msg)
 }
 
 func (sp *subProcess) Start(ctx context.Context) (errLast error) {
-
 	sp.logit("Start() start")
 	start := time.Now()
 	defer func() {
@@ -49,7 +45,7 @@ func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 	}()
 
 	var errChan chan error
-	for idx, s := range sp.resources {
+	for idx, s := range sp.group.resources {
 		f := os.NewFile(uintptr(3+idx), "")
 		s.Resource.SetFile(f)
 
@@ -69,10 +65,12 @@ func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 	case e1 := <-errChan:
 		err = e1
 	case sig := <-ch:
+		sp.logit(fmt.Sprintf("receive signal(%v)", sig))
+
 		err = fmt.Errorf("exit by signal(%v)", sig)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, sp.shutDownTimeout)
+	ctx, cancel := context.WithTimeout(ctx, sp.group.getStopTimeout())
 	defer cancel()
 
 	sp.Stop(ctx)
@@ -87,8 +85,8 @@ func (sp *subProcess) Stop(ctx context.Context) (errStop error) {
 	}()
 
 	var wg sync.WaitGroup
-	errChans := make(chan error, len(sp.resources))
-	for idx, s := range sp.resources {
+	errChans := make(chan error, len(sp.group.resources))
+	for idx, s := range sp.group.resources {
 		wg.Add(1)
 
 		go func(idx int, res Consumer) {

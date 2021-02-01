@@ -1,7 +1,17 @@
 {
-   "Resource":["tcp@127.0.0.1:8909","tcp@127.0.0.1:8910"],
-   "Cmd":"./http_server",
-    "PIDFilePath":"./var/pid",
-   "Keep":true,
-   "StopTimeout":3000
+  "StatusDir": "./var/",
+  "Keep": true,
+  "StopTimeout": 10000,
+  "Workers": {
+    "default": {
+      "Listen": [
+        "tcp@127.0.0.1:8909",
+        "tcp@127.0.0.1:8910"
+      ],
+      "Cmd": "./http_server"
+    },
+    "sleep": {
+      "Cmd": "./cmds/sleep.sh"
+    }
+  }
 }

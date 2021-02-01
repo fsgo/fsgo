@@ -36,26 +36,31 @@ func main() {
 	http.HandleFunc("/test", handler)
 	http.HandleFunc("/slow", handlerSlow)
 	http.HandleFunc("/panic", handlerPanic)
-
-	g := &grace.Grace{
-		PIDFilePath: "./ss.pid",
-		StopTimeout: 30 * time.Second,
-		Keep:        true,
-	}
-
 	go func() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 		select {
 		case <-ch:
-			log.Println("signal exiting...")
+			log.Println("worker exiting...")
 		}
 	}()
 
-	g.RegisterByDSN("tcp@127.0.0.1:8909", grace.NewServerConsumer(&http.Server{}))
+	cf, g, err1 := grace.NewWithConfigName("./conf/grace.json")
+	if err1 != nil {
+		panic(err1.Error())
+	}
 
-	g.RegisterByDSN("tcp@127.0.0.1:8910", grace.NewServerConsumer(&http.Server{}))
+	wcf := cf.Workers["default"]
+
+	worker := grace.NewWorker(nil)
+	worker.Register(wcf.Listen[0], grace.NewServerConsumer(&http.Server{}))
+	worker.Register(wcf.Listen[1], grace.NewServerConsumer(&http.Server{}))
+
+	g.Register("default", worker)
 
 	err := g.Start(context.Background())
-	log.Println("process exit", err, "pid=", os.Getpid())
+	log.Println("worker exit", err, "pid=", os.Getpid())
+	if err != nil {
+		os.Exit(1)
+	}
 }
