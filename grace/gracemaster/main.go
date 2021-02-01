@@ -8,7 +8,9 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -21,19 +23,22 @@ var confName = flag.String("conf", "conf/grace.json", "")
 
 func main() {
 	flag.Parse()
-	cf, g, err := grace.NewWithConfigName(*confName)
+
+	cf, err := LoadConfig(*confName)
 	if err != nil {
-		log.Printf(" load config %q failed, error=%v\n", *confName, err)
-		os.Exit(1)
+		log.Fatalf(" load config %q failed, error=%v\n", *confName, err)
+	}
+
+	if err = cf.Parser(); err != nil {
+		log.Fatalf(" parser config %q failed, error=%v\n", *confName, err)
+	}
+
+	g := grace.Grace{
+		Option: cf.ToOption(),
 	}
 
 	for name, wcf := range cf.Workers {
-		opt := &grace.WorkerOption{
-			Cmd:         wcf.Cmd,
-			CmdArgs:     wcf.CmdArgs,
-			StopTimeout: wcf.StopTimeout,
-		}
-		group := grace.NewWorker(opt)
+		group := grace.NewWorker(wcf.ToWorkerOption())
 		for _, dsn := range wcf.Listen {
 			if err := group.Register(dsn, nil); err != nil {
 				panic(err.Error())
@@ -53,4 +58,18 @@ func main() {
 
 	err = g.Start(context.Background())
 	log.Println("grace_master exit:", err)
+}
+
+func LoadConfig(name string) (*grace.Config, error) {
+	bf, err := ioutil.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
+
+	var c *grace.Config
+	if e := json.Unmarshal(bf, &c); e != nil {
+		return nil, e
+	}
+
+	return c, c.Parser()
 }

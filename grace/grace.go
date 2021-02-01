@@ -38,6 +38,9 @@ type Option struct {
 	StopTimeout int
 	StatusDir   string
 	Keep        bool
+
+	// 检查版本的间隔时间，默认为 5 秒
+	CheckInterval int
 }
 
 // Parser 参数解析、检查
@@ -57,6 +60,13 @@ func (c *Option) GetStopTimeout() time.Duration {
 
 func (c *Option) GetMainPIDPath() string {
 	return filepath.Join(c.StatusDir, "main.pid")
+}
+
+func (c *Option) GetCheckInterval() time.Duration {
+	if c.CheckInterval > 0 {
+		return time.Duration(c.CheckInterval) * time.Second
+	}
+	return 5 * time.Second
 }
 
 // Grace 安全的 stop、reload

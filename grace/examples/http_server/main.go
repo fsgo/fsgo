@@ -8,6 +8,8 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -45,9 +47,13 @@ func main() {
 		}
 	}()
 
-	cf, g, err1 := grace.NewWithConfigName("./conf/grace.json")
-	if err1 != nil {
-		panic(err1.Error())
+	cf, err := LoadConfig("conf/grace.json")
+	if err != nil {
+		log.Fatalf(" load config %q failed, error=%v\n", "conf/grace.json", err)
+	}
+
+	if err = cf.Parser(); err != nil {
+		log.Fatalf(" parser config %q failed, error=%v\n", "conf/grace.json", err)
 	}
 
 	wcf := cf.Workers["default"]
@@ -56,11 +62,28 @@ func main() {
 	worker.Register(wcf.Listen[0], grace.NewServerConsumer(&http.Server{}))
 	worker.Register(wcf.Listen[1], grace.NewServerConsumer(&http.Server{}))
 
+	g := grace.Grace{
+		Option: cf.ToOption(),
+	}
 	g.Register("default", worker)
 
-	err := g.Start(context.Background())
+	err = g.Start(context.Background())
 	log.Println("worker exit", err, "pid=", os.Getpid())
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func LoadConfig(name string) (*grace.Config, error) {
+	bf, err := ioutil.ReadFile(name)
+	if err != nil {
+		return nil, err
+	}
+
+	var c *grace.Config
+	if e := json.Unmarshal(bf, &c); e != nil {
+		return nil, e
+	}
+
+	return c, c.Parser()
 }

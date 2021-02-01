@@ -7,9 +7,7 @@
 package grace
 
 import (
-	"encoding/json"
 	"fmt"
-	"io/ioutil"
 )
 
 // Config 配置文件的结构体
@@ -25,6 +23,9 @@ type Config struct {
 
 	// Workers 工作进程配置
 	Workers map[string]*ConfigWorker
+
+	// CheckInterval 检查版本的间隔时间，默认为 5 秒
+	CheckInterval int
 }
 
 func (c *Config) Parser() error {
@@ -43,6 +44,15 @@ func (c *Config) Parser() error {
 		}
 	}
 	return nil
+}
+
+func (c *Config) ToOption() *Option {
+	return &Option{
+		StopTimeout:   c.GetStopTimeout(),
+		StatusDir:     c.StatusDir,
+		Keep:          c.Keep,
+		CheckInterval: c.CheckInterval,
+	}
 }
 
 func (c *Config) GetStopTimeout() int {
@@ -64,41 +74,19 @@ type ConfigWorker struct {
 
 	// StopTimeout StopTimeout 优雅关闭的最长时间，毫秒，若不填写，则使用全局 Config 的
 	StopTimeout int
+
+	VersionFile string
 }
 
 func (c *ConfigWorker) Parser() error {
 	return nil
 }
 
-var ConfigParser = json.Unmarshal
-
-func LoadConfig(name string) (*Config, error) {
-	bf, err := ioutil.ReadFile(name)
-	if err != nil {
-		return nil, err
+func (c *ConfigWorker) ToWorkerOption() *WorkerOption {
+	return &WorkerOption{
+		Cmd:         c.Cmd,
+		CmdArgs:     c.CmdArgs,
+		StopTimeout: c.StopTimeout,
+		VersionFile: c.VersionFile,
 	}
-
-	var c *Config
-	if e := ConfigParser(bf, &c); e != nil {
-		return nil, e
-	}
-
-	return c, c.Parser()
-}
-
-func NewWithConfigName(name string) (*Config, *Grace, error) {
-	cf, err := LoadConfig(name)
-	if err != nil {
-		return nil, nil, err
-	}
-	opt := &Option{
-		StopTimeout: cf.GetStopTimeout(),
-		StatusDir:   cf.StatusDir,
-		Keep:        cf.Keep,
-	}
-	g := &Grace{
-		Option: opt,
-	}
-
-	return cf, g, nil
 }

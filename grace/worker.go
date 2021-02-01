@@ -8,7 +8,11 @@ package grace
 
 import (
 	"context"
+	"crypto/md5"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -21,6 +25,39 @@ type WorkerOption struct {
 	Cmd         string
 	CmdArgs     []string
 	StopTimeout int
+
+	// VersionFile 版本号信息对应的文件地址
+	VersionFile string
+}
+
+func (c *WorkerOption) String() string {
+	bf, _ := json.Marshal(c)
+	return string(bf)
+}
+
+func (c *WorkerOption) version() string {
+	h := md5.New()
+	_, _ = io.WriteString(h, c.String())
+
+	cmd, _ := c.getWorkerCmd()
+	info, err := os.Stat(cmd)
+	if err == nil {
+		_, _ = io.WriteString(h, info.Mode().String())
+		_, _ = io.WriteString(h, info.ModTime().String())
+	}
+
+	info1, err1 := os.Stat(c.VersionFile)
+	if err1 == nil {
+		_, _ = io.WriteString(h, info1.Mode().String())
+		_, _ = io.WriteString(h, info1.ModTime().String())
+	}
+
+	f, err2 := os.Open(c.VersionFile)
+	if err2 == nil {
+		defer f.Close()
+		_, _ = io.Copy(h, f)
+	}
+	return hex.EncodeToString(h.Sum(nil))
 }
 
 func (c *WorkerOption) getWorkerCmd() (string, []string) {
@@ -64,6 +101,9 @@ type Worker struct {
 	stopped   bool
 
 	event chan string
+
+	// 进程的版本信息
+	version string
 }
 
 func (w *Worker) Register(dsn string, c Consumer) error {
@@ -89,6 +129,8 @@ func (w *Worker) register(res Resource, c Consumer) error {
 
 // mainStart 主进程开启开始
 func (w *Worker) mainStart(ctx context.Context) error {
+	go w.watchChange()
+
 	for _, info := range w.resources {
 		err := info.Resource.Open(ctx)
 		w.logit("open resource ", info.Resource.String(), ", error=", err)
@@ -136,6 +178,19 @@ func (w *Worker) mainStart(ctx context.Context) error {
 		}
 	}
 	return fmt.Errorf("shutdown")
+}
+
+func (w *Worker) watchChange() {
+	w.version = w.option.version()
+	tk := time.NewTicker(w.main.Option.GetCheckInterval())
+	for range tk.C {
+		newVersion := w.option.version()
+		if w.version != newVersion {
+			w.logit("version change, reload it")
+			w.version = newVersion
+			w.mainReload(context.Background())
+		}
+	}
 }
 
 func (w *Worker) subProcessStart(ctx context.Context) error {
