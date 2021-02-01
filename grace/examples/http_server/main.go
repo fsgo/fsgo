@@ -9,6 +9,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"flag"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -34,10 +35,15 @@ func handlerPanic(w http.ResponseWriter, r *http.Request) {
 	panic("must panic")
 }
 
+var msg = flag.String("msg", "", "")
+
 func main() {
+	flag.Parse()
+
 	http.HandleFunc("/test", handler)
 	http.HandleFunc("/slow", handlerSlow)
 	http.HandleFunc("/panic", handlerPanic)
+	_ = *msg
 	go func() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)

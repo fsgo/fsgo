@@ -121,6 +121,16 @@ func (g *Grace) Start(ctx context.Context) error {
 		action = do
 	}
 
+	switch action {
+	case actionStart,
+		actionReload,
+		actionStop,
+		actionSubStart:
+	default:
+		// 可能是其他的 参数，如 -conf app.toml
+		action = actionStart
+	}
+
 	g.logit("action=", action)
 
 	switch action {
