@@ -44,16 +44,14 @@ func main() {
 				panic(err.Error())
 			}
 		}
-		g.Register(name, group)
+		_ = g.Register(name, group)
 	}
 
 	go func() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-		select {
-		case <-ch:
-			log.Println("signal exiting...")
-		}
+		<-ch
+		log.Println("signal exiting...")
 	}()
 
 	err = g.Start(context.Background())

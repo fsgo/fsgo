@@ -24,7 +24,7 @@ import (
 const (
 	actionStart  = "start"
 	actionReload = "reload"
-	actionStop   = "mainStop"
+	actionStop   = "stop"
 
 	actionSubStart = "sub_process_start"
 
@@ -106,7 +106,7 @@ func (g *Grace) init() {
 
 func (g *Grace) logit(msgs ...interface{}) {
 	msg := fmt.Sprintf("[grace][main] pid=%d %s", os.Getpid(), fmt.Sprint(msgs...))
-	g.Logger.Output(1, msg)
+	_ = g.Logger.Output(1, msg)
 }
 
 // Start 开始服务，阻塞、同步的
@@ -196,8 +196,6 @@ func (g *Grace) actionReceiveStop() error {
 			}
 		}
 	}
-
-	return nil
 }
 
 func (g *Grace) writePIDFile() error {
@@ -251,7 +249,7 @@ func (g *Grace) watchMainPid() {
 		current := info1.ModTime()
 		if !last.Equal(current) {
 			last = current
-			g.keepSubProcess(context.Background())
+			_ = g.keepSubProcess(context.Background())
 		}
 	}
 }
@@ -271,12 +269,6 @@ func (g *Grace) workersDo(fn func(w *Worker) error) error {
 func (g *Grace) mainStart(ctx context.Context) error {
 	return g.workersDo(func(w *Worker) error {
 		return w.mainStart(ctx)
-	})
-}
-
-func (g *Grace) mainStop(ctx context.Context) error {
-	return g.workersDo(func(w *Worker) error {
-		return w.stop(ctx)
 	})
 }
 

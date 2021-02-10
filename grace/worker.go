@@ -155,6 +155,8 @@ func (w *Worker) mainStart(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			w.stopped = true
+			_ = w.stop(context.Background())
 			return ctx.Err()
 		case sig := <-ch:
 			w.logit(fmt.Sprintf("receive signal(%v)", sig))
@@ -163,32 +165,32 @@ func (w *Worker) mainStart(ctx context.Context) error {
 				syscall.SIGQUIT,
 				syscall.SIGTERM:
 				w.stopped = true
-				w.stop(context.Background())
+				_ = w.stop(context.Background())
 				return fmt.Errorf("shutdown by signal(%v)", sig)
 			case syscall.SIGUSR2:
-				w.mainReload(context.Background())
+				_ = w.mainReload(context.Background())
 			}
 		case e := <-w.event:
 			switch e {
 			case actionSubProcessExit:
 				if !w.stopped {
-					w.keepPrecess(context.Background())
+					_ = w.keepPrecess(context.Background())
 				}
 			}
 		}
 	}
-	return fmt.Errorf("shutdown")
 }
 
 func (w *Worker) watchChange() {
 	w.version = w.option.version()
-	tk := time.NewTicker(w.main.Option.GetCheckInterval())
+	dur := w.main.Option.GetCheckInterval()
+	tk := time.NewTicker(dur)
 	for range tk.C {
 		newVersion := w.option.version()
 		if w.version != newVersion {
 			w.logit("version change, reload it")
 			w.version = newVersion
-			w.mainReload(context.Background())
+			_ = w.mainReload(context.Background())
 		}
 	}
 }
@@ -199,7 +201,7 @@ func (w *Worker) subProcessStart(ctx context.Context) error {
 
 func (w *Worker) logit(msgs ...interface{}) {
 	msg := fmt.Sprintf("[grace][main] pid=%d %s", os.Getpid(), fmt.Sprint(msgs...))
-	w.main.Logger.Output(1, msg)
+	_ = w.main.Logger.Output(1, msg)
 }
 
 func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
@@ -315,5 +317,8 @@ func (w *Worker) getStopTimeout() time.Duration {
 }
 
 func (w *Worker) stop(ctx context.Context) error {
-	return nil
+	w.mux.Lock()
+	lastCmd := w.cmd
+	w.mux.Unlock()
+	return w.stopCmd(ctx, lastCmd)
 }

@@ -57,6 +57,4 @@ func stopCmd(ctx context.Context, cmd *exec.Cmd) error {
 
 		}
 	}
-
-	return nil
 }

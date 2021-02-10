@@ -30,9 +30,10 @@ type subProcess struct {
 
 func (sp *subProcess) logit(msgs ...interface{}) {
 	msg := fmt.Sprintf("[grace][worker.process] pid=%d ppid=%d %s", os.Getpid(), os.Getppid(), fmt.Sprint(msgs...))
-	sp.group.main.Logger.Output(1, msg)
+	_ = sp.group.main.Logger.Output(1, msg)
 }
 
+// Start 子进程的启动逻辑
 func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 	sp.logit("Start() start")
 	start := time.Now()
@@ -44,10 +45,10 @@ func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 		)
 	}()
 
-	var errChan chan error
+	errChan := make(chan error, len(sp.group.resources))
 	for idx, s := range sp.group.resources {
 		f := os.NewFile(uintptr(3+idx), "")
-		s.Resource.SetFile(f)
+		_ = s.Resource.SetFile(f)
 
 		go func(c Consumer) {
 			errChan <- c.Start(ctx)
@@ -73,7 +74,7 @@ func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 	ctx, cancel := context.WithTimeout(ctx, sp.group.getStopTimeout())
 	defer cancel()
 
-	sp.Stop(ctx)
+	_ = sp.Stop(ctx)
 
 	return err
 }
@@ -93,7 +94,7 @@ func (sp *subProcess) Stop(ctx context.Context) (errStop error) {
 			defer wg.Done()
 
 			if err := res.Stop(ctx); err != nil {
-				errChans <- fmt.Errorf("resource[%d] (%) Stop error: %w", idx, res.String(), err)
+				errChans <- fmt.Errorf("resource[%d] (%s) Stop error: %w", idx, res.String(), err)
 			} else {
 				errChans <- nil
 			}
