@@ -2,4 +2,4 @@ module github.com/fsgo/fsnet
 
 go 1.15
 
-require golang.org/x/sync v0.0.0-20201207232520-09787c993a3a
+require golang.org/x/sync v0.0.0-20210220032951-036812b2e83c
