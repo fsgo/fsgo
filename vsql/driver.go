@@ -2,7 +2,7 @@
 // Author: hidu (duv123+git@baidu.com)
 // Date: 2021/3/19
 
-package fssql
+package vsql
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"fmt"
 )
 
-const DriverName = "fssql"
+const DriverName = "vsql"
 
 func init() {
 	sql.Register(DriverName, &fDriver{})

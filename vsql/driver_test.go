@@ -2,7 +2,7 @@
 // Author: hidu (duv123+git@baidu.com)
 // Date: 2021/3/27
 
-package fssql
+package vsql
 
 import (
 	"database/sql"
