@@ -1,8 +1,6 @@
-/*
- * Copyright(C) 2020 github.com/hidu  All Rights Reserved.
- * Author: hidu (duv123+git@baidu.com)
- * Date: 2021/01/10
- */
+// Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
+// Author: fsgo
+// Date: 2021/6/5
 
 package resolver
 
@@ -67,7 +65,7 @@ type CachedResolver struct {
 }
 
 // LookupIP 查询host对应所有ip
-func (r *CachedResolver) LookupIP(ctx context.Context, host string) ([]net.IP, error) {
+func (r *CachedResolver) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
 	ipAddrs, err := r.LookupIPAddr(ctx, host)
 	if err != nil {
 		return nil, err
