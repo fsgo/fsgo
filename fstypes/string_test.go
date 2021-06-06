@@ -68,13 +68,13 @@ func TestString_ToInt64Slice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.ToInt64Slice(tt.args.sep)
+			got, err := tt.s.Int64s(tt.args.sep)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ToInt64Slice() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Int64s() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ToInt64Slice() got = %v, want %v", got, tt.want)
+				t.Errorf("Int64s() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -130,13 +130,13 @@ func TestString_ToIntSlice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.ToIntSlice(tt.args.sep)
+			got, err := tt.s.Ints(tt.args.sep)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ToIntSlice() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Ints() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ToIntSlice() got = %v, want %v", got, tt.want)
+				t.Errorf("Ints() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -201,13 +201,13 @@ func TestString_ToInt32Slice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.ToInt32Slice(tt.args.sep)
+			got, err := tt.s.Int32s(tt.args.sep)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ToInt32Slice() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Int32s() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ToInt32Slice() got = %v, want %v", got, tt.want)
+				t.Errorf("Int32s() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -263,13 +263,13 @@ func TestString_ToUint64Slice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.ToUint64Slice(tt.args.sep)
+			got, err := tt.s.Uint64s(tt.args.sep)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ToUint64Slice() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Uint64s() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ToUint64Slice() got = %v, want %v", got, tt.want)
+				t.Errorf("Uint64s() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
@@ -325,28 +325,27 @@ func TestString_ToUint32Slice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.ToUint32Slice(tt.args.sep)
+			got, err := tt.s.Uint32s(tt.args.sep)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("ToUint32Slice() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("Uint32s() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("ToUint32Slice() got = %v, want %v", got, tt.want)
+				t.Errorf("Uint32s() got = %v, want %v", got, tt.want)
 			}
 		})
 	}
 }
 
-func TestString_ToStrSlice(t *testing.T) {
+func TestString_Split(t *testing.T) {
 	type args struct {
 		sep string
 	}
 	tests := []struct {
-		name    string
-		s       String
-		args    args
-		want    []string
-		wantErr bool
+		name string
+		s    String
+		args args
+		want []string
 	}{
 		{
 			name: "case 1",
@@ -364,14 +363,18 @@ func TestString_ToStrSlice(t *testing.T) {
 			},
 			want: nil,
 		},
+		{
+			name: "case 3",
+			s:    " ",
+			args: args{
+				sep: ",",
+			},
+			want: nil,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.ToStrSlice(tt.args.sep)
-			if (err != nil) != tt.wantErr {
-				t.Errorf("ToStrSlice() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
+			got := tt.s.Split(tt.args.sep)
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("ToStrSlice() got = %v, want %v", got, tt.want)
 			}
@@ -384,7 +387,7 @@ func BenchmarkString_ToInt64Slice(b *testing.B) {
 	var xi []int64
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		xi, _ = xs.ToInt64Slice(",")
+		xi, _ = xs.Int64s(",")
 	}
 	_ = xi
 }

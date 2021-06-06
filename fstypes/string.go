@@ -24,29 +24,8 @@ func (s String) split(sep string) []string {
 	return strings.Split(string(s), sep)
 }
 
-// ToInt64Slice 转换为 []int64
-func (s String) ToInt64Slice(sep string) ([]int64, error) {
-	vs := s.split(sep)
-	if len(vs) == 0 {
-		return nil, nil
-	}
-	result := make([]int64, 0, len(vs))
-	for i := 0; i < len(vs); i++ {
-		v := strings.TrimSpace(vs[i])
-		if v == "" {
-			continue
-		}
-		vi, err := strconv.ParseInt(v, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("strconv.ParseInt([%d]=%q) failed: %w", i, vs[i], err)
-		}
-		result = append(result, vi)
-	}
-	return result, nil
-}
-
-// ToIntSlice 转换为 []int
-func (s String) ToIntSlice(sep string) ([]int, error) {
+// Ints 转换为 []int
+func (s String) Ints(sep string) ([]int, error) {
 	vs := s.split(sep)
 	if len(vs) == 0 {
 		return nil, nil
@@ -66,8 +45,8 @@ func (s String) ToIntSlice(sep string) ([]int, error) {
 	return result, nil
 }
 
-// ToInt32Slice 转换为 []int32
-func (s String) ToInt32Slice(sep string) ([]int32, error) {
+// Int32s 转换为 []int32
+func (s String) Int32s(sep string) ([]int32, error) {
 	vs := s.split(sep)
 	if len(vs) == 0 {
 		return nil, nil
@@ -87,29 +66,8 @@ func (s String) ToInt32Slice(sep string) ([]int32, error) {
 	return result, nil
 }
 
-// ToUint64Slice 转换为 []uint64
-func (s String) ToUint64Slice(sep string) ([]uint64, error) {
-	vs := s.split(sep)
-	if len(vs) == 0 {
-		return nil, nil
-	}
-	result := make([]uint64, 0, len(vs))
-	for i := 0; i < len(vs); i++ {
-		v := strings.TrimSpace(vs[i])
-		if v == "" {
-			continue
-		}
-		vi, err := strconv.ParseUint(v, 10, 64)
-		if err != nil {
-			return nil, fmt.Errorf("strconv.ParseUint([%d]=%q) failed: %w", i, vs[i], err)
-		}
-		result = append(result, vi)
-	}
-	return result, nil
-}
-
-// ToUint32Slice 转换为 []uint32
-func (s String) ToUint32Slice(sep string) ([]uint32, error) {
+// Uint32s 转换为 []uint32
+func (s String) Uint32s(sep string) ([]uint32, error) {
 	vs := s.split(sep)
 	if len(vs) == 0 {
 		return nil, nil
@@ -129,12 +87,54 @@ func (s String) ToUint32Slice(sep string) ([]uint32, error) {
 	return result, nil
 }
 
-// ToStrSlice 转换为 []string
-// 会剔除掉空字符串，如 `a, c,` -> []string{"a","c"}
-func (s String) ToStrSlice(sep string) ([]string, error) {
+// Int64s 转换为 []int64
+func (s String) Int64s(sep string) ([]int64, error) {
 	vs := s.split(sep)
 	if len(vs) == 0 {
 		return nil, nil
+	}
+	result := make([]int64, 0, len(vs))
+	for i := 0; i < len(vs); i++ {
+		v := strings.TrimSpace(vs[i])
+		if v == "" {
+			continue
+		}
+		vi, err := strconv.ParseInt(v, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("strconv.ParseInt([%d]=%q) failed: %w", i, vs[i], err)
+		}
+		result = append(result, vi)
+	}
+	return result, nil
+}
+
+// Uint64s 转换为 []uint64
+func (s String) Uint64s(sep string) ([]uint64, error) {
+	vs := s.split(sep)
+	if len(vs) == 0 {
+		return nil, nil
+	}
+	result := make([]uint64, 0, len(vs))
+	for i := 0; i < len(vs); i++ {
+		v := strings.TrimSpace(vs[i])
+		if v == "" {
+			continue
+		}
+		vi, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return nil, fmt.Errorf("strconv.ParseUint([%d]=%q) failed: %w", i, vs[i], err)
+		}
+		result = append(result, vi)
+	}
+	return result, nil
+}
+
+// Split 转换为 []string
+// 会剔除掉空字符串，如 `a, c,` -> []string{"a","c"}
+func (s String) Split(sep string) []string {
+	vs := s.split(sep)
+	if len(vs) == 0 {
+		return nil
 	}
 	result := make([]string, 0, len(vs))
 	for i := 0; i < len(vs); i++ {
@@ -144,5 +144,5 @@ func (s String) ToStrSlice(sep string) ([]string, error) {
 		}
 		result = append(result, v)
 	}
-	return result, nil
+	return result
 }
