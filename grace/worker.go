@@ -26,6 +26,8 @@ type WorkerOption struct {
 
 	// VersionFile 版本号信息对应的文件地址
 	VersionFile string
+
+	Watches []string
 }
 
 func (c *WorkerOption) String() string {
@@ -33,7 +35,7 @@ func (c *WorkerOption) String() string {
 	return string(bf)
 }
 
-func (c *WorkerOption) version() string {
+func (c *WorkerOption) version(name string) string {
 	h := md5.New()
 	_, _ = io.WriteString(h, c.String())
 
@@ -44,7 +46,7 @@ func (c *WorkerOption) version() string {
 		_, _ = io.WriteString(h, info.ModTime().String())
 	}
 
-	info1, err1 := os.Stat(c.VersionFile)
+	info1, err1 := os.Stat(name)
 	if err1 == nil {
 		_, _ = io.WriteString(h, info1.Mode().String())
 		_, _ = io.WriteString(h, info1.ModTime().String())
@@ -99,9 +101,6 @@ type Worker struct {
 	stopped   bool
 
 	event chan string
-
-	// 进程的版本信息
-	version string
 }
 
 func (w *Worker) Register(dsn string, c Consumer) error {
@@ -180,16 +179,31 @@ func (w *Worker) mainStart(ctx context.Context) error {
 }
 
 func (w *Worker) watchChange() {
-	w.version = w.option.version()
+	files := make([]string, 0, len(w.option.Watches)+1)
+	cmd, _ := w.option.getWorkerCmd()
+	files = append(files, cmd)
+	files = append(files, w.option.Watches...)
+	version := make([]string, len(files))
+	for i, fn := range files {
+		v := w.option.version(fn)
+		version[i] = v
+	}
 	dur := w.main.Option.GetCheckInterval()
-	tk := time.NewTicker(dur)
+	tk := time.NewTimer(dur)
+
+	defer tk.Stop()
 	for range tk.C {
-		newVersion := w.option.version()
-		if w.version != newVersion {
+		change := true
+		for i, fn := range files {
+			newVersion := w.option.version(fn)
+			oldVersion := version[i]
+			change = newVersion != oldVersion
+		}
+		if change {
 			w.logit("version change, reload it")
-			w.version = newVersion
 			_ = w.mainReload(context.Background())
 		}
+		tk.Reset(dur)
 	}
 }
 

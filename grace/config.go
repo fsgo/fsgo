@@ -73,7 +73,8 @@ type ConfigWorker struct {
 	// StopTimeout StopTimeout 优雅关闭的最长时间，毫秒，若不填写，则使用全局 Config 的
 	StopTimeout int
 
-	VersionFile string
+	// Watches 用于监听版本变化情况的文件列表
+	Watches []string
 }
 
 func (c *ConfigWorker) Parser() error {
@@ -85,6 +86,7 @@ func (c *ConfigWorker) ToWorkerOption() *WorkerOption {
 		Cmd:         c.Cmd,
 		CmdArgs:     c.CmdArgs,
 		StopTimeout: c.StopTimeout,
-		VersionFile: c.VersionFile,
+		// VersionFile: c.VersionFile,
+		Watches: c.Watches,
 	}
 }

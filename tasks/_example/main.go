@@ -11,7 +11,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/fsgo/fsnet/tasks"
+	"github.com/fsgo/fsgo/tasks"
 )
 
 func main() {

@@ -26,14 +26,16 @@ func RunWorker(ctx context.Context, fn func(ctx context.Context) error, workerNu
 	return g1.Wait()
 }
 
-func Run(ctx context.Context, task Task) error {
-	var err error
+func Run(ctx context.Context, task Task) (err error) {
 	defer func() {
 		task.TearDown(err)
 	}()
 	fg := flag.NewFlagSet(task.Name(), flag.ExitOnError)
 	task.FlagSet(fg)
-	fg.Parse(os.Args[3:])
+	
+	if err=fg.Parse(os.Args[3:]);err!=nil{
+		return err
+	}
 
 	return task.Run(ctx)
 }

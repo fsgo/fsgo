@@ -14,7 +14,7 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/fsgo/fsnet/grace"
+	"github.com/fsgo/fsgo/grace"
 )
 
 var confName = flag.String("conf", "conf/grace.json", "")

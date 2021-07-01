@@ -17,7 +17,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/fsgo/fsnet/grace"
+	"github.com/fsgo/fsgo/grace"
 )
 
 func handler(w http.ResponseWriter, r *http.Request) {

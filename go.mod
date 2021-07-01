@@ -1,4 +1,4 @@
-module github.com/fsgo/fsnet
+module github.com/fsgo/fsgo
 
 go 1.15
 
