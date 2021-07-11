@@ -26,7 +26,7 @@ type Resource interface {
 	String() string
 }
 
-// Consumer
+// Consumer 资源消费者
 type Consumer interface {
 	Bind(res Resource)
 
@@ -52,6 +52,7 @@ type ListenerResource struct {
 	file *os.File
 }
 
+// Open 启动
 func (s *ListenerResource) Open(ctx context.Context) error {
 	var lc net.ListenConfig
 	l, err := lc.Listen(ctx, s.NetWork, s.Address)
@@ -68,6 +69,7 @@ func (s *ListenerResource) Open(ctx context.Context) error {
 	return nil
 }
 
+// File 获取文件句柄
 func (s *ListenerResource) File() (*os.File, error) {
 	if s.file == nil {
 		return nil, fmt.Errorf("no file, Open or SetFile first")
@@ -75,6 +77,7 @@ func (s *ListenerResource) File() (*os.File, error) {
 	return s.file, nil
 }
 
+// SetFile 设置文件句柄
 func (s *ListenerResource) SetFile(file *os.File) error {
 	if file == nil {
 		return fmt.Errorf("file is nil")
@@ -84,6 +87,7 @@ func (s *ListenerResource) SetFile(file *os.File) error {
 	return nil
 }
 
+// String 格式化的描述信息，打印日志使用
 func (s *ListenerResource) String() string {
 	return fmt.Sprintf("NetWork=%q Address=%q", s.NetWork, s.Address)
 }

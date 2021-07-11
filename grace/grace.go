@@ -29,7 +29,7 @@ const (
 	actionSubProcessExit = "sub_process_exit"
 )
 
-const envActionKey = "fsgo_fsnet_grace_action"
+const envActionKey = "fsgo_grace_action"
 
 // Option  grace 的配置选项
 type Option struct {
@@ -49,6 +49,7 @@ func (c *Option) Parser() error {
 	return nil
 }
 
+// GetStopTimeout 获取停止超时时间
 func (c *Option) GetStopTimeout() time.Duration {
 	if c.StopTimeout < 1 {
 		return 10 * time.Second
@@ -56,10 +57,12 @@ func (c *Option) GetStopTimeout() time.Duration {
 	return time.Duration(c.StopTimeout) * time.Millisecond
 }
 
+// GetMainPIDPath 获取主程序的 PID 文件路径
 func (c *Option) GetMainPIDPath() string {
 	return filepath.Join(c.StatusDir, "main.pid")
 }
 
+// GetCheckInterval 获取检查的时间间隔
 func (c *Option) GetCheckInterval() time.Duration {
 	if c.CheckInterval > 0 {
 		return time.Duration(c.CheckInterval) * time.Second
@@ -78,6 +81,7 @@ type Grace struct {
 	groups map[string]*Worker
 }
 
+// Register 注册一个新的 worker
 func (g *Grace) Register(name string, gg *Worker) error {
 	g.init()
 

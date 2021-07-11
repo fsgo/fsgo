@@ -5,62 +5,113 @@
 package grace
 
 import (
+	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"os/signal"
+	"path/filepath"
+	"regexp"
+	"sort"
+	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 )
 
-type WorkerOption struct {
-	Cmd         string
-	CmdArgs     []string
+// WorkerConfig worker 的配置
+type WorkerConfig struct {
+	// Listen 监听的资源，如 "tcp@127.0.0.1:8909",
+	Listen []string
+
+	// EnvFile 提前配置 Cmd 的环境变量的文件，可选
+	// 在执行 Cmd 前，通过此文件获取env 信息
+	// 1.先直接解析该文件，获取 kv，正确的格式为：
+	// key1=1
+	// key2=2
+	// 若文件不是这个格式，则解析失败
+	// 2.尝试执行当前文件，若文件输出的  kv 对，则解析成功，否则为失败
+	// 若文件行以 # 开头，会当做注释
+	// 允许有 0 个 kv 对
+	EnvFile string
+
+	// Cmd 工作进程的 cmd
+	Cmd string
+
+	// CmdArgs 工作进程 cmd 的其他参数
+	CmdArgs []string
+
+	// StopTimeout StopTimeout 优雅关闭的最长时间，毫秒，若不填写，则使用全局 Config 的
 	StopTimeout int
 
-	// VersionFile 版本号信息对应的文件地址
-	VersionFile string
-
+	// Watches 用于监听版本变化情况的文件列表
 	Watches []string
 }
 
-func (c *WorkerOption) String() string {
+// Parser 解析当前配置
+func (c *WorkerConfig) Parser() error {
+	return nil
+}
+
+// String 格式化输出，打印输出时时候
+func (c *WorkerConfig) String() string {
 	bf, _ := json.Marshal(c)
 	return string(bf)
 }
 
-func (c *WorkerOption) version(name string) string {
-	h := md5.New()
-	_, _ = io.WriteString(h, c.String())
+func statVersion(info os.FileInfo) string {
+	var bf bytes.Buffer
+	bf.WriteString(info.Mode().String())
+	bf.WriteString(info.ModTime().String())
+	bf.WriteString(strconv.FormatInt(info.Size(), 10))
+	return bf.String()
+}
 
+func (c *WorkerConfig) getWatchFiles() []string {
+	var files []string
+	fm := map[string]int8{}
+	for _, w := range c.Watches {
+		ms, _ := filepath.Glob(w)
+		for _, f := range ms {
+			if _, has := fm[f]; !has {
+				fm[f] = 1
+				files = append(files, f)
+			}
+		}
+	}
+	sort.SliceStable(files, func(i, j int) bool {
+		return files[i] > files[j]
+	})
+	return files
+}
+
+// version 获取当前的版本信息
+func (c *WorkerConfig) version() string {
 	cmd, _ := c.getWorkerCmd()
-	info, err := os.Stat(cmd)
-	if err == nil {
-		_, _ = io.WriteString(h, info.Mode().String())
-		_, _ = io.WriteString(h, info.ModTime().String())
-	}
 
-	info1, err1 := os.Stat(name)
-	if err1 == nil {
-		_, _ = io.WriteString(h, info1.Mode().String())
-		_, _ = io.WriteString(h, info1.ModTime().String())
-	}
+	files := make([]string, 2+len(c.Watches))
+	files = append(files, c.EnvFile)
+	files = append(files, cmd)
+	files = append(files, c.getWatchFiles()...)
 
-	f, err2 := os.Open(c.VersionFile)
-	if err2 == nil {
-		defer f.Close()
-		_, _ = io.Copy(h, f)
+	var buf bytes.Buffer
+	for _, fn := range files {
+		info, err := os.Stat(fn)
+		if err == nil {
+			buf.WriteString(statVersion(info))
+		}
 	}
+	h := md5.New()
+	_, _ = h.Write(buf.Bytes())
 	return hex.EncodeToString(h.Sum(nil))
 }
 
-func (c *WorkerOption) getWorkerCmd() (string, []string) {
+func (c *WorkerConfig) getWorkerCmd() (string, []string) {
 	if len(c.Cmd) > 0 {
 		return c.Cmd, c.CmdArgs
 	}
@@ -71,9 +122,10 @@ func (c *WorkerOption) getWorkerCmd() (string, []string) {
 	return os.Args[0], args
 }
 
-func NewWorker(c *WorkerOption) *Worker {
+// NewWorker 创建一个新的 worker
+func NewWorker(c *WorkerConfig) *Worker {
 	if c == nil {
-		c = &WorkerOption{}
+		c = &WorkerConfig{}
 	}
 	g := &Worker{
 		option:  c,
@@ -91,7 +143,7 @@ func NewWorker(c *WorkerOption) *Worker {
 // Worker 工作进程的逻辑
 type Worker struct {
 	main      *Grace
-	option    *WorkerOption
+	option    *WorkerConfig
 	cmd       *exec.Cmd
 	closeFunc context.CancelFunc
 
@@ -101,8 +153,12 @@ type Worker struct {
 	stopped   bool
 
 	event chan string
+
+	// 子进程上次退出时间
+	lastExit time.Time
 }
 
+// Register 注册新的消费者
 func (w *Worker) Register(dsn string, c Consumer) error {
 	res, err := GenResourceByDSN(dsn)
 	if err != nil {
@@ -178,30 +234,44 @@ func (w *Worker) mainStart(ctx context.Context) error {
 	}
 }
 
+type watchReloadStats struct {
+	CheckTimes uint64
+	FailTimes  uint64
+	SucTimes   uint64
+	LastSuc    time.Time
+	LastFail   time.Time
+}
+
+func (rs *watchReloadStats) String() string {
+	bf, _ := json.Marshal(rs)
+	return string(bf)
+}
+
 func (w *Worker) watchChange() {
-	files := make([]string, 0, len(w.option.Watches)+1)
-	cmd, _ := w.option.getWorkerCmd()
-	files = append(files, cmd)
-	files = append(files, w.option.Watches...)
-	version := make([]string, len(files))
-	for i, fn := range files {
-		v := w.option.version(fn)
-		version[i] = v
-	}
+	oldVersion := w.option.version()
+
 	dur := w.main.Option.GetCheckInterval()
 	tk := time.NewTimer(dur)
 
+	st := &watchReloadStats{}
+
 	defer tk.Stop()
 	for range tk.C {
-		change := true
-		for i, fn := range files {
-			newVersion := w.option.version(fn)
-			oldVersion := version[i]
-			change = newVersion != oldVersion
-		}
+		st.CheckTimes++
+		newVersion := w.option.version()
+		change := oldVersion != newVersion
 		if change {
-			w.logit("version change, reload it")
-			_ = w.mainReload(context.Background())
+			w.logit("version changed, reload it start...", st.String())
+			err := w.mainReload(context.Background())
+			w.logit("version changed, reload it finish, err=", err)
+			if err == nil {
+				oldVersion = newVersion
+				st.SucTimes++
+				st.LastSuc = time.Now()
+			} else {
+				st.FailTimes++
+				st.LastFail = time.Now()
+			}
 		}
 		tk.Reset(dur)
 	}
@@ -212,7 +282,7 @@ func (w *Worker) subProcessStart(ctx context.Context) error {
 }
 
 func (w *Worker) logit(msgs ...interface{}) {
-	msg := fmt.Sprintf("[grace][main] pid=%d %s", os.Getpid(), fmt.Sprint(msgs...))
+	msg := fmt.Sprintf("[grace][worker] pid=%d %s", os.Getpid(), fmt.Sprint(msgs...))
 	_ = w.main.Logger.Output(1, msg)
 }
 
@@ -226,12 +296,26 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 		files[idx] = f
 	}
 
+	var userEnv []string
+	if w.option.EnvFile != "" {
+		var errParser error
+		userEnv, errParser = parserEvnFile(ctx, w.option.EnvFile)
+		w.logit(fmt.Sprintf("parserEvnFile(%q)", w.option.EnvFile), ", gotEnv=", userEnv, ", err=", errParser)
+		if errParser != nil {
+			return fmt.Errorf("parserEvnFile(%q) failed %w", w.option.EnvFile, errParser)
+		}
+	}
+
+	envs := append(os.Environ(), userEnv...)
+	envs = append(envs, envActionKey+"="+actionSubStart)
+
 	cmdName, args := w.option.getWorkerCmd()
 	cmd := exec.CommandContext(ctx, cmdName, args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	w.logit("fork new sub_process, cmd=", cmd.String())
 
-	cmd.Env = append(os.Environ(), envActionKey+"="+actionSubStart)
+	cmd.Env = envs
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.ExtraFiles = files
@@ -244,7 +328,14 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 		start := time.Now()
 		errWait := cmd.Wait()
 		cost := time.Since(start)
-		w.logit("cmd.Wait, error=", errWait, ", duration=", cost)
+
+		logFiles := make(map[string]interface{})
+		if cmd.Process != nil {
+			logFiles["pid"] = cmd.Process.Pid
+		}
+		cmd.ProcessState.SysUsage()
+
+		w.logit("cmd.Wait, error=", errWait, ", duration=", cost, ", sub_process_info=", logFiles)
 		w.event <- actionSubProcessExit
 	}()
 
@@ -266,10 +357,21 @@ func (w *Worker) withLock(fn func() error) error {
 func (w *Worker) keepPrecess(ctx context.Context) (err error) {
 	w.mux.Lock()
 	lastCmd := w.cmd
+	lastExit := w.lastExit
 	w.mux.Unlock()
 	if !cmdExited(lastCmd) {
 		return nil
 	}
+
+	// 避免子进程 不停重启服务导致 CPU 消耗特别高
+	if !lastExit.IsZero() && time.Since(lastExit) < time.Second {
+		time.Sleep(time.Second)
+	}
+
+	w.mux.Lock()
+	w.lastExit = time.Now()
+	w.mux.Unlock()
+
 	// 若进程不存在，则执行reload
 	return w.mainReload(ctx)
 }
@@ -333,4 +435,60 @@ func (w *Worker) stop(ctx context.Context) error {
 	lastCmd := w.cmd
 	w.mux.Unlock()
 	return w.stopCmd(ctx, lastCmd)
+}
+
+var errNotEnvKV = fmt.Errorf("not env k-v pair")
+
+func parserEvnFile(ctx context.Context, fp string) ([]string, error) {
+	bf, err := os.ReadFile(fp)
+	if err != nil {
+		return nil, err
+	}
+
+	keyReg := regexp.MustCompile("^[a-zA-Z_][a-zA-Z_0-9]*$")
+
+	parserEnv := func(bf []byte) ([]string, error) {
+		var result []string
+		lines := bytes.Split(bf, []byte("\n"))
+		for _, line := range lines {
+			line = bytes.TrimSpace(line)
+			if len(line) == 0 {
+				continue
+			}
+			// 以 # 开头的是注释
+			if bytes.HasPrefix(line, []byte("#")) {
+				continue
+			}
+			// 不包含 = 说明不是 kv 对
+			if !bytes.ContainsAny(line, "=") {
+				errParser := fmt.Errorf("line(%q) %w", line, errNotEnvKV)
+				return nil, errParser
+			}
+			arr := strings.SplitN(string(line), "=", 2)
+			k := strings.TrimSpace(arr[0])
+			v := strings.TrimSpace(arr[1])
+			if !keyReg.MatchString(k) {
+				errParser := fmt.Errorf("line(%q) %w", line, errNotEnvKV)
+				return nil, errParser
+			}
+			result = append(result, k+"="+v)
+		}
+		return result, nil
+	}
+
+	result, errParser := parserEnv(bf)
+	if errParser == nil {
+		return result, nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, fp)
+	cmd.Stderr = os.Stderr
+	data, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	return parserEnv(data)
 }

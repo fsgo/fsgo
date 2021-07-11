@@ -5,6 +5,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
@@ -20,9 +21,28 @@ import (
 	"github.com/fsgo/fsgo/grace"
 )
 
+var startTime = time.Now()
+
 func handler(w http.ResponseWriter, r *http.Request) {
 	pid := strconv.Itoa(os.Getpid())
-	w.Write([]byte("pid=" + pid))
+	var bf bytes.Buffer
+	bf.WriteString("<table>")
+	bf.WriteString(`<thead>
+<tr><th>Key</th><th>Value</th></tr>
+</thead>
+`)
+	bf.WriteString("\n<tbody>\n")
+	bf.WriteString("<tr><th>pid</th><td>" + pid + "</td></tr>\n")
+	bf.WriteString("<tr><th>start</th><td>" + startTime.Format("2006-01-02 15:04:05") + "</td></tr>\n")
+	bf.WriteString("<tr><th>os.Environ()</th><td>")
+	for _, v := range os.Environ() {
+		bf.WriteString(v + "<br/>")
+	}
+	bf.WriteString("</td></tr>\n")
+	bf.WriteString("</tbody></table>")
+
+	w.Header().Set("Content-Type", "text/html")
+	w.Write(bf.Bytes())
 }
 
 func handlerSlow(w http.ResponseWriter, r *http.Request) {
@@ -37,6 +57,7 @@ var msg = flag.String("msg", "", "")
 
 func main() {
 	flag.Parse()
+	http.HandleFunc("/", handler)
 
 	http.HandleFunc("/test", handler)
 	http.HandleFunc("/slow", handlerSlow)
@@ -51,7 +72,7 @@ func main() {
 		}
 	}()
 
-	cf, err := LoadConfig("conf/grace.json")
+	cf, err := loadConfig("conf/grace.json")
 	if err != nil {
 		log.Fatalf(" load config %q failed, error=%v\n", "conf/grace.json", err)
 	}
@@ -78,7 +99,7 @@ func main() {
 	}
 }
 
-func LoadConfig(name string) (*grace.Config, error) {
+func loadConfig(name string) (*grace.Config, error) {
 	bf, err := ioutil.ReadFile(name)
 	if err != nil {
 		return nil, err

@@ -16,6 +16,7 @@ type Server interface {
 	Shutdown(ctx context.Context) error
 }
 
+// NewServerConsumer 创建一个新的消费者
 func NewServerConsumer(ser Server) Consumer {
 	return &serverConsumer{
 		Server: ser,

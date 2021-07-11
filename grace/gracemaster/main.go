@@ -22,7 +22,7 @@ var confName = flag.String("conf", "conf/grace.json", "")
 func main() {
 	flag.Parse()
 
-	cf, err := LoadConfig(*confName)
+	cf, err := loadConfig(*confName)
 	if err != nil {
 		log.Fatalf(" load config %q failed, error=%v\n", *confName, err)
 	}
@@ -36,7 +36,7 @@ func main() {
 	}
 
 	for name, wcf := range cf.Workers {
-		group := grace.NewWorker(wcf.ToWorkerOption())
+		group := grace.NewWorker(wcf)
 		for _, dsn := range wcf.Listen {
 			if err := group.Register(dsn, nil); err != nil {
 				panic(err.Error())
@@ -56,7 +56,7 @@ func main() {
 	log.Println("grace_master exit:", err)
 }
 
-func LoadConfig(name string) (*grace.Config, error) {
+func loadConfig(name string) (*grace.Config, error) {
 	bf, err := ioutil.ReadFile(name)
 	if err != nil {
 		return nil, err

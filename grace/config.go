@@ -20,12 +20,13 @@ type Config struct {
 	Keep bool
 
 	// Workers 工作进程配置
-	Workers map[string]*ConfigWorker
+	Workers map[string]*WorkerConfig
 
 	// CheckInterval 检查版本的间隔时间，默认为 5 秒
 	CheckInterval int
 }
 
+// Parser 解析配置
 func (c *Config) Parser() error {
 	if len(c.Workers) == 0 {
 		return fmt.Errorf("empty Workers")
@@ -44,6 +45,7 @@ func (c *Config) Parser() error {
 	return nil
 }
 
+// ToOption 转换格式
 func (c *Config) ToOption() *Option {
 	return &Option{
 		StopTimeout:   c.GetStopTimeout(),
@@ -53,40 +55,10 @@ func (c *Config) ToOption() *Option {
 	}
 }
 
+// GetStopTimeout 获取配置的停止服务的超时时间
 func (c *Config) GetStopTimeout() int {
 	if c.StopTimeout < 1 {
 		return 10 * 1000
 	}
 	return c.StopTimeout
-}
-
-type ConfigWorker struct {
-	// Listen 监听的资源，如 "tcp@127.0.0.1:8909",
-	Listen []string
-
-	// Cmd 工作进程的 cmd
-	Cmd string
-
-	// CmdArgs 工作进程 cmd 的其他参数
-	CmdArgs []string
-
-	// StopTimeout StopTimeout 优雅关闭的最长时间，毫秒，若不填写，则使用全局 Config 的
-	StopTimeout int
-
-	// Watches 用于监听版本变化情况的文件列表
-	Watches []string
-}
-
-func (c *ConfigWorker) Parser() error {
-	return nil
-}
-
-func (c *ConfigWorker) ToWorkerOption() *WorkerOption {
-	return &WorkerOption{
-		Cmd:         c.Cmd,
-		CmdArgs:     c.CmdArgs,
-		StopTimeout: c.StopTimeout,
-		// VersionFile: c.VersionFile,
-		Watches: c.Watches,
-	}
 }
