@@ -6,6 +6,8 @@ package grace
 
 import (
 	"fmt"
+
+	"github.com/fsgo/fsconf"
 )
 
 // Config 配置文件的结构体
@@ -61,4 +63,16 @@ func (c *Config) GetStopTimeout() int {
 		return 10 * 1000
 	}
 	return c.StopTimeout
+}
+
+// LoadConfig 加载主程序的配置文件
+func LoadConfig(name string) (*Config, error) {
+	var c *Config
+	if err := fsconf.Parse(name, &c); err != nil {
+		return nil, err
+	}
+	if err := c.Parser(); err != nil {
+		return nil, err
+	}
+	return c, nil
 }

@@ -6,9 +6,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"flag"
-	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -17,18 +15,14 @@ import (
 	"github.com/fsgo/fsgo/grace"
 )
 
-var confName = flag.String("conf", "conf/grace.json", "")
+var confName = flag.String("conf", "./conf/grace.json", "")
 
 func main() {
 	flag.Parse()
 
-	cf, err := loadConfig(*confName)
+	cf, err := grace.LoadConfig(*confName)
 	if err != nil {
 		log.Fatalf(" load config %q failed, error=%v\n", *confName, err)
-	}
-
-	if err = cf.Parser(); err != nil {
-		log.Fatalf(" parser config %q failed, error=%v\n", *confName, err)
 	}
 
 	g := grace.Grace{
@@ -38,7 +32,7 @@ func main() {
 	for name, wcf := range cf.Workers {
 		group := grace.NewWorker(wcf)
 		for _, dsn := range wcf.Listen {
-			if err := group.Register(dsn, nil); err != nil {
+			if err = group.Register(dsn, nil); err != nil {
 				panic(err.Error())
 			}
 		}
@@ -48,24 +42,10 @@ func main() {
 	go func() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-		<-ch
-		log.Println("signal exiting...")
+		sig := <-ch
+		log.Printf("received signal %v, exiting...", sig)
 	}()
 
 	err = g.Start(context.Background())
 	log.Println("grace_master exit:", err)
-}
-
-func loadConfig(name string) (*grace.Config, error) {
-	bf, err := ioutil.ReadFile(name)
-	if err != nil {
-		return nil, err
-	}
-
-	var c *grace.Config
-	if e := json.Unmarshal(bf, &c); e != nil {
-		return nil, e
-	}
-
-	return c, c.Parser()
 }

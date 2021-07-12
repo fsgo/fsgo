@@ -21,6 +21,8 @@ func RegisterResourceDriver(scheme string, fn ResourceDriverFunc) {
 }
 
 func init() {
+	// 将所有的网络类型全部注册
+	// 也可以注册其他自定义类型的
 	RegisterResourceDriver("tcp", netResourceDrive)
 	RegisterResourceDriver("tcp4", netResourceDrive)
 	RegisterResourceDriver("tcp6", netResourceDrive)

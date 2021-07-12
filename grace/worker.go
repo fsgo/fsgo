@@ -167,6 +167,11 @@ func (w *Worker) Register(dsn string, c Consumer) error {
 	return w.register(res, c)
 }
 
+func (w *Worker) RegisterServer(dns string, ser Server) error {
+	c := NewServerConsumer(ser)
+	return w.Register(dns, c)
+}
+
 // register 注册资源
 func (w *Worker) register(res Resource, c Consumer) error {
 	ss := &resourceServer{
@@ -333,7 +338,6 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 		if cmd.Process != nil {
 			logFiles["pid"] = cmd.Process.Pid
 		}
-		cmd.ProcessState.SysUsage()
 
 		w.logit("cmd.Wait, error=", errWait, ", duration=", cost, ", sub_process_info=", logFiles)
 		w.event <- actionSubProcessExit

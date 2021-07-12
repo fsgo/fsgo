@@ -285,3 +285,8 @@ func (g *Grace) startWorkerProcess(ctx context.Context) error {
 		return w.subProcessStart(ctx)
 	})
 }
+
+// IsSubProcess 是否子进程
+func IsSubProcess() bool {
+	return os.Getenv(envActionKey) != ""
+}

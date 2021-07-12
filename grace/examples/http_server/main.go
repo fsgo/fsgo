@@ -7,9 +7,7 @@ package main
 import (
 	"bytes"
 	"context"
-	"encoding/json"
 	"flag"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -72,20 +70,16 @@ func main() {
 		}
 	}()
 
-	cf, err := loadConfig("conf/grace.json")
+	cf, err := grace.LoadConfig("./conf/grace.json")
 	if err != nil {
 		log.Fatalf(" load config %q failed, error=%v\n", "conf/grace.json", err)
-	}
-
-	if err = cf.Parser(); err != nil {
-		log.Fatalf(" parser config %q failed, error=%v\n", "conf/grace.json", err)
 	}
 
 	wcf := cf.Workers["default"]
 
 	worker := grace.NewWorker(nil)
-	worker.Register(wcf.Listen[0], grace.NewServerConsumer(&http.Server{}))
-	worker.Register(wcf.Listen[1], grace.NewServerConsumer(&http.Server{}))
+	worker.RegisterServer(wcf.Listen[0], &http.Server{})
+	worker.RegisterServer(wcf.Listen[1], &http.Server{})
 
 	g := grace.Grace{
 		Option: cf.ToOption(),
@@ -97,18 +91,4 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
-}
-
-func loadConfig(name string) (*grace.Config, error) {
-	bf, err := ioutil.ReadFile(name)
-	if err != nil {
-		return nil, err
-	}
-
-	var c *grace.Config
-	if e := json.Unmarshal(bf, &c); e != nil {
-		return nil, e
-	}
-
-	return c, c.Parser()
 }

@@ -12,6 +12,11 @@ import (
 )
 
 // Resource 支持 grace 的资源
+//
+// 由于在 unix 上所有资源都可以用文件来表示
+// 所以这里就使用最底层的文件类型
+// 当 我们需要 net.Listen 的时候，也可以将文件转换为 net.Listen
+// 也就是下面的  ListenerResource
 type Resource interface {
 	// Open 打开文件，执行后立即返回
 	Open(ctx context.Context) error
@@ -52,7 +57,7 @@ type ListenerResource struct {
 	file *os.File
 }
 
-// Open 启动
+// Open 作为主进程启动时，打开资源
 func (s *ListenerResource) Open(ctx context.Context) error {
 	var lc net.ListenConfig
 	l, err := lc.Listen(ctx, s.NetWork, s.Address)
@@ -72,12 +77,13 @@ func (s *ListenerResource) Open(ctx context.Context) error {
 // File 获取文件句柄
 func (s *ListenerResource) File() (*os.File, error) {
 	if s.file == nil {
-		return nil, fmt.Errorf("no file, Open or SetFile first")
+		return nil, fmt.Errorf("no file, should Open or SetFile first")
 	}
 	return s.file, nil
 }
 
 // SetFile 设置文件句柄
+// 当作为子进程运行的时候被调用
 func (s *ListenerResource) SetFile(file *os.File) error {
 	if file == nil {
 		return fmt.Errorf("file is nil")
