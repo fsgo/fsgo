@@ -6,6 +6,7 @@ package fsnet
 
 import (
 	"context"
+	"math/rand"
 	"net"
 	"sync"
 	"time"
@@ -46,6 +47,9 @@ func (r *ResolverCached) LookupIP(ctx context.Context, network, host string) ([]
 }
 
 func (r *ResolverCached) lookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
+	if ip := parseIPZone(host); ip != nil {
+		return []net.IP{ip}, nil
+	}
 	result, err := r.withCache(ctx, "LookupIP", network+host, func() (interface{}, error) {
 		ret, err := r.getStdResolver().LookupIP(ctx, network, host)
 		return ret, err
@@ -62,6 +66,13 @@ func (r *ResolverCached) LookupIPAddr(ctx context.Context, host string) ([]net.I
 }
 
 func (r *ResolverCached) lookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
+	if ip := parseIPZone(host); ip != nil {
+		return []net.IPAddr{
+			{
+				IP: ip,
+			},
+		}, nil
+	}
 	result, err := r.withCache(ctx, "LookupIPAddr", host, func() (interface{}, error) {
 		ret, err := r.getStdResolver().LookupIPAddr(ctx, host)
 		return ret, err
@@ -203,4 +214,20 @@ func (rhs resolverHooks) HookLookupIPAddr(ctx context.Context, host string, fn L
 	return rhs[idx].LookupIPAddr(ctx, host, func(ctx context.Context, host string) ([]net.IPAddr, error) {
 		return rhs.HookLookupIPAddr(ctx, host, fn, idx-1)
 	})
+}
+
+func lookupOneIP(ctx context.Context, network, host string) (net.IP, error) {
+	if ip := parseIPZone(host); ip != nil {
+		return ip, nil
+	}
+	ips, err := LookupIP(ctx, network, host)
+	if err != nil {
+		return nil, err
+	}
+	n := rand.Intn(len(ips))
+	return ips[n], nil
+}
+
+func init() {
+	rand.Seed(time.Now().UnixNano())
 }

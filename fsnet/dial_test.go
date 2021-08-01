@@ -22,7 +22,7 @@ func TestDialer_DialContext(t *testing.T) {
 		}
 		_, err := d.DialContext(context.Background(), "tcp", "127.0.0.1:80")
 		if err != wantErr {
-			t.Fatalf("not eq")
+			t.Fatalf("not eq, got=%v want=%v", err, wantErr)
 		}
 	})
 

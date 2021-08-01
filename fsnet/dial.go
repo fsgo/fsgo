@@ -52,9 +52,24 @@ func (d *Dialer) DialContext(ctx context.Context, network string, address string
 		ctx, cancel = context.WithTimeout(ctx, d.Timeout)
 		defer cancel()
 	}
-	std := d.getSTDDialer()
 	hook := d.getHooks(ctx)
-	return hook.HookDialContext(ctx, network, address, std.DialContext, len(hook)-1)
+	return hook.HookDialContext(ctx, network, address, d.stdDial, len(hook)-1)
+}
+
+func (d *Dialer) stdDial(ctx context.Context, network string, address string) (net.Conn, error) {
+	nt := Network(network).Resolver()
+	if nt.IsIP() {
+		host, port, err := net.SplitHostPort(address)
+		if err != nil {
+			return nil, err
+		}
+		ip, err := lookupOneIP(ctx, nt.String(), host)
+		if err != nil {
+			return nil, err
+		}
+		address = net.JoinHostPort(ip.String(), port)
+	}
+	return d.getSTDDialer().DialContext(ctx, network, address)
 }
 
 var zeroDialer = &net.Dialer{}
