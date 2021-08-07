@@ -21,6 +21,11 @@ type Resolver interface {
 	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
 }
 
+// ResolverCanHook 支持注册 ResolverHook
+type ResolverCanHook interface {
+	RegisterHook(hooks ...*ResolverHook)
+}
+
 // LookupIPFunc lookupIP func type
 type LookupIPFunc func(ctx context.Context, network, host string) ([]net.IP, error)
 
@@ -127,6 +132,8 @@ func (r *ResolverCached) getCache(key string) fscache.SCache {
 	return c
 }
 
+var _ ResolverCanHook = (*ResolverCached)(nil)
+
 // RegisterHook Register Hook
 func (r *ResolverCached) RegisterHook(hooks ...*ResolverHook) {
 	r.Hooks = append(r.Hooks, hooks...)
@@ -230,4 +237,22 @@ func lookupOneIP(ctx context.Context, network, host string) (net.IP, error) {
 
 func init() {
 	rand.Seed(time.Now().UnixNano())
+}
+
+// TryRegisterResolverHook 尝试给 DefaultResolver 注册 ResolverHook
+// 若注册失败将返回 false
+func TryRegisterResolverHook(hooks ...*ResolverHook) bool {
+	if d, ok := DefaultResolver.(ResolverCanHook); ok {
+		d.RegisterHook(hooks...)
+		return true
+	}
+	return false
+}
+
+// MustRegisterResolverHook 给 DefaultDialer 注册 DialerHook
+// 若不支持将 panic
+func MustRegisterResolverHook(hooks ...*ResolverHook) {
+	if !TryRegisterResolverHook(hooks...) {
+		panic("DefaultResolver cannot RegisterHook")
+	}
 }

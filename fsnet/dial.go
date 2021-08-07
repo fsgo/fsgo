@@ -31,14 +31,14 @@ var DialContext = func(ctx context.Context, network string, address string) (net
 	return DefaultDialer.DialContext(ctx, network, address)
 }
 
-var _ DialerCanHook = (*Dialer)(nil)
-
 // Dialer dialer
 type Dialer struct {
 	Timeout   time.Duration
 	StdDialer DialerType
 	Hooks     []*DialerHook
 }
+
+var _ DialerCanHook = (*Dialer)(nil)
 
 // RegisterHook register Hooks
 func (d *Dialer) RegisterHook(hooks ...*DialerHook) {
@@ -144,4 +144,22 @@ func dialerHooksFormContext(ctx context.Context) *dialerHookMapper {
 		return nil
 	}
 	return val.(*dialerHookMapper)
+}
+
+// TryRegisterDialerHook 尝试给 DefaultDialer 注册 DialerHook
+// 若注册失败将返回 false
+func TryRegisterDialerHook(hooks ...*DialerHook) bool {
+	if d, ok := DefaultDialer.(DialerCanHook); ok {
+		d.RegisterHook(hooks...)
+		return true
+	}
+	return false
+}
+
+// MustRegisterDialerHook 给 DefaultDialer 注册 DialerHook
+// 若不支持将 panic
+func MustRegisterDialerHook(hooks ...*DialerHook) {
+	if !TryRegisterDialerHook(hooks...) {
+		panic("DefaultDialer cannot RegisterHook")
+	}
 }
