@@ -57,7 +57,9 @@ func TestNewConn(t *testing.T) {
 			},
 		}
 
-		w1 := NewConn(w, tr, tr2)
+		stHook := NewConnStatHook()
+
+		w1 := NewConn(w, tr, tr2, stHook.ConnHook())
 		r1 := NewConn(r)
 
 		msg := []byte("hello")
@@ -65,6 +67,7 @@ func TestNewConn(t *testing.T) {
 			_, _ = w1.Write(msg)
 		}()
 		buf := make([]byte, 128)
+
 		if n, err := r1.Read(buf); err != nil || n != len(msg) {
 			t.Fatalf("read faild, err=%v n=%v", err, n)
 		} else if !bytes.Equal(msg, buf[:n]) {
@@ -79,15 +82,45 @@ func TestNewConn(t *testing.T) {
 			t.Fatalf("w1.RemoteAddr().Network()=%v want=%v", got, "tcp")
 		}
 
-		if err := w1.Close(); err != nil {
-			t.Fatalf("w1.close failed: %v", err)
-		}
+		t.Run("Close", func(t *testing.T) {
+			if err := w1.Close(); err != nil {
+				t.Fatalf("w1.close failed: %v", err)
+			}
 
-		if err := r1.Close(); err != nil {
-			t.Fatalf("r1.close failed: %v", err)
-		}
-		if closeNum != 1 {
-			t.Fatalf("closeNum=%v want=%v", closeNum, 1)
-		}
+			if err := r1.Close(); err != nil {
+				t.Fatalf("r1.close failed: %v", err)
+			}
+			if closeNum != 1 {
+				t.Fatalf("closeNum=%v want=%v", closeNum, 1)
+			}
+		})
+
+		t.Run("StatHook", func(t *testing.T) {
+			if got := stHook.WriteSize(); got != int64(len(msg)) {
+				t.Fatalf("stHook.WriteSize()=%d want=%d", got, len(msg))
+			}
+
+			if got := stHook.WriteCost(); got <= 0 {
+				t.Fatalf("stHook.WriteCost()=%d, want > 0", got)
+			}
+
+			stHook.Reset()
+			if got := stHook.WriteSize(); got != 0 {
+				t.Fatalf("stHook.WriteSize()=%d want=%d", got, 0)
+			}
+		})
 	})
+}
+
+func TestOriginConn(t *testing.T) {
+	c1 := &net.TCPConn{}
+	c2 := NewConn(c1)
+
+	if got := OriginConn(c2); got != c1 {
+		t.Fatalf("OriginConn(c2) not eq c1")
+	}
+
+	if got := OriginConn(c1); got != c1 {
+		t.Fatalf("OriginConn(cc) not eq c1")
+	}
 }

@@ -5,7 +5,10 @@
 package fsnet
 
 import (
+	"context"
 	"net"
+	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -21,7 +24,25 @@ func NewConn(c net.Conn, hooks ...*ConnHook) net.Conn {
 	return nc
 }
 
+// HasRawConn 有原始的 net.Conn
+type HasRawConn interface {
+	Raw() net.Conn
+}
+
+// OriginConn 获取最底层的 net.Conn
+func OriginConn(conn net.Conn) net.Conn {
+	for {
+		c, ok := conn.(HasRawConn)
+		if ok {
+			conn = c.Raw()
+		} else {
+			return conn
+		}
+	}
+}
+
 var _ net.Conn = (*conn)(nil)
+var _ HasRawConn = (*conn)(nil)
 
 type conn struct {
 	raw   net.Conn
@@ -190,4 +211,102 @@ func (chs connHooks) HookSetWriteDeadline(dl time.Time, raw func(time.Time) erro
 	return chs[idx].SetWriteDeadline(func(dl time.Time) error {
 		return chs.HookSetWriteDeadline(dl, raw, idx-1)
 	})
+}
+
+// NewConnStatHook create instance
+func NewConnStatHook() *ConnStatHook {
+	return &ConnStatHook{}
+}
+
+// ConnStatHook 用于获取网络状态的 Hook
+type ConnStatHook struct {
+	readSize int64
+	readCost int64
+
+	writeSize int64
+	writeCost int64
+
+	dialCost int64
+
+	connHook *ConnHook
+	dialHook *DialerHook
+
+	once sync.Once
+}
+
+func (ch *ConnStatHook) init() {
+	ch.connHook = &ConnHook{
+		Read: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
+			start := time.Now()
+			defer func() {
+				atomic.AddInt64(&ch.readCost, time.Since(start).Nanoseconds())
+				atomic.AddInt64(&ch.readSize, int64(n))
+			}()
+			return raw(b)
+		},
+
+		Write: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
+			start := time.Now()
+			defer func() {
+				atomic.AddInt64(&ch.writeCost, time.Since(start).Nanoseconds())
+				atomic.AddInt64(&ch.writeSize, int64(n))
+			}()
+			return raw(b)
+		},
+	}
+
+	ch.dialHook = &DialerHook{
+		DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
+			start := time.Now()
+			defer func() {
+				atomic.AddInt64(&ch.dialCost, time.Since(start).Nanoseconds())
+			}()
+			conn, err = fn(ctx, network, address)
+			if err != nil {
+				return nil, err
+			}
+			return NewConn(conn, ch.connHook), nil
+		},
+	}
+}
+
+// ConnHook 获取 net.Conn 的状态 hook
+func (ch *ConnStatHook) ConnHook() *ConnHook {
+	ch.once.Do(ch.init)
+	return ch.connHook
+}
+
+// DialerHook 获取拨号器的 Hook，之后可将其注册到 Dialer
+func (ch *ConnStatHook) DialerHook() *DialerHook {
+	ch.once.Do(ch.init)
+	return ch.dialHook
+}
+
+// ReadSize 获取累计读到的的字节大小
+func (ch *ConnStatHook) ReadSize() int64 {
+	return atomic.LoadInt64(&ch.readSize)
+}
+
+// ReadCost 获取累积的读耗时
+func (ch *ConnStatHook) ReadCost() time.Duration {
+	return time.Duration(atomic.LoadInt64(&ch.readCost))
+}
+
+// WriteSize 获取累计写出的的字节大小
+func (ch *ConnStatHook) WriteSize() int64 {
+	return atomic.LoadInt64(&ch.writeSize)
+}
+
+// WriteCost 获取累积的写耗时
+func (ch *ConnStatHook) WriteCost() time.Duration {
+	return time.Duration(atomic.LoadInt64(&ch.writeCost))
+}
+
+// Reset 将所有状态数据重置为 0
+func (ch *ConnStatHook) Reset() {
+	atomic.StoreInt64(&ch.dialCost, 0)
+	atomic.StoreInt64(&ch.readSize, 0)
+	atomic.StoreInt64(&ch.readCost, 0)
+	atomic.StoreInt64(&ch.writeSize, 0)
+	atomic.StoreInt64(&ch.writeCost, 0)
 }
