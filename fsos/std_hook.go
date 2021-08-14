@@ -7,17 +7,13 @@
 package fsos
 
 import (
-	"io"
-	"os"
 	"syscall"
 )
 
-func StdFileHook(fd int, to io.Writer) error {
-	r, w, err := os.Pipe()
-	if err != nil {
-		return err
-	}
-	syscall.Dup2(int(w.Fd()), fd)
-	go io.Copy(to, r)
-	return nil
+func HookStderr(f HasFd) error {
+	return syscall.Dup2(int(f.Fd()), Stderr)
+}
+
+func HookStdout(f HasFd) error {
+	return syscall.Dup2(int(f.Fd()), Stderr)
 }

@@ -8,3 +8,7 @@ const (
 	Stdout = 1
 	Stderr = 2
 )
+
+type HasFd interface {
+	Fd() uintptr
+}

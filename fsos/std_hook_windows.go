@@ -5,29 +5,44 @@
 package fsos
 
 import (
-	"io"
-	"os"
 	"syscall"
 )
 
-func StdFileHook(fd int, to io.Writer) error {
-	r, w, err := os.Pipe()
-	if err != nil {
-		return err
+// HookStderr hook stderr
+// now work well for panic and print、println.
+//
+// not work for log.x and os.Stderr.
+// you should:
+// 	os.Stderr=yourFile
+// 	log.SetOutput(yourFile)
+func HookStderr(f HasFd) error {
+	return hookStd(syscall.STD_ERROR_HANDLE, f.Fd())
+}
+
+// HookStdout hook stdout
+func HookStdout(f HasFd) error {
+	return hookStd(syscall.STD_OUTPUT_HANDLE, f.Fd())
+}
+
+var (
+	kernel32   = syscall.NewLazyDLL("kernel32.dll")
+	winHandler = kernel32.NewProc("SetStdHandle")
+)
+
+func hookStd(stdHandle int, fd uintptr) error {
+	// see https://docs.microsoft.com/en-us/windows/console/setstdhandle
+	// BOOL WINAPI SetStdHandle(
+	//  _In_ DWORD  nStdHandle,
+	//  _In_ HANDLE hHandle
+	// );
+	// If the function succeeds, the return value is nonzero.
+	// If the function fails, the return value is zero
+	r0, _, errno := syscall.Syscall(winHandler.Addr(), 2, uintptr(stdHandle), fd, 0)
+	if r0 == 0 {
+		if errno != 0 {
+			return error(errno)
+		}
+		return syscall.EINVAL
 	}
-	kernel32 := syscall.NewLazyDLL("kernel32.dll")
-	winHandler := kernel32.NewProc("SetStdHandle")
-	var hfd int
-	switch fd {
-	case Stdout:
-		hfd = syscall.STD_OUTPUT_HANDLE
-	case Stderr:
-		hfd = syscall.STD_ERROR_HANDLE
-	}
-	v, _, err := winHandler.Call(uintptr(hfd), w.Fd())
-	if v == 0 {
-		return err
-	}
-	go io.Copy(to, r)
 	return nil
 }
