@@ -226,7 +226,9 @@ type ConnStatHook struct {
 	writeSize int64
 	writeCost int64
 
-	dialCost int64
+	dialCost      int64
+	dialTimes     int64
+	dialFailTimes int64
 
 	connHook *ConnHook
 	dialHook *DialerHook
@@ -258,11 +260,14 @@ func (ch *ConnStatHook) init() {
 	ch.dialHook = &DialerHook{
 		DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 			start := time.Now()
-			defer func() {
-				atomic.AddInt64(&ch.dialCost, time.Since(start).Nanoseconds())
-			}()
+
 			conn, err = fn(ctx, network, address)
+
+			atomic.AddInt64(&ch.dialCost, time.Since(start).Nanoseconds())
+			atomic.AddInt64(&ch.dialTimes, 1)
+
 			if err != nil {
+				atomic.AddInt64(&ch.dialFailTimes, 1)
 				return nil, err
 			}
 			return NewConn(conn, ch.connHook), nil
@@ -302,11 +307,30 @@ func (ch *ConnStatHook) WriteCost() time.Duration {
 	return time.Duration(atomic.LoadInt64(&ch.writeCost))
 }
 
+// DialCost 获取累积的 Dial 耗时
+func (ch *ConnStatHook) DialCost() time.Duration {
+	return time.Duration(atomic.LoadInt64(&ch.dialCost))
+}
+
+// DialTimes 获取累积的 Dial 总次数
+func (ch *ConnStatHook) DialTimes() int64 {
+	return atomic.LoadInt64(&ch.dialTimes)
+}
+
+// DialFailTimes 获取累积的 Dial 失败次数
+func (ch *ConnStatHook) DialFailTimes() int64 {
+	return atomic.LoadInt64(&ch.dialFailTimes)
+}
+
 // Reset 将所有状态数据重置为 0
 func (ch *ConnStatHook) Reset() {
 	atomic.StoreInt64(&ch.dialCost, 0)
+	atomic.StoreInt64(&ch.dialTimes, 0)
+	atomic.StoreInt64(&ch.dialFailTimes, 0)
+
 	atomic.StoreInt64(&ch.readSize, 0)
 	atomic.StoreInt64(&ch.readCost, 0)
+
 	atomic.StoreInt64(&ch.writeSize, 0)
 	atomic.StoreInt64(&ch.writeCost, 0)
 }
