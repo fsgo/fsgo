@@ -106,7 +106,9 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	defer conn.Close()
 
 	if dl, ok := req.Context().Deadline(); ok {
-		conn.SetDeadline(dl)
+		if err = conn.SetDeadline(dl); err != nil {
+			return nil, err
+		}
 	}
 
 	// https proxy
