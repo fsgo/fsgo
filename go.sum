@@ -1,5 +1,5 @@
-github.com/BurntSushi/toml v0.3.1 h1:WXkYYl6Yr3qBf1K79EBnL4mak0OimBfB0XUf9Vl28OQ=
-github.com/BurntSushi/toml v0.3.1/go.mod h1:xHWCNGjB5oqiDr8zfno3MHue2Ht5sIBksp03qcyfWMU=
+github.com/BurntSushi/toml v0.4.1 h1:GaI7EiDXDRfa8VshkTj7Fym7ha+y8/XxIgD2okUIjLw=
+github.com/BurntSushi/toml v0.4.1/go.mod h1:CxXYINrC8qIiEnFrOxCa7Jy5BFHlXnUU2pbicEuybxQ=
 github.com/OneOfOne/xxhash v1.2.2/go.mod h1:HSdplMjZKSmBqAxg5vPj2TmRDmfkzw+cTzAElWljhcU=
 github.com/cespare/xxhash v1.1.0/go.mod h1:XrSqR1VqqWfGrhpAt58auRo0WTKS1nRRg3ghfAqPWnc=
 github.com/coocood/freecache v1.1.0/go.mod h1:ePwxCDzOYvARfHdr1pByNct1at3CoKnsipOHwKlNbzI=
@@ -7,8 +7,8 @@ github.com/davecgh/go-spew v1.1.0 h1:ZDRjVQ15GmhC3fiQ8ni8+OwkZQO4DARzQgrnXU1Liz8
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/fsgo/fscache v0.0.0-20210627102524-d8feea65668e h1:zdrgpG/JodNwqKVYs/eY2gwbF4RtfUGpTdkxiWF8zDY=
 github.com/fsgo/fscache v0.0.0-20210627102524-d8feea65668e/go.mod h1:J89Jt7D6bo/lAHw85MDlzh+RweXOFRgdo3XLuJXzNf4=
-github.com/fsgo/fsconf v0.2.0 h1:VF5OlUzqcLokI8SY7x2UEefc3c9uTXLrOrkLZBymoVA=
-github.com/fsgo/fsconf v0.2.0/go.mod h1:IcghhqoMW3mFBPpjptIdT6n1h12Ez2gziuyY8xUhAeI=
+github.com/fsgo/fsconf v0.2.2 h1:A48hn9d883sAW8eQB8VovGdzVnV3xbRJ3cWE1UN6qik=
+github.com/fsgo/fsconf v0.2.2/go.mod h1:oflHHWe5vmNOPlNmvrM5tu5DOon8iIt/6nSBHVlaHBk=
 github.com/fsgo/fsenv v0.2.2 h1:hER4HYHLPf9qITmr7TqWVBzzK/Xj1Yoxju7ER532DtM=
 github.com/fsgo/fsenv v0.2.2/go.mod h1:2Yls4ODlOb2lpOnqeKaqGw2bpkkWA/vntnElEK2+GRE=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=

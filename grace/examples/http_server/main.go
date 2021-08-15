@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -52,9 +53,16 @@ func handlerPanic(w http.ResponseWriter, r *http.Request) {
 }
 
 var msg = flag.String("msg", "", "")
+var config = flag.String("conf", "./conf/grace.toml", "grace config path")
 
 func main() {
 	flag.Parse()
+
+	{
+		wd, err := os.Getwd()
+		log.Println("os.Getwd()=", wd, err)
+	}
+
 	http.HandleFunc("/", handler)
 
 	http.HandleFunc("/test", handler)
@@ -65,14 +73,14 @@ func main() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 		select {
-		case <-ch:
-			log.Println("worker exiting...")
+		case sig := <-ch:
+			log.Println("worker exiting by signal ...", sig)
 		}
 	}()
 
-	cf, err := grace.LoadConfig("./conf/grace.json")
+	cf, err := grace.LoadConfig(*config)
 	if err != nil {
-		log.Fatalf(" load config %q failed, error=%v\n", "conf/grace.json", err)
+		log.Fatalf(" load config %q failed, error=%v\n", *config, err)
 	}
 
 	wcf := cf.Workers["default"]
@@ -91,4 +99,8 @@ func main() {
 	if err != nil {
 		os.Exit(1)
 	}
+}
+
+func init() {
+	log.SetPrefix(fmt.Sprintf("pid=%d ", os.Getpid()))
 }

@@ -2,7 +2,7 @@
 
 ## 方式1
 ```
-go build mail.go
+go build -o http_server main.go
 ./http_server
 ```
 主进程 和 工作进程 为同一个程序，但是是两个独立的进程。
@@ -13,7 +13,8 @@ work            52889   0.1  0.1  4980924   4692 s001  S+    1:49下午   0:00.0
 
 ## 方式2
 ```
-gracemaster -conf conf/grace.json
+go build  -o cmds/httpserver/http_server main.go
+gracemaster -conf conf/grace.toml
 ```
 
 主进程 和 工作进程 为不同程序，是两个独立的进程。

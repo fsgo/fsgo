@@ -40,13 +40,17 @@ type WorkerConfig struct {
 	// 允许有 0 个 kv 对
 	EnvFile string
 
+	// RootDir 执行应用程序的根目录
+	// Cmd、Watches 对应的文件路径都是相对于此目录的
+	RootDir string
+
 	// Cmd 工作进程的 cmd
 	Cmd string
 
 	// CmdArgs 工作进程 cmd 的其他参数
 	CmdArgs []string
 
-	// StopTimeout StopTimeout 优雅关闭的最长时间，毫秒，若不填写，则使用全局 Config 的
+	// StopTimeout  优雅关闭的最长时间，毫秒，若不填写，则使用全局 Config 的
 	StopTimeout int
 
 	// Watches 用于监听版本变化情况的文件列表
@@ -72,11 +76,29 @@ func statVersion(info os.FileInfo) string {
 	return bf.String()
 }
 
+func (c *WorkerConfig) getFilePath(p string) string {
+	if c.RootDir == "" {
+		return p
+	}
+	if filepath.IsAbs(p) {
+		return p
+	}
+	return filepath.Join(c.RootDir, p)
+}
+
+func (c *WorkerConfig) getEnvFilePath() string {
+	if c.EnvFile == "" {
+		return ""
+	}
+	return c.getFilePath(c.EnvFile)
+}
+
 func (c *WorkerConfig) getWatchFiles() []string {
 	var files []string
 	fm := map[string]int8{}
-	for _, w := range c.Watches {
-		ms, _ := filepath.Glob(w)
+	for _, watchPath := range c.Watches {
+		pattern := c.getFilePath(watchPath)
+		ms, _ := filepath.Glob(pattern)
 		for _, f := range ms {
 			if _, has := fm[f]; !has {
 				fm[f] = 1
@@ -94,9 +116,14 @@ func (c *WorkerConfig) getWatchFiles() []string {
 func (c *WorkerConfig) version() string {
 	cmd, _ := c.getWorkerCmd()
 
-	files := make([]string, 2+len(c.Watches))
-	files = append(files, c.EnvFile)
-	files = append(files, cmd)
+	files := make([]string, 0, 3+len(c.Watches))
+	if p := c.getEnvFilePath(); p != "" {
+		files = append(files, p)
+	}
+
+	files = append(files, cmd)                // 可能是在环境变量里的一些命令
+	files = append(files, c.getFilePath(cmd)) // 配置在项目里的文件路径
+
 	files = append(files, c.getWatchFiles()...)
 
 	var buf bytes.Buffer
@@ -265,6 +292,7 @@ func (w *Worker) watchChange() {
 		st.CheckTimes++
 		newVersion := w.option.version()
 		change := oldVersion != newVersion
+		// w.logit("watchChange ",change,oldVersion,newVersion)
 		if change {
 			w.logit("version changed, reload it start...", st.String())
 			err := w.mainReload(context.Background())
@@ -302,9 +330,9 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 	}
 
 	var userEnv []string
-	if w.option.EnvFile != "" {
+	if envFile := w.option.getEnvFilePath(); envFile != "" {
 		var errParser error
-		userEnv, errParser = parserEvnFile(ctx, w.option.EnvFile)
+		userEnv, errParser = parserEvnFile(ctx, envFile)
 		w.logit(fmt.Sprintf("parserEvnFile(%q)", w.option.EnvFile), ", gotEnv=", userEnv, ", err=", errParser)
 		if errParser != nil {
 			return fmt.Errorf("parserEvnFile(%q) failed %w", w.option.EnvFile, errParser)
@@ -316,9 +344,10 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 
 	cmdName, args := w.option.getWorkerCmd()
 	cmd := exec.CommandContext(ctx, cmdName, args...)
+	cmd.Dir = w.option.RootDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	w.logit("fork new sub_process, cmd=", cmd.String())
+	w.logit("fork new sub_process, work_dir=", cmd.Dir, ", cmd=", cmd.String())
 
 	cmd.Env = envs
 	cmd.Stdout = os.Stdout

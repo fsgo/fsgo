@@ -1,0 +1,14 @@
+StatusDir = "./var/"
+Keep = true
+StopTimeout = 10000
+
+[Workers.default]
+RootDir="cmds/httpserver/"
+EnvFile = "prepare.sh"
+Listen = [ "tcp@127.0.0.1:8909", "tcp@127.0.0.1:8910" ]
+Cmd = "./http_server"
+CmdArgs=["-conf","../../conf/grace.toml"]
+
+[Workers.sleep]
+RootDir="cmds/"
+Cmd = "./sleep.sh"

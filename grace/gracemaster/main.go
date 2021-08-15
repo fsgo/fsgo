@@ -10,12 +10,13 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"syscall"
 
 	"github.com/fsgo/fsgo/grace"
 )
 
-var confName = flag.String("conf", "./conf/grace.json", "")
+var confName = flag.String("conf", "./conf/grace.toml", "")
 
 func main() {
 	flag.Parse()
@@ -23,6 +24,15 @@ func main() {
 	cf, err := grace.LoadConfig(*confName)
 	if err != nil {
 		log.Fatalf(" load config %q failed, error=%v\n", *confName, err)
+	}
+
+	{
+		fn, err := filepath.Abs(*confName)
+		if err != nil {
+			log.Fatalf("filepath.Abs(%q) failed, err=%v", *confName, err)
+		}
+		wd := filepath.Dir(filepath.Dir(fn))
+		log.Println("[grace][master] working dir=", wd)
 	}
 
 	g := grace.Grace{
