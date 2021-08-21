@@ -9,6 +9,8 @@ import (
 	"fmt"
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDialer_DialContext(t *testing.T) {
@@ -21,18 +23,14 @@ func TestDialer_DialContext(t *testing.T) {
 			},
 		}
 		_, err := d.DialContext(context.Background(), "tcp", "127.0.0.1:80")
-		if err != wantErr {
-			t.Fatalf("not eq, got=%v want=%v", err, wantErr)
-		}
+		assert.Equal(t, wantErr, err)
 	})
 
 	t.Run("with many hooks", func(t *testing.T) {
 		wantErr := fmt.Errorf("err must")
 		var num int32
 		checkNum := func(want int32) {
-			if num != want {
-				t.Fatalf("got num=%d want=%d", num, want)
-			}
+			assert.Equal(t, want, num)
 			num++
 		}
 		d := &Dialer{
@@ -74,9 +72,7 @@ func TestDialer_DialContext(t *testing.T) {
 			},
 		})
 		_, err := d.DialContext(ctx, "tcp", "127.0.0.1:80")
-		if err != wantErr {
-			t.Fatalf("not eq")
-		}
+		assert.Equal(t, wantErr, err)
 	})
 }
 
@@ -98,17 +94,13 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 	t.Run("zero dhs", func(t *testing.T) {
 		var dhs dialerHooks
 		_, err := dhs.HookDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, -1)
-		if err != td.retErr {
-			t.Fatalf("not eq")
-		}
+		assert.Equal(t, td.retErr, err)
 	})
 
 	t.Run("one dhs", func(t *testing.T) {
 		var num int32
 		checkNum := func(want int32) {
-			if num != want {
-				t.Fatalf("got num=%d want=%d", num, want)
-			}
+			assert.Equal(t, want, num)
 			num++
 		}
 		dhs := dialerHooks{
@@ -120,17 +112,13 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 			},
 		}
 		_, err := dhs.HookDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, len(dhs)-1)
-		if err != td.retErr {
-			t.Fatalf("not eq")
-		}
+		assert.Equal(t, td.retErr, err)
 		checkNum(1)
 	})
 	t.Run("tow dhs", func(t *testing.T) {
 		var num int32
 		checkNum := func(want int32) {
-			if num != want {
-				t.Fatalf("got num=%d want=%d", num, want)
-			}
+			assert.Equal(t, want, num)
 			num++
 		}
 		dhs := dialerHooks{
@@ -148,9 +136,20 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 			},
 		}
 		_, err := dhs.HookDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, len(dhs)-1)
-		if err != td.retErr {
-			t.Fatalf("not eq")
-		}
+		assert.Equal(t, td.retErr, err)
 		checkNum(2)
 	})
+}
+
+func TestMustRegisterDialerHook(t *testing.T) {
+	DefaultDialer = &Dialer{}
+	defer func() {
+		DefaultDialer = &Dialer{}
+	}()
+	hk := NewConnDialerHook(&ConnHook{})
+	MustRegisterDialerHook(hk)
+	hks := DefaultDialer.(*Dialer).Hooks
+	assert.Len(t, hks, 1)
+
+	assert.Equal(t, hks[0], hk)
 }

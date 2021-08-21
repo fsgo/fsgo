@@ -53,7 +53,12 @@ func (d *Dialer) DialContext(ctx context.Context, network string, address string
 		defer cancel()
 	}
 	hook := d.getHooks(ctx)
-	return hook.HookDialContext(ctx, network, address, d.stdDial, len(hook)-1)
+	c, err := hook.HookDialContext(ctx, network, address, d.stdDial, len(hook)-1)
+	cks := ConnHooksFromContext(ctx)
+	if err != nil || len(cks) == 0 {
+		return c, err
+	}
+	return NewConn(c, cks...), nil
 }
 
 func (d *Dialer) stdDial(ctx context.Context, network string, address string) (net.Conn, error) {
@@ -82,14 +87,14 @@ func (d *Dialer) getSTDDialer() DialerType {
 }
 
 func (d *Dialer) getHooks(ctx context.Context) dialerHooks {
-	ctxHookMapper := dialerHooksFormContext(ctx)
-	if ctxHookMapper == nil || len(ctxHookMapper.hooks) == 0 {
+	ctxHooks := DialerHooksFromContext(ctx)
+	if len(ctxHooks) == 0 {
 		return d.Hooks
 	}
 	if len(d.Hooks) == 0 {
 		return nil
 	}
-	return append(d.Hooks, ctxHookMapper.hooks...)
+	return append(d.Hooks, ctxHooks...)
 }
 
 // DialerHook  dialer hook
@@ -129,7 +134,7 @@ func ContextWithDialerHook(ctx context.Context, hooks ...*DialerHook) context.Co
 	if len(hooks) == 0 {
 		return ctx
 	}
-	dh := dialerHooksFormContext(ctx)
+	dh := dialerHookMapperFormContext(ctx)
 	if dh == nil {
 		dh = &dialerHookMapper{}
 		ctx = context.WithValue(ctx, ctxKeyDialerHook, dh)
@@ -138,7 +143,16 @@ func ContextWithDialerHook(ctx context.Context, hooks ...*DialerHook) context.Co
 	return ctx
 }
 
-func dialerHooksFormContext(ctx context.Context) *dialerHookMapper {
+// DialerHooksFromContext get DialerHooks from contexts
+func DialerHooksFromContext(ctx context.Context) []*DialerHook {
+	dhm := dialerHookMapperFormContext(ctx)
+	if dhm == nil {
+		return nil
+	}
+	return dhm.hooks
+}
+
+func dialerHookMapperFormContext(ctx context.Context) *dialerHookMapper {
 	val := ctx.Value(ctxKeyDialerHook)
 	if val == nil {
 		return nil
@@ -161,5 +175,19 @@ func TryRegisterDialerHook(hooks ...*DialerHook) bool {
 func MustRegisterDialerHook(hooks ...*DialerHook) {
 	if !TryRegisterDialerHook(hooks...) {
 		panic("DefaultDialer cannot RegisterHook")
+	}
+}
+
+// NewConnDialerHook 创建一个支持添加 ConnHook 的 DialerHook
+// 当想给 DefaultDialer 注册 全局的 ConnHook 的时候，可以使用该方法
+func NewConnDialerHook(connHooks ...*ConnHook) *DialerHook {
+	return &DialerHook{
+		DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
+			conn, err = fn(ctx, network, address)
+			if err != nil || len(connHooks) == 0 {
+				return conn, err
+			}
+			return NewConn(conn, connHooks...), nil
+		},
 	}
 }

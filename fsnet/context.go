@@ -9,4 +9,5 @@ type ctxKey uint8
 const (
 	ctxKeyDialerHook ctxKey = iota
 	ctxKeyResolverHook
+	ctxKeyConnHook
 )

@@ -5,6 +5,7 @@
 package fsnet
 
 import (
+	"context"
 	"net"
 	"time"
 )
@@ -14,6 +15,11 @@ var _ net.Conn = (*conn)(nil)
 // NewConn wrap conn with hooks
 // hooks 将倒序执行：后注册的先执行
 func NewConn(c net.Conn, hooks ...*ConnHook) net.Conn {
+	if rc, ok := c.(*conn); ok {
+		rc.hooks = append(rc.hooks, hooks...)
+		return rc
+	}
+
 	nc := &conn{
 		raw:   c,
 		hooks: hooks,
@@ -208,4 +214,43 @@ func (chs connHooks) HookSetWriteDeadline(dl time.Time, raw func(time.Time) erro
 	return chs[idx].SetWriteDeadline(func(dl time.Time) error {
 		return chs.HookSetWriteDeadline(dl, raw, idx-1)
 	})
+}
+
+// ContextWithConnHook set conn hook to context
+func ContextWithConnHook(ctx context.Context, hooks ...*ConnHook) context.Context {
+	if len(hooks) == 0 {
+		return ctx
+	}
+	dh := connHookMapperFormContext(ctx)
+	if dh == nil {
+		dh = &connHookMapper{}
+		ctx = context.WithValue(ctx, ctxKeyConnHook, dh)
+	}
+	dh.Register(hooks...)
+	return ctx
+}
+
+// ConnHooksFromContext get conn hooks from context
+func ConnHooksFromContext(ctx context.Context) []*ConnHook {
+	chm := connHookMapperFormContext(ctx)
+	if chm == nil {
+		return nil
+	}
+	return chm.hooks
+}
+
+func connHookMapperFormContext(ctx context.Context) *connHookMapper {
+	val := ctx.Value(ctxKeyConnHook)
+	if val == nil {
+		return nil
+	}
+	return val.(*connHookMapper)
+}
+
+type connHookMapper struct {
+	hooks connHooks
+}
+
+func (chm *connHookMapper) Register(hooks ...*ConnHook) {
+	chm.hooks = append(chm.hooks, hooks...)
 }

@@ -5,9 +5,10 @@
 package fsnet
 
 import (
-	"bytes"
 	"net"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNewConn(t *testing.T) {
@@ -25,9 +26,7 @@ func TestNewConn(t *testing.T) {
 				}()
 
 				readIndex++
-				if readIndex != 2 {
-					t.Fatalf("readIndex=%d want=2", readIndex)
-				}
+				assert.Equal(t, 2, readIndex)
 
 				return raw(b)
 			},
@@ -50,9 +49,7 @@ func TestNewConn(t *testing.T) {
 		tr2 := &ConnHook{
 			Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 				readIndex++
-				if readIndex != 1 {
-					t.Fatalf("readIndex=%d want=1", readIndex)
-				}
+				assert.Equal(t, 1, readIndex)
 				return raw(b)
 			},
 		}
@@ -68,59 +65,61 @@ func TestNewConn(t *testing.T) {
 		}()
 		buf := make([]byte, 128)
 
-		if n, err := r1.Read(buf); err != nil || n != len(msg) {
-			t.Fatalf("read faild, err=%v n=%v", err, n)
-		} else if !bytes.Equal(msg, buf[:n]) {
-			t.Fatalf("read msg not expect, got=%q", buf[:n])
-		}
+		n, err := r1.Read(buf)
+		assert.Nil(t, err)
+		assert.Equal(t, len(msg), n)
+		assert.Equal(t, string(msg), string(buf[:n]))
 
-		if got := w1.LocalAddr().Network(); got != "pipe" {
-			t.Fatalf("w1.LocalAddr().Network()=%v want=%v", got, "pipe")
-		}
-
-		if got := w1.RemoteAddr().Network(); got != "tcp" {
-			t.Fatalf("w1.RemoteAddr().Network()=%v want=%v", got, "tcp")
-		}
+		assert.Equal(t, "pipe", w1.LocalAddr().Network())
+		assert.Equal(t, "tcp", w1.RemoteAddr().Network())
 
 		t.Run("Close", func(t *testing.T) {
-			if err := w1.Close(); err != nil {
-				t.Fatalf("w1.close failed: %v", err)
-			}
+			assert.Nil(t, w1.Close())
 
-			if err := r1.Close(); err != nil {
-				t.Fatalf("r1.close failed: %v", err)
-			}
-			if closeNum != 1 {
-				t.Fatalf("closeNum=%v want=%v", closeNum, 1)
-			}
+			assert.Equal(t, 1, closeNum)
 		})
 
 		t.Run("StatHook", func(t *testing.T) {
-			if got := stHook.WriteSize(); got != int64(len(msg)) {
-				t.Fatalf("stHook.WriteSize()=%d want=%d", got, len(msg))
-			}
+			assert.Greater(t, stHook.WriteSize(), int64(0))
 
-			if got := stHook.WriteCost(); got <= 0 {
-				t.Fatalf("stHook.WriteCost()=%d, want > 0", got)
-			}
+			assert.Greater(t, int(stHook.WriteCost()), 0)
 
 			stHook.Reset()
-			if got := stHook.WriteSize(); got != 0 {
-				t.Fatalf("stHook.WriteSize()=%d want=%d", got, 0)
-			}
+			assert.Equal(t, int64(0), stHook.WriteSize())
 		})
 	})
+
+}
+
+func TestNewConn_merge(t *testing.T) {
+	var id int
+	hk1 := &ConnHook{
+		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+			// 先注册的后执行
+			id++
+			assert.Equal(t, 2, id)
+			return raw(b)
+		},
+	}
+	nc := NewConn(&net.TCPConn{}, hk1)
+
+	hk2 := &ConnHook{
+		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+			id++
+			assert.Equal(t, 1, id)
+			return raw(b)
+		},
+	}
+	nc1 := NewConn(nc, hk2)
+	assert.Equal(t, nc, nc1)
+	bf := make([]byte, 1)
+	_, _ = nc1.Read(bf)
 }
 
 func TestOriginConn(t *testing.T) {
 	c1 := &net.TCPConn{}
 	c2 := NewConn(c1)
 
-	if got := OriginConn(c2); got != c1 {
-		t.Fatalf("OriginConn(c2) not eq c1")
-	}
-
-	if got := OriginConn(c1); got != c1 {
-		t.Fatalf("OriginConn(cc) not eq c1")
-	}
+	assert.Equal(t, c1, OriginConn(c2))
+	assert.Equal(t, c1, OriginConn(c1))
 }

@@ -5,9 +5,14 @@
 package fsnet
 
 import (
-	"bytes"
+	"io"
 	"net"
+	"net/http"
+	"net/http/httptest"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestConnReadBytesHook(t *testing.T) {
@@ -17,12 +22,8 @@ func TestConnReadBytesHook(t *testing.T) {
 		c2 := NewConn(c1, ch.ConnHook())
 		bf := make([]byte, 1024)
 		_, err := c2.Read(bf)
-		if err == nil {
-			t.Fatalf("expect error")
-		}
-		if got := ch.ReadBytes(); len(got) != 0 {
-			t.Fatalf("ch.ReadBytes()=%q want 0 bytes", got)
-		}
+		assert.NotNil(t, t, err)
+		assert.Equal(t, len(ch.ReadBytes()), 0)
 	})
 
 	t.Run("read success", func(t *testing.T) {
@@ -41,21 +42,13 @@ func TestConnReadBytesHook(t *testing.T) {
 		}()
 		bf := make([]byte, 1024)
 		n, err := c2.Read(bf)
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-		if !bytes.Equal(want, bf[:n]) {
-			t.Fatalf("got=%v want=%v", bf[:n], want)
-		}
+		assert.Nil(t, err)
+		assert.Equal(t, want, bf[:n])
 
-		if got := ch.ReadBytes(); !bytes.Equal(want, got) {
-			t.Fatalf("ch.ReadBytes()=%q want=%q ", got, want)
-		}
+		assert.Equal(t, ch.ReadBytes(), want)
 
 		ch.Reset()
-		if got := ch.ReadBytes(); len(got) != 0 {
-			t.Fatalf("ch.ReadBytes()=%q want 0 bytes ", got)
-		}
+		assert.Len(t, ch.ReadBytes(), 0)
 	})
 }
 
@@ -65,12 +58,8 @@ func TestConnWriteBytesHook(t *testing.T) {
 		ch := NewConnWriteBytesHook()
 		c2 := NewConn(c1, ch.ConnHook())
 		_, err := c2.Write([]byte("hello"))
-		if err == nil {
-			t.Fatalf("expect error")
-		}
-		if got := ch.WriteBytes(); len(got) != 0 {
-			t.Fatalf("ch.WriteBytes()=%q want 0 bytes", got)
-		}
+		assert.NotNil(t, err)
+		assert.Len(t, ch.WriteBytes(), 0)
 	})
 
 	t.Run("write success", func(t *testing.T) {
@@ -90,16 +79,64 @@ func TestConnWriteBytesHook(t *testing.T) {
 
 		want := []byte("hello")
 		_, err := c2.Write(want)
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
+		assert.Nil(t, err)
+		assert.Equal(t, ch.WriteBytes(), want)
 
-		if got := ch.WriteBytes(); !bytes.Equal(want, got) {
-			t.Fatalf("ch.WriteBytes()=%q want=%q ", got, want)
-		}
 		ch.Reset()
-		if got := ch.WriteBytes(); len(got) != 0 {
-			t.Fatalf("ch.WriteBytes()=%q want 0 bytes ", got)
-		}
+		assert.Len(t, ch.WriteBytes(), 0)
 	})
+}
+
+func Test_hooks(t *testing.T) {
+	DefaultDialer = &Dialer{}
+	defer func() {
+		DefaultDialer = &Dialer{}
+	}()
+
+	rt := http.NewServeMux()
+	want := []byte("HelloFsNet")
+	rt.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
+		_, err1 := writer.Write(want)
+		assert.Nil(t, err1)
+	})
+	ts := httptest.NewServer(rt)
+	defer ts.Close()
+
+	statHK := NewConnStatHook()
+	readHK := NewConnReadBytesHook()
+	globalHook := NewConnDialerHook(readHK.ConnHook())
+	MustRegisterDialerHook(statHK.DialerHook(), globalHook)
+
+	tr := &http.Transport{
+		DialContext:           DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          1,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+	}
+	defer tr.Clone()
+
+	req := httptest.NewRequest("get", ts.URL, nil)
+	resp, err := tr.RoundTrip(req)
+	assert.Nil(t, err)
+
+	defer resp.Body.Close()
+
+	t.Run("body", func(t *testing.T) {
+		got, err := io.ReadAll(resp.Body)
+		assert.Nil(t, err)
+		assert.Equal(t, want, got)
+	})
+
+	t.Run("statHK", func(t *testing.T) {
+		assert.NotEqual(t, 0, statHK.ReadCost())
+		assert.NotEqual(t, 0, statHK.WriteCost())
+	})
+
+	t.Run("ReadBytes", func(t *testing.T) {
+		got := readHK.ReadBytes()
+		assert.Contains(t, string(got), string(want))
+	})
+
 }
