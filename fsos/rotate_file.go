@@ -23,16 +23,21 @@ type RotateFile struct {
 	// Path 文件名
 	Path string
 
-	// ExtRule 文件后缀生成的规则
-	// 目前支持：1hour、1day
+	// ExtRule 文件后缀生成的规则，可选
+	// 目前支持：1hour、1day、no(默认)
 	ExtRule string
 
-	// ExtFunc 文件后缀生成的自定义函数
+	// ExtFunc 文件后缀生成的自定义函数,可选
 	// 优先使用 ExtRule
 	ExtFunc func() string
 
 	// MaxFiles 最多保留文件数，默认为 24
 	MaxFiles int
+
+	// MaxDelay 最大延迟时间,可选，默认为 100ms.
+	// 影响文件状态、buffer.
+	// 如文件被删除了，则最大间隔 MaxDelay 时长会检查到
+	MaxDelay time.Duration
 
 	file            *os.File
 	bfWrite         *bufio.Writer
@@ -72,11 +77,20 @@ func (f *RotateFile) init() error {
 	if f.MaxFiles == 0 {
 		f.MaxFiles = 24
 	}
+
 	if f.MaxFiles > 0 {
 		f.OnFileChange(f.cleanFiles)
 	}
 
-	f.tk = time.NewTicker(time.Second)
+	if f.MaxDelay < time.Microsecond {
+		f.MaxDelay = 100 * time.Millisecond
+	}
+
+	if f.ExtRule == "" && f.ExtFunc == nil {
+		f.ExtRule = "1hour"
+	}
+
+	f.tk = time.NewTicker(f.MaxDelay)
 	go f.loop()
 	return nil
 }
@@ -136,8 +150,7 @@ func (f *RotateFile) setFile() error {
 	if err := KeepDirExists(dir); err != nil {
 		return err
 	}
-
-	file, err := os.OpenFile(fp, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	file, err := os.OpenFile(fp, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return err
 	}
