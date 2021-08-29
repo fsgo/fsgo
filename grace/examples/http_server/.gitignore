@@ -1,3 +1,4 @@
 http_server
 ss.pid
 var/
+log/

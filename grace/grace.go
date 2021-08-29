@@ -35,6 +35,7 @@ const envActionKey = "fsgo_grace_action"
 type Option struct {
 	StopTimeout int
 	StatusDir   string
+	LogDir      string
 	Keep        bool
 
 	// 检查版本的间隔时间，默认为 5 秒
@@ -96,8 +97,9 @@ func (g *Grace) Register(name string, gg *Worker) error {
 
 func (g *Grace) init() {
 	if g.Logger == nil {
-		g.Logger = log.New(log.Writer(), log.Prefix(), log.Flags())
+		g.Logger = log.Default()
 	}
+
 	if err := g.Option.Parser(); err != nil {
 		panic(err.Error())
 	}

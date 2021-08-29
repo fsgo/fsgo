@@ -1,4 +1,5 @@
 StatusDir = "./var/"
+LogDir = "./log/"
 Keep = true
 StopTimeout = 10000
 

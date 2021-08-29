@@ -6,6 +6,7 @@ package grace
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"github.com/fsgo/fsconf"
 )
@@ -14,6 +15,10 @@ import (
 type Config struct {
 	// StatusDir 状态数据文件目录，如 主进程的 pid 文件都存放在这里
 	StatusDir string
+
+	// LogDir 日志文件目录，可选
+	// 每个子进程一个子目录
+	LogDir string
 
 	// StopTimeout 优雅关闭的最长时间，毫秒，若不填写使用默认值  10000
 	StopTimeout int
@@ -36,12 +41,19 @@ func (c *Config) Parser() error {
 	if c.StatusDir == "" {
 		return fmt.Errorf("empty StatusDir")
 	}
+	if c.LogDir == "" {
+		return fmt.Errorf("empty LogDir")
+	}
 	if len(c.Workers) == 0 {
 		return fmt.Errorf("empty Workers")
 	}
-	for _, w := range c.Workers {
+
+	for name, w := range c.Workers {
 		if e := w.Parser(); e != nil {
 			return e
+		}
+		if w.LogDir == "" {
+			w.LogDir = filepath.Join(c.LogDir, name)
 		}
 	}
 	return nil
@@ -52,6 +64,7 @@ func (c *Config) ToOption() *Option {
 	return &Option{
 		StopTimeout:   c.GetStopTimeout(),
 		StatusDir:     c.StatusDir,
+		LogDir:        c.LogDir,
 		Keep:          c.Keep,
 		CheckInterval: c.CheckInterval,
 	}

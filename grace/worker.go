@@ -22,6 +22,8 @@ import (
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/fsgo/fsgo/fsos"
 )
 
 // WorkerConfig worker 的配置
@@ -43,6 +45,9 @@ type WorkerConfig struct {
 	// RootDir 执行应用程序的根目录
 	// Cmd、Watches 对应的文件路径都是相对于此目录的
 	RootDir string
+
+	// LogDir 当前子进程的日志目录，可选
+	LogDir string
 
 	// Cmd 工作进程的 cmd
 	Cmd string
@@ -150,21 +155,35 @@ func (c *WorkerConfig) getWorkerCmd() (string, []string) {
 }
 
 // NewWorker 创建一个新的 worker
-func NewWorker(c *WorkerConfig) *Worker {
-	if c == nil {
-		c = &WorkerConfig{}
+func NewWorker(cfg *WorkerConfig) *Worker {
+	if cfg == nil {
+		cfg = &WorkerConfig{}
 	}
-	g := &Worker{
-		option:  c,
+	w := &Worker{
+		option:  cfg,
 		stopped: false,
 		event:   make(chan string, 1),
 	}
 
-	g.sub = &subProcess{
-		group: g,
+	w.sub = &subProcess{
+		group: w,
 	}
 
-	return g
+	stderr := &fsos.RotateFile{
+		Path:    filepath.Join(cfg.LogDir, "stderr.log"),
+		ExtRule: "1hour",
+	}
+	_ = stderr.Init()
+	w.stderr = stderr
+
+	stdout := &fsos.RotateFile{
+		Path:    filepath.Join(cfg.LogDir, "stdout.log"),
+		ExtRule: "1hour",
+	}
+	_ = stdout.Init()
+	w.stdout = stdout
+
+	return w
 }
 
 // Worker 工作进程的逻辑
@@ -183,6 +202,9 @@ type Worker struct {
 
 	// 子进程上次退出时间
 	lastExit time.Time
+
+	stderr *fsos.RotateFile
+	stdout *fsos.RotateFile
 }
 
 // Register 注册新的消费者
@@ -194,6 +216,7 @@ func (w *Worker) Register(dsn string, c Consumer) error {
 	return w.register(res, c)
 }
 
+// RegisterServer 注册/绑定一个 server
 func (w *Worker) RegisterServer(dns string, ser Server) error {
 	c := NewServerConsumer(ser)
 	return w.Register(dns, c)
@@ -350,8 +373,10 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 	w.logit("fork new sub_process, work_dir=", cmd.Dir, ", cmd=", cmd.String())
 
 	cmd.Env = envs
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
+	// cmd.Stdout = os.Stdout
+	cmd.Stdout = w.stdout
+	// cmd.Stderr = os.Stderr
+	cmd.Stderr = w.stderr
 	cmd.ExtraFiles = files
 	err := cmd.Start()
 	if err != nil {

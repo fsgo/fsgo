@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/fsgo/fsgo/fsos"
 	"github.com/fsgo/fsgo/grace"
 )
 
@@ -26,17 +27,31 @@ func main() {
 		log.Fatalf(" load config %q failed, error=%v\n", *confName, err)
 	}
 
+	lg := &fsos.RotateFile{
+		Path:    filepath.Join(cf.LogDir, "grace", "grace.log"),
+		ExtRule: "1hour",
+	}
+	if err := lg.Init(); err != nil {
+		log.Fatalf("init logger failed, error=%v\n", err)
+	}
+
+	defer lg.Close()
+
+	logger := log.Default()
+	logger.SetOutput(lg)
+
 	{
 		fn, err := filepath.Abs(*confName)
 		if err != nil {
-			log.Fatalf("filepath.Abs(%q) failed, err=%v", *confName, err)
+			logger.Fatalf("filepath.Abs(%q) failed, err=%v", *confName, err)
 		}
 		wd := filepath.Dir(filepath.Dir(fn))
-		log.Println("[grace][master] working dir=", wd)
+		logger.Println("[grace][master] working dir=", wd)
 	}
 
 	g := grace.Grace{
 		Option: cf.ToOption(),
+		Logger: logger,
 	}
 
 	for name, wcf := range cf.Workers {
@@ -53,9 +68,9 @@ func main() {
 		ch := make(chan os.Signal, 1)
 		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 		sig := <-ch
-		log.Printf("received signal %v, exiting...", sig)
+		logger.Printf("received signal %v, exiting...", sig)
 	}()
 
 	err = g.Start(context.Background())
-	log.Println("grace_master exit:", err)
+	logger.Println("grace_master exit:", err)
 }
