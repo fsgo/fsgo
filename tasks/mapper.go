@@ -54,7 +54,9 @@ func (m *Mapper) Execute(ctx context.Context) error {
 		fs.PrintDefaults()
 		return fmt.Errorf("os.Args too short")
 	}
-	fs.Parse(os.Args[1:3])
+	if err := fs.Parse(os.Args[1:3]); err != nil {
+		return err
+	}
 	if name == "" {
 		fs.PrintDefaults()
 		return fmt.Errorf("-name is empty")

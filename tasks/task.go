@@ -32,8 +32,8 @@ func Run(ctx context.Context, task Task) (err error) {
 	}()
 	fg := flag.NewFlagSet(task.Name(), flag.ExitOnError)
 	task.FlagSet(fg)
-	
-	if err=fg.Parse(os.Args[3:]);err!=nil{
+
+	if err = fg.Parse(os.Args[3:]); err != nil {
 		return err
 	}
 

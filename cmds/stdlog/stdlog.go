@@ -52,5 +52,5 @@ func toRotateFile(name string, from io.Reader) {
 	if err := f.Init(); err != nil {
 		log.Fatalln(err.Error())
 	}
-	io.Copy(f, from)
+	_, _ = io.Copy(f, from)
 }
