@@ -61,19 +61,38 @@ func (d *Dialer) DialContext(ctx context.Context, network string, address string
 	return NewConn(c, cks...), nil
 }
 
-func (d *Dialer) stdDial(ctx context.Context, network string, address string) (net.Conn, error) {
+func (d *Dialer) stdDial(ctx context.Context, network string, address string) (conn net.Conn, err error) {
 	nt := Network(network).Resolver()
 	if nt.IsIP() {
 		host, port, err := net.SplitHostPort(address)
 		if err != nil {
 			return nil, err
 		}
-		ip, err := lookupOneIP(ctx, nt.String(), host)
+
+		ip, _ := parseIPZone(host)
+		if ip != nil {
+			return d.dial(ctx, network, address)
+		}
+
+		ips, err := LookupIP(ctx, string(nt), host)
 		if err != nil {
 			return nil, err
 		}
-		address = net.JoinHostPort(ip.String(), port)
+		// 在超时允许的范围内，将所有 ip 都尝试一遍
+		for _, ip := range ips {
+			ad := net.JoinHostPort(ip.String(), port)
+			conn, err = d.dial(ctx, network, ad)
+			if err == nil || ctx.Err() != nil {
+				return conn, err
+			}
+		}
+		return nil, err
+
 	}
+	return d.dial(ctx, network, address)
+}
+
+func (d *Dialer) dial(ctx context.Context, network, address string) (net.Conn, error) {
 	return d.getSTDDialer().DialContext(ctx, network, address)
 }
 

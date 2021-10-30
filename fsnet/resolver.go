@@ -52,7 +52,7 @@ func (r *ResolverCached) LookupIP(ctx context.Context, network, host string) ([]
 }
 
 func (r *ResolverCached) lookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
-	if ip := parseIPZone(host); ip != nil {
+	if ip, _ := parseIPZone(host); ip != nil {
 		return []net.IP{ip}, nil
 	}
 	result, err := r.withCache(ctx, "LookupIP", network+host, func() (interface{}, error) {
@@ -71,10 +71,11 @@ func (r *ResolverCached) LookupIPAddr(ctx context.Context, host string) ([]net.I
 }
 
 func (r *ResolverCached) lookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
-	if ip := parseIPZone(host); ip != nil {
+	if ip, zone := parseIPZone(host); ip != nil {
 		return []net.IPAddr{
 			{
-				IP: ip,
+				IP:   ip,
+				Zone: zone,
 			},
 		}, nil
 	}
@@ -224,7 +225,7 @@ func (rhs resolverHooks) HookLookupIPAddr(ctx context.Context, host string, fn L
 }
 
 func lookupOneIP(ctx context.Context, network, host string) (net.IP, error) {
-	if ip := parseIPZone(host); ip != nil {
+	if ip, _ := parseIPZone(host); ip != nil {
 		return ip, nil
 	}
 	ips, err := LookupIP(ctx, network, host)
