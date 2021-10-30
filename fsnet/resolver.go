@@ -13,6 +13,8 @@ import (
 
 	"github.com/fsgo/fscache"
 	"github.com/fsgo/fscache/lrucache"
+
+	"github.com/fsgo/fsgo/fsnet/internal"
 )
 
 // Resolver resolver type
@@ -52,7 +54,7 @@ func (r *ResolverCached) LookupIP(ctx context.Context, network, host string) ([]
 }
 
 func (r *ResolverCached) lookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
-	if ip, _ := parseIPZone(host); ip != nil {
+	if ip, _ := internal.ParseIPZone(host); ip != nil {
 		return []net.IP{ip}, nil
 	}
 	result, err := r.withCache(ctx, "LookupIP", network+host, func() (interface{}, error) {
@@ -71,7 +73,7 @@ func (r *ResolverCached) LookupIPAddr(ctx context.Context, host string) ([]net.I
 }
 
 func (r *ResolverCached) lookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
-	if ip, zone := parseIPZone(host); ip != nil {
+	if ip, zone := internal.ParseIPZone(host); ip != nil {
 		return []net.IPAddr{
 			{
 				IP:   ip,
@@ -222,18 +224,6 @@ func (rhs resolverHooks) HookLookupIPAddr(ctx context.Context, host string, fn L
 	return rhs[idx].LookupIPAddr(ctx, host, func(ctx context.Context, host string) ([]net.IPAddr, error) {
 		return rhs.HookLookupIPAddr(ctx, host, fn, idx-1)
 	})
-}
-
-func lookupOneIP(ctx context.Context, network, host string) (net.IP, error) {
-	if ip, _ := parseIPZone(host); ip != nil {
-		return ip, nil
-	}
-	ips, err := LookupIP(ctx, network, host)
-	if err != nil {
-		return nil, err
-	}
-	n := rand.Intn(len(ips))
-	return ips[n], nil
 }
 
 func init() {

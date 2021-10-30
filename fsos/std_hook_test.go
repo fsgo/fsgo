@@ -11,12 +11,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/fsgo/fsgo/fsos/fsfs"
 )
 
 func TestHookStderr(t *testing.T) {
 	fp := "testdata/tmp/hook_stderr.txt"
 	defer os.Remove(fp)
-	kp := &KeepFile{
+	kp := &fsfs.Keeper{
 		FilePath: func() string {
 			return fp
 		},
@@ -46,7 +48,7 @@ func TestHookStderr(t *testing.T) {
 func TestHookStdout(t *testing.T) {
 	fp := "testdata/tmp/hook_stdout.txt"
 	defer os.Remove(fp)
-	kp := &KeepFile{
+	kp := &fsfs.Keeper{
 		FilePath: func() string {
 			return fp
 		},

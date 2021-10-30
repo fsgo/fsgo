@@ -1,67 +1,47 @@
 // Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
 // Author: fsgo
-// Date: 2021/10/29
+// Date: 2021/10/30
 
-package fsnet
+package fsdns
 
 import (
 	"context"
 	"errors"
 	"fmt"
 	"net"
-	"os"
-	"strings"
+	"sync"
 
 	"github.com/miekg/dns"
+
+	"github.com/fsgo/fsgo/fsnet"
+	"github.com/fsgo/fsgo/fsnet/internal"
 )
 
-var _ Resolver = (*DNSClient)(nil)
+var _ fsnet.Resolver = (*DNSClient)(nil)
 
 // DNSClient prue dns client
 type DNSClient struct {
 	// Servers nameserver list,eg 114.114.114.114:53
 	Servers []net.Addr
 
+	mux sync.RWMutex
+
 	// LookupIPHook after query dns success, hook the result
-	LookupIPHook func(ctx context.Context, network, host string, ns net.Addr, result []net.IP, err error) ([]net.IP, error)
+	LookupIPHook func(ctx context.Context, network, host string, ns net.Addr, result []net.IP) ([]net.IP, error)
 }
 
-// ServersFromEnv parser nameserver list from os.env 'FSNET_NAMESERVER'
-// 	eg: export FSNET_NAMESERVER=1.1.1.1,8.8.8.8:53
-func (client *DNSClient) ServersFromEnv() []net.Addr {
-	ev := os.Getenv("FSNET_NAMESERVER")
-	if len(ev) == 0 {
-		return nil
-	}
-	return client.ParserServers(strings.Split(ev, ","))
+// SetServers set servers
+func (client *DNSClient) SetServers(servers []net.Addr) {
+	client.mux.Lock()
+	client.Servers = servers
+	client.mux.Unlock()
 }
 
-func (client *DNSClient) ParserServers(hosts []string) []net.Addr {
-	var list []net.Addr
-	for _, host := range hosts {
-		host = strings.TrimSpace(host)
-		if len(host) == 0 {
-			continue
-		}
-		if ip := net.ParseIP(host); ip != nil {
-			list = append(list, NewAddr("udp", host+":53"))
-			continue
-		}
-		if _, _, err := net.SplitHostPort(host); err == nil {
-			list = append(list, NewAddr("udp", host))
-		}
-	}
-	return list
-}
-
-// SetServersAuto use ServersFromEnv or use def list
-func (client *DNSClient) SetServersAuto(def []net.Addr) {
-	list := client.ServersFromEnv()
-	if len(list) > 0 {
-		client.Servers = list
-		return
-	}
-	client.Servers = def
+// GetServers get servers
+func (client *DNSClient) GetServers() []net.Addr {
+	client.mux.RLock()
+	client.mux.RUnlock()
+	return client.Servers
 }
 
 // LookupIP lookup ip
@@ -75,10 +55,11 @@ func (client *DNSClient) LookupIP(ctx context.Context, network, host string) ([]
 }
 
 func (client *DNSClient) lookupIP(ctx context.Context, network, host string) (ret []net.IP, err error) {
-	if len(client.Servers) == 0 {
+	servers := client.GetServers()
+	if len(servers) == 0 {
 		return nil, errors.New("no nameserver")
 	}
-	for _, ns := range client.Servers {
+	for _, ns := range servers {
 		ret, err = client.LookupIPByNS(ctx, network, host, ns)
 		if err == nil {
 			return ret, nil
@@ -137,11 +118,12 @@ func (client *DNSClient) LookupIPByNS(ctx context.Context, network, host string,
 		}
 	}
 	var errRet error
+	if client.LookupIPHook != nil {
+		result, errRet = client.LookupIPHook(ctx, network, host, ns, result)
+	}
+
 	if len(result) == 0 {
 		errRet = errDNSEmptyResult
-	}
-	if client.LookupIPHook != nil {
-		result, errRet = client.LookupIPHook(ctx, network, host, ns, result, errRet)
 	}
 	if errRet != nil {
 		return nil, errRet
@@ -157,7 +139,7 @@ func (client *DNSClient) LookupIPAddr(ctx context.Context, host string) ([]net.I
 	}
 	result := make([]net.IPAddr, len(ips))
 	for i := 0; i < len(ips); i++ {
-		ip, zone := parseIPZone(ips[i].String())
+		ip, zone := internal.ParseIPZone(ips[i].String())
 		result[i] = net.IPAddr{
 			IP:   ip,
 			Zone: zone,
@@ -167,12 +149,12 @@ func (client *DNSClient) LookupIPAddr(ctx context.Context, host string) ([]net.I
 }
 
 // ResolverHook to ResolverHook
-func (client *DNSClient) ResolverHook() *ResolverHook {
-	return &ResolverHook{
-		LookupIP: func(ctx context.Context, network, host string, fn LookupIPFunc) ([]net.IP, error) {
+func (client *DNSClient) ResolverHook() *fsnet.ResolverHook {
+	return &fsnet.ResolverHook{
+		LookupIP: func(ctx context.Context, network, host string, fn fsnet.LookupIPFunc) ([]net.IP, error) {
 			return client.LookupIP(ctx, network, host)
 		},
-		LookupIPAddr: func(ctx context.Context, host string, fn LookupIPAddrFunc) ([]net.IPAddr, error) {
+		LookupIPAddr: func(ctx context.Context, host string, fn fsnet.LookupIPAddrFunc) ([]net.IPAddr, error) {
 			return client.LookupIPAddr(ctx, host)
 		},
 	}

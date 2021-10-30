@@ -1,8 +1,8 @@
 // Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
 // Author: fsgo
-// Date: 2021/8/10
+// Date: 2021/10/30
 
-package fsos
+package fsfs
 
 import (
 	"log"
@@ -11,21 +11,13 @@ import (
 	"sort"
 )
 
-const (
-	// Stdout 标准输出
-	Stdout = 1
-
-	// Stderr 标准错误输出
-	Stderr = 2
-)
-
 // HasFd 有实现 Fd 方法
 type HasFd interface {
 	Fd() uintptr
 }
 
-// FileExists 判断文件是否存在
-func FileExists(name string) (bool, error) {
+// Exists 判断文件是否存在
+func Exists(name string) (bool, error) {
 	_, err := os.Stat(name)
 	if os.IsNotExist(err) {
 		return false, nil

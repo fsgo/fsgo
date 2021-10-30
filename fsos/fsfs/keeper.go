@@ -1,8 +1,8 @@
 // Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
 // Author: fsgo
-// Date: 2021/8/28
+// Date: 2021/10/30
 
-package fsos
+package fsfs
 
 import (
 	"fmt"
@@ -13,8 +13,8 @@ import (
 	"time"
 )
 
-// KeepFile 保持文件存在
-type KeepFile struct {
+// Keeper 保持文件存在
+type Keeper struct {
 	FilePath func() string
 
 	// CheckInterval 检查间隔，可选
@@ -37,7 +37,7 @@ type KeepFile struct {
 
 // Start 开始,非阻塞运行
 // 	与之对应的有 Stop 方法
-func (kf *KeepFile) Start() error {
+func (kf *Keeper) Start() error {
 	if err := kf.init(); err != nil {
 		return err
 	}
@@ -60,15 +60,15 @@ func (kf *KeepFile) Start() error {
 	return nil
 }
 
-func (kf *KeepFile) loop() {
+func (kf *Keeper) loop() {
 	if err := kf.checkFile(); err != nil {
-		log.Println("[fsgo][KeepFile][error]", err)
+		log.Println("[fsgo][Keeper][error]", err)
 	}
 	kf.timer.Reset(kf.CheckInterval)
 }
 
 // Stop 停止运行
-func (kf *KeepFile) Stop() error {
+func (kf *Keeper) Stop() error {
 	kf.mux.Lock()
 	defer kf.mux.Unlock()
 	if !kf.running {
@@ -80,7 +80,7 @@ func (kf *KeepFile) Stop() error {
 	return nil
 }
 
-func (kf *KeepFile) init() error {
+func (kf *Keeper) init() error {
 	if kf.FilePath == nil {
 		return fmt.Errorf("fn FilePath is nil")
 	}
@@ -91,27 +91,27 @@ func (kf *KeepFile) init() error {
 }
 
 // File 获取文件
-func (kf *KeepFile) File() *os.File {
+func (kf *Keeper) File() *os.File {
 	kf.mux.RLock()
 	defer kf.mux.RUnlock()
 	return kf.file
 }
 
 // BeforeChange 注册当文件变化前的回调函数
-func (kf *KeepFile) BeforeChange(fn func(f *os.File)) {
+func (kf *Keeper) BeforeChange(fn func(f *os.File)) {
 	kf.mux.Lock()
 	defer kf.mux.Unlock()
 	kf.beforeChanges = append(kf.beforeChanges, fn)
 }
 
 // AfterChange 注册当文件变化后的回调函数
-func (kf *KeepFile) AfterChange(fn func(f *os.File)) {
+func (kf *Keeper) AfterChange(fn func(f *os.File)) {
 	kf.mux.Lock()
 	defer kf.mux.Unlock()
 	kf.afterChanges = append(kf.afterChanges, fn)
 }
 
-func (kf *KeepFile) checkFile() error {
+func (kf *Keeper) checkFile() error {
 	fp := kf.FilePath()
 
 	if fp == "" {
@@ -165,14 +165,14 @@ func (kf *KeepFile) checkFile() error {
 	return nil
 }
 
-func (kf *KeepFile) openFile(fp string) (*os.File, error) {
+func (kf *Keeper) openFile(fp string) (*os.File, error) {
 	if kf.OpenFile != nil {
 		return kf.openFile(fp)
 	}
 	return os.OpenFile(fp, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 }
 
-func (kf *KeepFile) exists(fp string) (bool, error) {
+func (kf *Keeper) exists(fp string) (bool, error) {
 	kf.mux.RLock()
 	info := kf.info
 	kf.mux.RUnlock()

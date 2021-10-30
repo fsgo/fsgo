@@ -1,8 +1,8 @@
 // Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
 // Author: fsgo
-// Date: 2021/8/15
+// Date: 2021/10/30
 
-package fsos
+package fsfs
 
 import (
 	"fmt"
@@ -15,10 +15,10 @@ import (
 	"github.com/fsgo/fsgo/fsio"
 )
 
-var _ io.WriteCloser = (*RotateFile)(nil)
+var _ io.WriteCloser = (*Rotator)(nil)
 
-// RotateFile 文件具备自动切割的功能
-type RotateFile struct {
+// Rotator 文件具备自动切割的功能
+type Rotator struct {
 	// Path 文件名
 	Path string
 
@@ -43,7 +43,7 @@ type RotateFile struct {
 
 	filePathFn func() string
 
-	kp        *KeepFile
+	kp        *Keeper
 	mux       sync.RWMutex
 	onceSetup sync.Once
 	onceInit  sync.Once
@@ -53,11 +53,11 @@ type RotateFile struct {
 }
 
 // Init 初始化
-func (f *RotateFile) Init() error {
+func (f *Rotator) Init() error {
 	return f.initOnce()
 }
 
-func (f *RotateFile) initOnce() error {
+func (f *Rotator) initOnce() error {
 	var err error
 	f.onceInit.Do(func() {
 		err = f.setupOnce()
@@ -68,19 +68,19 @@ func (f *RotateFile) initOnce() error {
 	return err
 }
 
-func (f *RotateFile) mustInit() {
+func (f *Rotator) mustInit() {
 	if err := f.initOnce(); err != nil {
 		panic(err)
 	}
 }
 
-func (f *RotateFile) mustSetup() {
+func (f *Rotator) mustSetup() {
 	if err := f.setupOnce(); err != nil {
 		panic(err)
 	}
 }
 
-func (f *RotateFile) setupOnce() error {
+func (f *Rotator) setupOnce() error {
 	var err error
 	f.onceSetup.Do(func() {
 		err = f.setup()
@@ -89,7 +89,7 @@ func (f *RotateFile) setupOnce() error {
 }
 
 // setup 初始化
-func (f *RotateFile) setup() error {
+func (f *Rotator) setup() error {
 	if err := f.setFilePathFn(); err != nil {
 		return err
 	}
@@ -106,13 +106,13 @@ func (f *RotateFile) setup() error {
 	return nil
 }
 
-func (f *RotateFile) setupKeepFile() {
+func (f *Rotator) setupKeepFile() {
 	maxDelay := f.MaxDelay
 	if maxDelay < time.Microsecond {
 		maxDelay = 100 * time.Millisecond
 	}
 
-	f.kp = &KeepFile{
+	f.kp = &Keeper{
 		FilePath:      f.filePathFn,
 		CheckInterval: maxDelay,
 	}
@@ -120,12 +120,12 @@ func (f *RotateFile) setupKeepFile() {
 	f.kp.AfterChange(f.onFileChange)
 }
 
-func (f *RotateFile) onFileChange(file *os.File) {
+func (f *Rotator) onFileChange(file *os.File) {
 	_ = fsio.TryFlush(f.writer)
 	f.writer.Reset(file)
 }
 
-func (f *RotateFile) setupClean() {
+func (f *Rotator) setupClean() {
 	if f.MaxFiles < 0 {
 		return
 	}
@@ -137,12 +137,12 @@ func (f *RotateFile) setupClean() {
 	f.kp.AfterChange(func(_ *os.File) {
 		err := CleanFiles(f.Path+"*", num)
 		if err != nil {
-			log.Println("[RotateFile][CleanFiles][error]", err)
+			log.Println("[Rotator][CleanFiles][error]", err)
 		}
 	})
 }
 
-func (f *RotateFile) setFilePathFn() error {
+func (f *Rotator) setFilePathFn() error {
 	if f.Path == "" {
 		return fmt.Errorf("f.Path is empty")
 	}
@@ -172,7 +172,7 @@ func (f *RotateFile) setFilePathFn() error {
 }
 
 // Write 写入
-func (f *RotateFile) Write(p []byte) (n int, err error) {
+func (f *Rotator) Write(p []byte) (n int, err error) {
 	if err := f.initOnce(); err != nil {
 		return 0, err
 	}
@@ -180,19 +180,19 @@ func (f *RotateFile) Write(p []byte) (n int, err error) {
 }
 
 // File 获取当前的文件
-func (f *RotateFile) File() *os.File {
+func (f *Rotator) File() *os.File {
 	f.mustInit()
 	return f.kp.File()
 }
 
 // AfterChange 注册当文件变化时的回调函数
-func (f *RotateFile) AfterChange(fn func(f *os.File)) {
+func (f *Rotator) AfterChange(fn func(f *os.File)) {
 	f.mustSetup()
 	f.kp.AfterChange(fn)
 }
 
 // Close 关闭文件
-func (f *RotateFile) Close() error {
+func (f *Rotator) Close() error {
 	if f.kp == nil {
 		return nil
 	}

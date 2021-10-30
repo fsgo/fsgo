@@ -54,9 +54,12 @@ func (d *Dialer) DialContext(ctx context.Context, network string, address string
 	}
 	hook := d.getHooks(ctx)
 	c, err := hook.HookDialContext(ctx, network, address, d.stdDial, len(hook)-1)
+	if err != nil {
+		return nil, err
+	}
 	cks := ConnHooksFromContext(ctx)
-	if err != nil || len(cks) == 0 {
-		return c, err
+	if len(cks) == 0 {
+		return c, nil
 	}
 	return NewConn(c, cks...), nil
 }

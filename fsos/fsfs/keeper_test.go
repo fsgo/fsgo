@@ -1,8 +1,8 @@
 // Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
 // Author: fsgo
-// Date: 2021/8/29
+// Date: 2021/10/30
 
-package fsos
+package fsfs
 
 import (
 	"os"
@@ -17,7 +17,7 @@ func TestKeepFile(t *testing.T) {
 	fp := "testdata/tmp/keep.txt"
 	defer os.Remove(fp)
 	ci := 10 * time.Millisecond
-	kp := &KeepFile{
+	kp := &Keeper{
 		FilePath: func() string {
 			return fp
 		},
