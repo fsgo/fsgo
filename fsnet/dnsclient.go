@@ -33,8 +33,12 @@ func (client *DNSClient) ServersFromEnv() []net.Addr {
 	if len(ev) == 0 {
 		return nil
 	}
+	return client.ParserServers(strings.Split(ev, ","))
+}
+
+func (client *DNSClient) ParserServers(hosts []string) []net.Addr {
 	var list []net.Addr
-	for _, host := range strings.Split(ev, ",") {
+	for _, host := range hosts {
 		host = strings.TrimSpace(host)
 		if len(host) == 0 {
 			continue
