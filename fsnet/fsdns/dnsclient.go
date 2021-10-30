@@ -24,6 +24,8 @@ type DNSClient struct {
 	// Servers nameserver list,eg 114.114.114.114:53
 	Servers []net.Addr
 
+	HostsFile fsnet.HasLookupIP
+
 	mux sync.RWMutex
 
 	// LookupIPHook after query dns success, hook the result
@@ -46,6 +48,12 @@ func (client *DNSClient) GetServers() []net.Addr {
 
 // LookupIP lookup ip
 func (client *DNSClient) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
+	if client.HostsFile != nil {
+		// 先尝试读取
+		if ips, _ := client.HostsFile.LookupIP(ctx, network, host); len(ips) > 0 {
+			return ips, nil
+		}
+	}
 	switch network {
 	case "ip", "ip4", "ip6":
 		return client.lookupIP(ctx, network, host)

@@ -8,6 +8,8 @@ import (
 	"context"
 	"net"
 	"time"
+
+	"github.com/fsgo/fsgo/fsnet/internal"
 )
 
 // DialerType dial conn type
@@ -72,7 +74,7 @@ func (d *Dialer) stdDial(ctx context.Context, network string, address string) (c
 			return nil, err
 		}
 
-		ip, _ := parseIPZone(host)
+		ip, _ := internal.ParseIPZone(host)
 		if ip != nil {
 			return d.dial(ctx, network, address)
 		}

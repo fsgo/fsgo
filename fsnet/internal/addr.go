@@ -70,3 +70,22 @@ func last(s string, b byte) int {
 	}
 	return i
 }
+
+func IPv4only(ip net.IP) bool {
+	return ip.To4() != nil
+}
+
+// IPv6only reports whether addr is an IPv6 address except IPv4-mapped IPv6 address.
+func IPv6only(ip net.IP) bool {
+	return len(ip) == net.IPv6len && ip.To4() == nil
+}
+
+func FilterIPList(filter func(ip net.IP) bool, ips []net.IP) []net.IP {
+	var result []net.IP
+	for _, ip := range ips {
+		if filter == nil || filter(ip) {
+			result = append(result, ip)
+		}
+	}
+	return result
+}

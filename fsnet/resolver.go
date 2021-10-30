@@ -23,6 +23,10 @@ type Resolver interface {
 	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
 }
 
+type HasLookupIP interface {
+	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
+}
+
 // ResolverCanHook 支持注册 ResolverHook
 type ResolverCanHook interface {
 	RegisterHook(hooks ...*ResolverHook)
