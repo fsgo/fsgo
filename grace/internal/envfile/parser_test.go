@@ -1,8 +1,8 @@
 // Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
 // Author: fsgo
-// Date: 2021/7/11
+// Date: 2021/10/31
 
-package grace
+package envfile
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func Test_parserEvnFile(t *testing.T) {
+func TestParserEvnFile(t *testing.T) {
 	type args struct {
 		fp string
 	}
@@ -63,13 +63,13 @@ func Test_parserEvnFile(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := parserEvnFile(context.Background(), tt.args.fp)
+			got, err := ParserFile(context.Background(), tt.args.fp)
 			if (err != nil) != tt.wantErr {
-				t.Errorf("parserEvnFile() error = %v, wantErr %v", err, tt.wantErr)
+				t.Errorf("ParserFile() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
 			if !reflect.DeepEqual(got, tt.want) {
-				t.Errorf("parserEvnFile() got = %v, want %v", got, tt.want)
+				t.Errorf("ParserFile() got = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -71,6 +71,7 @@ func last(s string, b byte) int {
 	return i
 }
 
+// IPv4only 是否 ipv4
 func IPv4only(ip net.IP) bool {
 	return ip.To4() != nil
 }
@@ -80,6 +81,7 @@ func IPv6only(ip net.IP) bool {
 	return len(ip) == net.IPv6len && ip.To4() == nil
 }
 
+// FilterIPList 对 ip 地址进行过滤
 func FilterIPList(filter func(ip net.IP) bool, ips []net.IP) []net.IP {
 	var result []net.IP
 	for _, ip := range ips {

@@ -9,19 +9,14 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 )
 
-// Watcher 文件监听
-type Watcher struct {
-	Interval time.Duration
-	Delay    time.Duration
-	rules    []*watchRule
-	tk       *time.Ticker
-}
-
 const (
+	// WatcherEventUpdate contains create and update ent
 	WatcherEventUpdate = "update"
+	// WatcherEventDelete  delete event
 	WatcherEventDelete = "delete"
 )
 
@@ -31,8 +26,20 @@ type WatcherEvent struct {
 	Type     string
 }
 
+// String event desc
 func (we *WatcherEvent) String() string {
 	return we.FileName + " " + we.Type
+}
+
+// Watcher 文件监听
+type Watcher struct {
+	Interval time.Duration
+	Delay    time.Duration
+	rules    []*watchRule
+
+	tk      *time.Ticker
+	mux     sync.RWMutex
+	started bool
 }
 
 // Watch add  file watch with callback
@@ -61,22 +68,20 @@ func (w *Watcher) getInterval() time.Duration {
 	return time.Second
 }
 
+// Start ticker start async
 func (w *Watcher) Start() error {
-	if w.tk != nil {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	if w.started {
 		return errors.New("already started")
 	}
 	w.tk = time.NewTicker(w.getInterval())
 	go func() {
-		for {
-			select {
-			case _, ok := <-w.tk.C:
-				if !ok {
-					return
-				}
-				w.scan()
-			}
+		for range w.tk.C {
+			w.scan()
 		}
 	}()
+	w.started = true
 	return nil
 }
 
@@ -91,18 +96,21 @@ func (w *Watcher) scan() {
 	}
 }
 
+// Stop ticker stop
 func (w *Watcher) Stop() {
-	if w.tk == nil {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	if !w.started {
 		return
 	}
 	w.tk.Stop()
-	w.tk = nil
+	w.started = false
 }
 
 type watchRule struct {
 	Name     string
 	CallBack func(event *WatcherEvent)
-	last     map[string]os.FileInfo
+	last     map[string]time.Time
 	delay    time.Duration
 }
 
@@ -117,28 +125,30 @@ func (wr *watchRule) scan() {
 		return
 	}
 	if wr.last == nil {
-		wr.last = map[string]os.FileInfo{}
+		wr.last = map[string]time.Time{}
 	}
-	nowData := map[string]os.FileInfo{}
+	nowData := map[string]time.Time{}
 	for _, name := range matches {
 		info, err := os.Stat(name)
 		if err != nil {
 			continue
 		}
-		lastInfo, has := wr.last[name]
+		lastMod, has := wr.last[name]
 		// 新增 或者有变更的情况
-		if !has || !info.ModTime().Equal(lastInfo.ModTime()) {
+		if !has || !info.ModTime().Equal(lastMod) {
 			if wr.checkDelay(info.ModTime()) {
-				nowData[name] = info
+				nowData[name] = info.ModTime()
 				event := &WatcherEvent{
 					FileName: name,
 					Type:     WatcherEventUpdate,
 				}
 				wr.CallBack(event)
+			} else {
+				nowData[name] = info.ModTime().Add(-1)
 			}
 		} else {
 			// 没有变化的情况
-			nowData[name] = info
+			nowData[name] = lastMod
 		}
 	}
 	for name := range wr.last {

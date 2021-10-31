@@ -15,15 +15,14 @@ import (
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strconv"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/fsgo/fsgo/fsos"
+	"github.com/fsgo/fsgo/fsfs"
+	"github.com/fsgo/fsgo/grace/internal/envfile"
 )
 
 // WorkerConfig worker 的配置
@@ -169,14 +168,14 @@ func NewWorker(cfg *WorkerConfig) *Worker {
 		group: w,
 	}
 
-	stderr := &fsos.RotateFile{
+	stderr := &fsfs.Rotator{
 		Path:    filepath.Join(cfg.LogDir, "stderr.log"),
 		ExtRule: "1hour",
 	}
 	_ = stderr.Init()
 	w.stderr = stderr
 
-	stdout := &fsos.RotateFile{
+	stdout := &fsfs.Rotator{
 		Path:    filepath.Join(cfg.LogDir, "stdout.log"),
 		ExtRule: "1hour",
 	}
@@ -203,8 +202,8 @@ type Worker struct {
 	// 子进程上次退出时间
 	lastExit time.Time
 
-	stderr *fsos.RotateFile
-	stdout *fsos.RotateFile
+	stderr *fsfs.Rotator
+	stdout *fsfs.Rotator
 }
 
 // Register 注册新的消费者
@@ -355,7 +354,7 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 	var userEnv []string
 	if envFile := w.option.getEnvFilePath(); envFile != "" {
 		var errParser error
-		userEnv, errParser = parserEvnFile(ctx, envFile)
+		userEnv, errParser = envfile.ParserFile(ctx, envFile)
 		w.logit(fmt.Sprintf("parserEvnFile(%q)", w.option.EnvFile), ", gotEnv=", userEnv, ", err=", errParser)
 		if errParser != nil {
 			return fmt.Errorf("parserEvnFile(%q) failed %w", w.option.EnvFile, errParser)
@@ -493,60 +492,4 @@ func (w *Worker) stop(ctx context.Context) error {
 	lastCmd := w.cmd
 	w.mux.Unlock()
 	return w.stopCmd(ctx, lastCmd)
-}
-
-var errNotEnvKV = fmt.Errorf("not env k-v pair")
-
-func parserEvnFile(ctx context.Context, fp string) ([]string, error) {
-	bf, err := os.ReadFile(fp)
-	if err != nil {
-		return nil, err
-	}
-
-	keyReg := regexp.MustCompile("^[a-zA-Z_][a-zA-Z_0-9]*$")
-
-	parserEnv := func(bf []byte) ([]string, error) {
-		var result []string
-		lines := bytes.Split(bf, []byte("\n"))
-		for _, line := range lines {
-			line = bytes.TrimSpace(line)
-			if len(line) == 0 {
-				continue
-			}
-			// 以 # 开头的是注释
-			if bytes.HasPrefix(line, []byte("#")) {
-				continue
-			}
-			// 不包含 = 说明不是 kv 对
-			if !bytes.ContainsAny(line, "=") {
-				errParser := fmt.Errorf("line(%q) %w", line, errNotEnvKV)
-				return nil, errParser
-			}
-			arr := strings.SplitN(string(line), "=", 2)
-			k := strings.TrimSpace(arr[0])
-			v := strings.TrimSpace(arr[1])
-			if !keyReg.MatchString(k) {
-				errParser := fmt.Errorf("line(%q) %w", line, errNotEnvKV)
-				return nil, errParser
-			}
-			result = append(result, k+"="+v)
-		}
-		return result, nil
-	}
-
-	result, errParser := parserEnv(bf)
-	if errParser == nil {
-		return result, nil
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, fp)
-	cmd.Stderr = os.Stderr
-	data, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-	return parserEnv(data)
 }

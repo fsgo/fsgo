@@ -23,6 +23,7 @@ type Resolver interface {
 	LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error)
 }
 
+// HasLookupIP has  LookupIP func
 type HasLookupIP interface {
 	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
 }
@@ -131,7 +132,7 @@ func (r *ResolverCached) getCache(key string) fscache.SCache {
 	if c, has := r.caches[key]; has {
 		return c
 	}
-	c, err := lrucache.NewSCache(&lrucache.Option{Capacity: 128})
+	c, err := lrucache.NewSCache(&lrucache.Option{Capacity: 128 * 1024})
 	if err != nil {
 		panic("init cache has error:" + err.Error())
 	}

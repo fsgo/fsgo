@@ -146,3 +146,23 @@ func (s String) Split(sep string) []string {
 	}
 	return result
 }
+
+// StringSlice alias off []string
+type StringSlice []string
+
+// Unique uniq
+func (ss StringSlice) Unique() StringSlice {
+	if len(ss) < 2 {
+		return ss
+	}
+	c := make(map[string]bool, len(ss))
+	ret := make(StringSlice, 0, len(ss))
+	for _, v := range ss {
+		if c[v] {
+			continue
+		}
+		c[v] = true
+		ret = append(ret, v)
+	}
+	return ret
+}

@@ -9,7 +9,7 @@ package fsos
 import (
 	"syscall"
 
-	"github.com/fsgo/fsgo/fsos/fsfs"
+	"github.com/fsgo/fsgo/fsfs"
 )
 
 // HookStderr 劫持标准错误输出

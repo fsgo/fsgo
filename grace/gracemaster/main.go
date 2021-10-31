@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"syscall"
 
-	"github.com/fsgo/fsgo/fsos"
+	"github.com/fsgo/fsgo/fsfs"
 	"github.com/fsgo/fsgo/grace"
 )
 
@@ -27,7 +27,7 @@ func main() {
 		log.Fatalf(" load config %q failed, error=%v\n", *confName, err)
 	}
 
-	lg := &fsos.RotateFile{
+	lg := &fsfs.Rotator{
 		Path:    filepath.Join(cf.LogDir, "grace", "grace.log"),
 		ExtRule: "1hour",
 	}

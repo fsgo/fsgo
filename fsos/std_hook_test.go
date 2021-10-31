@@ -12,7 +12,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"github.com/fsgo/fsgo/fsos/fsfs"
+	"github.com/fsgo/fsgo/fsfs"
 )
 
 func TestHookStderr(t *testing.T) {

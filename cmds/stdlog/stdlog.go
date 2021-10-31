@@ -11,7 +11,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/fsgo/fsgo/fsos"
+	"github.com/fsgo/fsgo/fsfs"
 )
 
 var logName = flag.String("name", "stdout.log", "file name")
@@ -42,7 +42,7 @@ func pipeRun() {
 }
 
 func toRotateFile(name string, from io.Reader) {
-	f := &fsos.RotateFile{
+	f := &fsfs.Rotator{
 		Path:    name,
 		ExtRule: *extRule,
 	}
