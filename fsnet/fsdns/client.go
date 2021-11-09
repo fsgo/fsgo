@@ -141,12 +141,15 @@ func (client *Client) lookupIP(ctx context.Context, network, host string) (ret [
 		if err == nil && len(ret) > 0 {
 			ret, err = client.callLookupIPHook(ctx, network, host, ns, ret)
 		}
-		if err == nil {
+		if err == nil && len(ret) > 0 {
 			return ret, nil
 		}
 		if ctx.Err() != nil {
 			return nil, err
 		}
+	}
+	if err == nil && len(ret) == 0 {
+		err = errEmptyResult
 	}
 	return nil, fmt.Errorf("query all nameserver faild, last err: %w", err)
 }
@@ -169,8 +172,8 @@ func (client *Client) LookupIPAddr(ctx context.Context, host string) ([]net.IPAd
 }
 
 // ResolverHook to ResolverHook
-func (client *Client) ResolverHook() *fsnet.ResolverHook {
-	return &fsnet.ResolverHook{
+func (client *Client) ResolverHook() *fsnet.ResolverInterceptor {
+	return &fsnet.ResolverInterceptor{
 		LookupIP: func(ctx context.Context, network, host string, fn fsnet.LookupIPFunc) ([]net.IP, error) {
 			return client.LookupIP(ctx, network, host)
 		},

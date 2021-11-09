@@ -17,9 +17,9 @@ type DialerType interface {
 	DialContext(ctx context.Context, network string, address string) (net.Conn, error)
 }
 
-// DialerCanHook dialer can RegisterHook
-type DialerCanHook interface {
-	RegisterHook(hooks ...*DialerHook)
+// DialerCanInterceptor dialer can RegisterHook
+type DialerCanInterceptor interface {
+	RegisterInterceptor(hooks ...*DialerInterceptor)
 }
 
 // DialContextFunc Dial func type
@@ -35,16 +35,21 @@ var DialContext = func(ctx context.Context, network string, address string) (net
 
 // Dialer dialer
 type Dialer struct {
-	Timeout   time.Duration
+	// Timeout 可选，超时时间
+	Timeout time.Duration
+
+	// StdDialer 可选，底层拨号器
 	StdDialer DialerType
-	Hooks     []*DialerHook
+
+	// Interceptors 可选，拦截器列表,倒序执行
+	Interceptors []*DialerInterceptor
 }
 
-var _ DialerCanHook = (*Dialer)(nil)
+var _ DialerCanInterceptor = (*Dialer)(nil)
 
-// RegisterHook register Hooks
-func (d *Dialer) RegisterHook(hooks ...*DialerHook) {
-	d.Hooks = append(d.Hooks, hooks...)
+// RegisterInterceptor register Interceptor
+func (d *Dialer) RegisterInterceptor(hooks ...*DialerInterceptor) {
+	d.Interceptors = append(d.Interceptors, hooks...)
 }
 
 // DialContext dial with Context
@@ -54,12 +59,12 @@ func (d *Dialer) DialContext(ctx context.Context, network string, address string
 		ctx, cancel = context.WithTimeout(ctx, d.Timeout)
 		defer cancel()
 	}
-	hook := d.getHooks(ctx)
+	hook := d.getInterceptors(ctx)
 	c, err := hook.HookDialContext(ctx, network, address, d.stdDial, len(hook)-1)
 	if err != nil {
 		return nil, err
 	}
-	cks := ConnHooksFromContext(ctx)
+	cks := ConnInterceptorsFromContext(ctx)
 	if len(cks) == 0 {
 		return c, nil
 	}
@@ -110,27 +115,27 @@ func (d *Dialer) getSTDDialer() DialerType {
 	return zeroDialer
 }
 
-func (d *Dialer) getHooks(ctx context.Context) dialerHooks {
-	ctxHooks := DialerHooksFromContext(ctx)
+func (d *Dialer) getInterceptors(ctx context.Context) dialerInterceptors {
+	ctxHooks := DialerInterceptorsFromContext(ctx)
 	if len(ctxHooks) == 0 {
-		return d.Hooks
+		return d.Interceptors
 	}
-	if len(d.Hooks) == 0 {
+	if len(d.Interceptors) == 0 {
 		return nil
 	}
-	return append(d.Hooks, ctxHooks...)
+	return append(d.Interceptors, ctxHooks...)
 }
 
-// DialerHook  dialer hook
-type DialerHook struct {
+// DialerInterceptor  dialer interceptor
+type DialerInterceptor struct {
 	DialContext func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error)
 }
 
-type dialerHooks []*DialerHook
+type dialerInterceptors []*DialerInterceptor
 
 // HookDialContext 执行 hooks
 // 倒序执行
-func (dhs dialerHooks) HookDialContext(ctx context.Context, network, address string, fn DialContextFunc, idx int) (net.Conn, error) {
+func (dhs dialerInterceptors) HookDialContext(ctx context.Context, network, address string, fn DialContextFunc, idx int) (net.Conn, error) {
 	for ; idx >= 0; idx-- {
 		if dhs[idx].DialContext != nil {
 			break
@@ -145,16 +150,16 @@ func (dhs dialerHooks) HookDialContext(ctx context.Context, network, address str
 }
 
 type dialerHookMapper struct {
-	hooks dialerHooks
+	hooks dialerInterceptors
 }
 
-func (dhm *dialerHookMapper) Register(hooks ...*DialerHook) {
+func (dhm *dialerHookMapper) Register(hooks ...*DialerInterceptor) {
 	dhm.hooks = append(dhm.hooks, hooks...)
 }
 
 // ContextWithDialerHook set dialer hook to context
-// these hooks will exec before Dialer.Hooks
-func ContextWithDialerHook(ctx context.Context, hooks ...*DialerHook) context.Context {
+// these hooks will exec before Dialer.Interceptors
+func ContextWithDialerHook(ctx context.Context, hooks ...*DialerInterceptor) context.Context {
 	if len(hooks) == 0 {
 		return ctx
 	}
@@ -167,8 +172,8 @@ func ContextWithDialerHook(ctx context.Context, hooks ...*DialerHook) context.Co
 	return ctx
 }
 
-// DialerHooksFromContext get DialerHooks from contexts
-func DialerHooksFromContext(ctx context.Context) []*DialerHook {
+// DialerInterceptorsFromContext get DialerHooks from contexts
+func DialerInterceptorsFromContext(ctx context.Context) []*DialerInterceptor {
 	dhm := dialerHookMapperFormContext(ctx)
 	if dhm == nil {
 		return nil
@@ -184,34 +189,34 @@ func dialerHookMapperFormContext(ctx context.Context) *dialerHookMapper {
 	return val.(*dialerHookMapper)
 }
 
-// TryRegisterDialerHook 尝试给 DefaultDialer 注册 DialerHook
+// TryRegisterDialerInterceptor 尝试给 DefaultDialer 注册 DialerInterceptor
 // 若注册失败将返回 false
-func TryRegisterDialerHook(hooks ...*DialerHook) bool {
-	if d, ok := DefaultDialer.(DialerCanHook); ok {
-		d.RegisterHook(hooks...)
+func TryRegisterDialerInterceptor(hooks ...*DialerInterceptor) bool {
+	if d, ok := DefaultDialer.(DialerCanInterceptor); ok {
+		d.RegisterInterceptor(hooks...)
 		return true
 	}
 	return false
 }
 
-// MustRegisterDialerHook 给 DefaultDialer 注册 DialerHook
+// MustRegisterDialerHook 给 DefaultDialer 注册 DialerInterceptor
 // 若不支持将 panic
-func MustRegisterDialerHook(hooks ...*DialerHook) {
-	if !TryRegisterDialerHook(hooks...) {
-		panic("DefaultDialer cannot RegisterHook")
+func MustRegisterDialerHook(hooks ...*DialerInterceptor) {
+	if !TryRegisterDialerInterceptor(hooks...) {
+		panic("DefaultDialer cannot Register DialerInterceptor")
 	}
 }
 
-// NewConnDialerHook 创建一个支持添加 ConnHook 的 DialerHook
-// 当想给 DefaultDialer 注册 全局的 ConnHook 的时候，可以使用该方法
-func NewConnDialerHook(connHooks ...*ConnHook) *DialerHook {
-	return &DialerHook{
+// NewConnDialerInterceptor 创建一个支持添加 ConnInterceptor 的 DialerInterceptor
+// 当想给 DefaultDialer 注册 全局的 ConnInterceptor 的时候，可以使用该方法
+func NewConnDialerInterceptor(its ...*ConnInterceptor) *DialerInterceptor {
+	return &DialerInterceptor{
 		DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 			conn, err = fn(ctx, network, address)
-			if err != nil || len(connHooks) == 0 {
+			if err != nil || len(its) == 0 {
 				return conn, err
 			}
-			return NewConn(conn, connHooks...), nil
+			return NewConn(conn, its...), nil
 		},
 	}
 }

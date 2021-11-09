@@ -8,6 +8,7 @@ import (
 	"context"
 	"math/rand"
 	"net"
+	"os"
 	"sync"
 	"time"
 
@@ -28,9 +29,9 @@ type HasLookupIP interface {
 	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
 }
 
-// ResolverCanHook 支持注册 ResolverHook
+// ResolverCanHook 支持注册 ResolverInterceptor
 type ResolverCanHook interface {
-	RegisterHook(hooks ...*ResolverHook)
+	RegisterHook(hooks ...*ResolverInterceptor)
 }
 
 // LookupIPFunc lookupIP func type
@@ -47,7 +48,7 @@ type ResolverCached struct {
 
 	StdResolver Resolver
 
-	Hooks []*ResolverHook
+	Interceptors []*ResolverInterceptor
 
 	caches map[string]fscache.SCache
 	mux    sync.Mutex
@@ -55,7 +56,7 @@ type ResolverCached struct {
 
 // LookupIP Lookup IP
 func (r *ResolverCached) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
-	return resolverHooks(r.Hooks).HookLookupIP(ctx, network, host, r.lookupIP, len(r.Hooks)-1)
+	return resolverInterceptors(r.Interceptors).HookLookupIP(ctx, network, host, r.lookupIP, len(r.Interceptors)-1)
 }
 
 func (r *ResolverCached) lookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
@@ -74,7 +75,7 @@ func (r *ResolverCached) lookupIP(ctx context.Context, network, host string) ([]
 
 // LookupIPAddr Lookup IPAddr
 func (r *ResolverCached) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
-	return resolverHooks(r.Hooks).HookLookupIPAddr(ctx, host, r.lookupIPAddr, len(r.Hooks)-1)
+	return resolverInterceptors(r.Interceptors).HookLookupIPAddr(ctx, host, r.lookupIPAddr, len(r.Interceptors)-1)
 }
 
 func (r *ResolverCached) lookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
@@ -143,13 +144,24 @@ func (r *ResolverCached) getCache(key string) fscache.SCache {
 var _ ResolverCanHook = (*ResolverCached)(nil)
 
 // RegisterHook Register Hook
-func (r *ResolverCached) RegisterHook(hooks ...*ResolverHook) {
-	r.Hooks = append(r.Hooks, hooks...)
+func (r *ResolverCached) RegisterHook(hooks ...*ResolverInterceptor) {
+	r.Interceptors = append(r.Interceptors, hooks...)
 }
 
-// DefaultResolver default Resolver,result has 1 min cache
+// DefaultResolver default Resolver, result has 3 min cache
+// 	Environment Variables 'FSGO_RESOLVER_EXP' can set the default cache lifetime
+// 	eg: export FSGO_RESOLVER_EXP="10m" set cache lifetime as 10 minute
 var DefaultResolver Resolver = &ResolverCached{
-	Expiration: time.Minute,
+	Expiration: defaultResolverExpiration(),
+}
+
+func defaultResolverExpiration() time.Duration {
+	val := os.Getenv("FSGO_RESOLVER_EXP")
+	ts, _ := time.ParseDuration(val)
+	if ts > time.Second {
+		return ts
+	}
+	return 3 * time.Minute
 }
 
 // LookupIP DefaultResolver.LookupIP
@@ -162,46 +174,46 @@ var LookupIPAddr = func(ctx context.Context, host string) ([]net.IPAddr, error) 
 	return DefaultResolver.LookupIPAddr(ctx, host)
 }
 
-// ResolverHook  Resolver Hook
-type ResolverHook struct {
+// ResolverInterceptor  Resolver Interceptor
+type ResolverInterceptor struct {
 	LookupIP     func(ctx context.Context, network, host string, fn LookupIPFunc) ([]net.IP, error)
 	LookupIPAddr func(ctx context.Context, host string, fn LookupIPAddrFunc) ([]net.IPAddr, error)
 }
 
-// ContextWithResolverHook set Resolver Hook to context
-// these hooks will exec before Dialer.Hooks
-func ContextWithResolverHook(ctx context.Context, hooks ...*ResolverHook) context.Context {
-	if len(hooks) == 0 {
+// ContextWithResolverInterceptor set Resolver Interceptor to context
+// these interceptors will exec before Dialer.Interceptors
+func ContextWithResolverInterceptor(ctx context.Context, its ...*ResolverInterceptor) context.Context {
+	if len(its) == 0 {
 		return ctx
 	}
-	dhm := resolverHookMapperFormContext(ctx)
+	dhm := resolverInterceptorMapperFormContext(ctx)
 	if dhm == nil {
-		dhm = &resolverHookMapper{}
+		dhm = &resolverInterceptorMapper{}
 		ctx = context.WithValue(ctx, ctxKeyResolverHook, dhm)
 	}
-	dhm.Register(hooks...)
+	dhm.Register(its...)
 	return ctx
 }
 
-func resolverHookMapperFormContext(ctx context.Context) *resolverHookMapper {
+func resolverInterceptorMapperFormContext(ctx context.Context) *resolverInterceptorMapper {
 	val := ctx.Value(ctxKeyResolverHook)
 	if val == nil {
 		return nil
 	}
-	return val.(*resolverHookMapper)
+	return val.(*resolverInterceptorMapper)
 }
 
-type resolverHookMapper struct {
-	hooks resolverHooks
+type resolverInterceptorMapper struct {
+	hooks resolverInterceptors
 }
 
-func (rhm *resolverHookMapper) Register(hooks ...*ResolverHook) {
+func (rhm *resolverInterceptorMapper) Register(hooks ...*ResolverInterceptor) {
 	rhm.hooks = append(rhm.hooks, hooks...)
 }
 
-type resolverHooks []*ResolverHook
+type resolverInterceptors []*ResolverInterceptor
 
-func (rhs resolverHooks) HookLookupIP(ctx context.Context, network, host string, fn LookupIPFunc, idx int) ([]net.IP, error) {
+func (rhs resolverInterceptors) HookLookupIP(ctx context.Context, network, host string, fn LookupIPFunc, idx int) ([]net.IP, error) {
 	for ; idx >= 0; idx-- {
 		if rhs[idx].LookupIP != nil {
 			break
@@ -216,7 +228,7 @@ func (rhs resolverHooks) HookLookupIP(ctx context.Context, network, host string,
 	})
 }
 
-func (rhs resolverHooks) HookLookupIPAddr(ctx context.Context, host string, fn LookupIPAddrFunc, idx int) ([]net.IPAddr, error) {
+func (rhs resolverInterceptors) HookLookupIPAddr(ctx context.Context, host string, fn LookupIPAddrFunc, idx int) ([]net.IPAddr, error) {
 	for ; idx >= 0; idx-- {
 		if rhs[idx].LookupIPAddr != nil {
 			break
@@ -235,20 +247,20 @@ func init() {
 	rand.Seed(time.Now().UnixNano())
 }
 
-// TryRegisterResolverHook 尝试给 DefaultResolver 注册 ResolverHook
+// TryRegisterResolverInterceptor 尝试给 DefaultResolver 注册 ResolverInterceptor
 // 若注册失败将返回 false
-func TryRegisterResolverHook(hooks ...*ResolverHook) bool {
+func TryRegisterResolverInterceptor(its ...*ResolverInterceptor) bool {
 	if d, ok := DefaultResolver.(ResolverCanHook); ok {
-		d.RegisterHook(hooks...)
+		d.RegisterHook(its...)
 		return true
 	}
 	return false
 }
 
-// MustRegisterResolverHook 给 DefaultDialer 注册 DialerHook
+// MustRegisterResolverInterceptor 给 DefaultDialer 注册 DialerInterceptor
 // 若不支持将 panic
-func MustRegisterResolverHook(hooks ...*ResolverHook) {
-	if !TryRegisterResolverHook(hooks...) {
-		panic("DefaultResolver cannot RegisterHook")
+func MustRegisterResolverInterceptor(its ...*ResolverInterceptor) {
+	if !TryRegisterResolverInterceptor(its...) {
+		panic("DefaultResolver cannot Register Interceptor")
 	}
 }

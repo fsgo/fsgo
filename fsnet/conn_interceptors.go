@@ -13,13 +13,13 @@ import (
 	"time"
 )
 
-// NewConnStatHook create instance
-func NewConnStatHook() *ConnStatHook {
-	return &ConnStatHook{}
+// NewConnStatInterceptor create instance
+func NewConnStatInterceptor() *ConnStatInterceptor {
+	return &ConnStatInterceptor{}
 }
 
-// ConnStatHook 用于获取网络状态的 Hook
-type ConnStatHook struct {
+// ConnStatInterceptor 用于获取网络状态的 Hook
+type ConnStatInterceptor struct {
 	readSize int64
 	readCost int64
 
@@ -30,14 +30,14 @@ type ConnStatHook struct {
 	dialTimes     int64
 	dialFailTimes int64
 
-	connHook *ConnHook
-	dialHook *DialerHook
+	connHook *ConnInterceptor
+	dialHook *DialerInterceptor
 
 	once sync.Once
 }
 
-func (ch *ConnStatHook) init() {
-	ch.connHook = &ConnHook{
+func (ch *ConnStatInterceptor) init() {
+	ch.connHook = &ConnInterceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
@@ -57,7 +57,7 @@ func (ch *ConnStatHook) init() {
 		},
 	}
 
-	ch.dialHook = &DialerHook{
+	ch.dialHook = &DialerInterceptor{
 		DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 			start := time.Now()
 
@@ -75,55 +75,55 @@ func (ch *ConnStatHook) init() {
 	}
 }
 
-// ConnHook 获取 net.Conn 的状态 hook
-func (ch *ConnStatHook) ConnHook() *ConnHook {
+// ConnInterceptor 获取 net.Conn 的状态拦截器
+func (ch *ConnStatInterceptor) ConnInterceptor() *ConnInterceptor {
 	ch.once.Do(ch.init)
 	return ch.connHook
 }
 
-// DialerHook 获取拨号器的 Hook，之后可将其注册到 Dialer
-func (ch *ConnStatHook) DialerHook() *DialerHook {
+// DialerInterceptor 获取拨号器的拦截器，之后可将其注册到 Dialer
+func (ch *ConnStatInterceptor) DialerInterceptor() *DialerInterceptor {
 	ch.once.Do(ch.init)
 	return ch.dialHook
 }
 
 // ReadSize 获取累计读到的的字节大小
-func (ch *ConnStatHook) ReadSize() int64 {
+func (ch *ConnStatInterceptor) ReadSize() int64 {
 	return atomic.LoadInt64(&ch.readSize)
 }
 
 // ReadCost 获取累积的读耗时
-func (ch *ConnStatHook) ReadCost() time.Duration {
+func (ch *ConnStatInterceptor) ReadCost() time.Duration {
 	return time.Duration(atomic.LoadInt64(&ch.readCost))
 }
 
 // WriteSize 获取累计写出的的字节大小
-func (ch *ConnStatHook) WriteSize() int64 {
+func (ch *ConnStatInterceptor) WriteSize() int64 {
 	return atomic.LoadInt64(&ch.writeSize)
 }
 
 // WriteCost 获取累积的写耗时
-func (ch *ConnStatHook) WriteCost() time.Duration {
+func (ch *ConnStatInterceptor) WriteCost() time.Duration {
 	return time.Duration(atomic.LoadInt64(&ch.writeCost))
 }
 
 // DialCost 获取累积的 Dial 耗时
-func (ch *ConnStatHook) DialCost() time.Duration {
+func (ch *ConnStatInterceptor) DialCost() time.Duration {
 	return time.Duration(atomic.LoadInt64(&ch.dialCost))
 }
 
 // DialTimes 获取累积的 Dial 总次数
-func (ch *ConnStatHook) DialTimes() int64 {
+func (ch *ConnStatInterceptor) DialTimes() int64 {
 	return atomic.LoadInt64(&ch.dialTimes)
 }
 
 // DialFailTimes 获取累积的 Dial 失败次数
-func (ch *ConnStatHook) DialFailTimes() int64 {
+func (ch *ConnStatInterceptor) DialFailTimes() int64 {
 	return atomic.LoadInt64(&ch.dialFailTimes)
 }
 
 // Reset 将所有状态数据重置为 0
-func (ch *ConnStatHook) Reset() {
+func (ch *ConnStatInterceptor) Reset() {
 	atomic.StoreInt64(&ch.dialCost, 0)
 	atomic.StoreInt64(&ch.dialTimes, 0)
 	atomic.StoreInt64(&ch.dialFailTimes, 0)
@@ -142,14 +142,14 @@ func NewConnReadBytesHook() *ConnReadBytesHook {
 
 // ConnReadBytesHook 获取所有通过 Read 方法读取的数据的副本
 type ConnReadBytesHook struct {
-	connHook *ConnHook
+	connHook *ConnInterceptor
 	buf      bytes.Buffer
 	once     sync.Once
 	mux      sync.RWMutex
 }
 
 func (ch *ConnReadBytesHook) init() {
-	ch.connHook = &ConnHook{
+	ch.connHook = &ConnInterceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			n, err := raw(b)
 			if n > 0 {
@@ -169,8 +169,8 @@ func (ch *ConnReadBytesHook) ReadBytes() []byte {
 	return ch.buf.Bytes()
 }
 
-// ConnHook 获取 Hook 实例
-func (ch *ConnReadBytesHook) ConnHook() *ConnHook {
+// ConnInterceptor 获取 ConnInterceptor 实例
+func (ch *ConnReadBytesHook) ConnInterceptor() *ConnInterceptor {
 	ch.once.Do(ch.init)
 	return ch.connHook
 }
@@ -182,21 +182,21 @@ func (ch *ConnReadBytesHook) Reset() {
 	ch.mux.Unlock()
 }
 
-// NewConnWriteBytesHook create ConnWriteBytesHook ins
-func NewConnWriteBytesHook() *ConnWriteBytesHook {
-	return &ConnWriteBytesHook{}
+// NewConnWriteBytesInterceptor create ConnWriteBytesInterceptor
+func NewConnWriteBytesInterceptor() *ConnWriteBytesInterceptor {
+	return &ConnWriteBytesInterceptor{}
 }
 
-// ConnWriteBytesHook 获取所有通过 Write 方法写出的数据的副本
-type ConnWriteBytesHook struct {
-	connHook *ConnHook
+// ConnWriteBytesInterceptor 获取所有通过 Write 方法写出的数据的副本
+type ConnWriteBytesInterceptor struct {
+	connHook *ConnInterceptor
 	buf      bytes.Buffer
 	once     sync.Once
 	mux      sync.RWMutex
 }
 
-func (ch *ConnWriteBytesHook) init() {
-	ch.connHook = &ConnHook{
+func (ch *ConnWriteBytesInterceptor) init() {
+	ch.connHook = &ConnInterceptor{
 		Write: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			n, err := raw(b)
 			if n > 0 {
@@ -210,20 +210,20 @@ func (ch *ConnWriteBytesHook) init() {
 }
 
 // WriteBytes Write 方法写出的数据的副本
-func (ch *ConnWriteBytesHook) WriteBytes() []byte {
+func (ch *ConnWriteBytesInterceptor) WriteBytes() []byte {
 	ch.mux.RLock()
 	defer ch.mux.RUnlock()
 	return ch.buf.Bytes()
 }
 
-// ConnHook 获取 Hook 实例
-func (ch *ConnWriteBytesHook) ConnHook() *ConnHook {
+// ConnInterceptor 获取 ConnInterceptor 实例
+func (ch *ConnWriteBytesInterceptor) ConnInterceptor() *ConnInterceptor {
 	ch.once.Do(ch.init)
 	return ch.connHook
 }
 
 // Reset 重置 buffer
-func (ch *ConnWriteBytesHook) Reset() {
+func (ch *ConnWriteBytesInterceptor) Reset() {
 	ch.mux.Lock()
 	ch.buf.Reset()
 	ch.mux.Unlock()

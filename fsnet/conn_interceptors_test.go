@@ -19,7 +19,7 @@ func TestConnReadBytesHook(t *testing.T) {
 	t.Run("read fail", func(t *testing.T) {
 		c1 := &net.TCPConn{}
 		ch := NewConnReadBytesHook()
-		c2 := NewConn(c1, ch.ConnHook())
+		c2 := NewConn(c1, ch.ConnInterceptor())
 		bf := make([]byte, 1024)
 		_, err := c2.Read(bf)
 		assert.NotNil(t, t, err)
@@ -32,7 +32,7 @@ func TestConnReadBytesHook(t *testing.T) {
 		defer r.Close()
 
 		ch := NewConnReadBytesHook()
-		c2 := NewConn(r, ch.ConnHook())
+		c2 := NewConn(r, ch.ConnInterceptor())
 
 		want := []byte("hello")
 		go func() {
@@ -55,8 +55,8 @@ func TestConnReadBytesHook(t *testing.T) {
 func TestConnWriteBytesHook(t *testing.T) {
 	t.Run("write fail", func(t *testing.T) {
 		c1 := &net.TCPConn{}
-		ch := NewConnWriteBytesHook()
-		c2 := NewConn(c1, ch.ConnHook())
+		ch := NewConnWriteBytesInterceptor()
+		c2 := NewConn(c1, ch.ConnInterceptor())
 		_, err := c2.Write([]byte("hello"))
 		assert.NotNil(t, err)
 		assert.Len(t, ch.WriteBytes(), 0)
@@ -67,8 +67,8 @@ func TestConnWriteBytesHook(t *testing.T) {
 		defer w.Close()
 		defer r.Close()
 
-		ch := NewConnWriteBytesHook()
-		c2 := NewConn(r, ch.ConnHook())
+		ch := NewConnWriteBytesInterceptor()
+		c2 := NewConn(r, ch.ConnInterceptor())
 
 		go func() {
 			bf := make([]byte, 1024)
@@ -102,10 +102,10 @@ func Test_hooks(t *testing.T) {
 	ts := httptest.NewServer(rt)
 	defer ts.Close()
 
-	statHK := NewConnStatHook()
+	statHK := NewConnStatInterceptor()
 	readHK := NewConnReadBytesHook()
-	globalHook := NewConnDialerHook(readHK.ConnHook())
-	MustRegisterDialerHook(statHK.DialerHook(), globalHook)
+	globalHook := NewConnDialerInterceptor(readHK.ConnInterceptor())
+	MustRegisterDialerHook(statHK.DialerInterceptor(), globalHook)
 
 	tr := &http.Transport{
 		DialContext:           DialContext,

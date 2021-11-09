@@ -14,7 +14,7 @@ var _ net.Conn = (*conn)(nil)
 
 // NewConn wrap conn with hooks
 // hooks 将倒序执行：后注册的先执行
-func NewConn(c net.Conn, hooks ...*ConnHook) net.Conn {
+func NewConn(c net.Conn, hooks ...*ConnInterceptor) net.Conn {
 	if rc, ok := c.(*conn); ok {
 		rc.hooks = append(rc.hooks, hooks...)
 		return rc
@@ -49,7 +49,7 @@ var _ HasRawConn = (*conn)(nil)
 
 type conn struct {
 	raw   net.Conn
-	hooks connHooks
+	hooks connInterceptors
 }
 
 func (c *conn) Raw() net.Conn {
@@ -88,8 +88,8 @@ func (c *conn) SetWriteDeadline(t time.Time) error {
 	return c.hooks.HookSetWriteDeadline(t, c.raw.SetWriteDeadline, len(c.hooks)-1)
 }
 
-// ConnHook conn hook
-type ConnHook struct {
+// ConnInterceptor conn Interceptor
+type ConnInterceptor struct {
 	Read             func(b []byte, raw func([]byte) (int, error)) (int, error)
 	Write            func(b []byte, raw func([]byte) (int, error)) (int, error)
 	Close            func(raw func() error) error
@@ -102,9 +102,9 @@ type ConnHook struct {
 
 //
 // 倒序执行,后注册的先执行
-type connHooks []*ConnHook
+type connInterceptors []*ConnInterceptor
 
-func (chs connHooks) HookRead(b []byte, raw func(b []byte) (int, error), idx int) (n int, err error) {
+func (chs connInterceptors) HookRead(b []byte, raw func(b []byte) (int, error), idx int) (n int, err error) {
 	for ; idx >= 0; idx-- {
 		if chs[idx].Read != nil {
 			break
@@ -118,7 +118,7 @@ func (chs connHooks) HookRead(b []byte, raw func(b []byte) (int, error), idx int
 	})
 }
 
-func (chs connHooks) HookWrite(b []byte, raw func(b []byte) (int, error), idx int) (n int, err error) {
+func (chs connInterceptors) HookWrite(b []byte, raw func(b []byte) (int, error), idx int) (n int, err error) {
 	for ; idx >= 0; idx-- {
 		if chs[idx].Write != nil {
 			break
@@ -132,7 +132,7 @@ func (chs connHooks) HookWrite(b []byte, raw func(b []byte) (int, error), idx in
 	})
 }
 
-func (chs connHooks) HookClose(raw func() error, idx int) error {
+func (chs connInterceptors) HookClose(raw func() error, idx int) error {
 	for ; idx >= 0; idx-- {
 		if chs[idx].Close != nil {
 			break
@@ -146,7 +146,7 @@ func (chs connHooks) HookClose(raw func() error, idx int) error {
 	})
 }
 
-func (chs connHooks) HookLocalAddr(raw func() net.Addr, idx int) net.Addr {
+func (chs connInterceptors) HookLocalAddr(raw func() net.Addr, idx int) net.Addr {
 	for ; idx >= 0; idx-- {
 		if chs[idx].LocalAddr != nil {
 			break
@@ -160,7 +160,7 @@ func (chs connHooks) HookLocalAddr(raw func() net.Addr, idx int) net.Addr {
 	})
 }
 
-func (chs connHooks) HookRemoteAddr(raw func() net.Addr, idx int) net.Addr {
+func (chs connInterceptors) HookRemoteAddr(raw func() net.Addr, idx int) net.Addr {
 	for ; idx >= 0; idx-- {
 		if chs[idx].RemoteAddr != nil {
 			break
@@ -174,7 +174,7 @@ func (chs connHooks) HookRemoteAddr(raw func() net.Addr, idx int) net.Addr {
 	})
 }
 
-func (chs connHooks) HookSetDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
+func (chs connInterceptors) HookSetDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
 	for ; idx >= 0; idx-- {
 		if chs[idx].SetDeadline != nil {
 			break
@@ -188,7 +188,7 @@ func (chs connHooks) HookSetDeadline(dl time.Time, raw func(time.Time) error, id
 	})
 }
 
-func (chs connHooks) HookSetReadDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
+func (chs connInterceptors) HookSetReadDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
 	for ; idx >= 0; idx-- {
 		if chs[idx].SetReadDeadline != nil {
 			break
@@ -202,7 +202,7 @@ func (chs connHooks) HookSetReadDeadline(dl time.Time, raw func(time.Time) error
 	})
 }
 
-func (chs connHooks) HookSetWriteDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
+func (chs connInterceptors) HookSetWriteDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
 	for ; idx >= 0; idx-- {
 		if chs[idx].SetWriteDeadline != nil {
 			break
@@ -216,8 +216,8 @@ func (chs connHooks) HookSetWriteDeadline(dl time.Time, raw func(time.Time) erro
 	})
 }
 
-// ContextWithConnHook set conn hook to context
-func ContextWithConnHook(ctx context.Context, hooks ...*ConnHook) context.Context {
+// ContextWithConnInterceptor set conn interceptor to context
+func ContextWithConnInterceptor(ctx context.Context, hooks ...*ConnInterceptor) context.Context {
 	if len(hooks) == 0 {
 		return ctx
 	}
@@ -230,8 +230,8 @@ func ContextWithConnHook(ctx context.Context, hooks ...*ConnHook) context.Contex
 	return ctx
 }
 
-// ConnHooksFromContext get conn hooks from context
-func ConnHooksFromContext(ctx context.Context) []*ConnHook {
+// ConnInterceptorsFromContext get conn hooks from context
+func ConnInterceptorsFromContext(ctx context.Context) []*ConnInterceptor {
 	chm := connHookMapperFormContext(ctx)
 	if chm == nil {
 		return nil
@@ -248,9 +248,9 @@ func connHookMapperFormContext(ctx context.Context) *connHookMapper {
 }
 
 type connHookMapper struct {
-	hooks connHooks
+	hooks connInterceptors
 }
 
-func (chm *connHookMapper) Register(hooks ...*ConnHook) {
+func (chm *connHookMapper) Register(hooks ...*ConnInterceptor) {
 	chm.hooks = append(chm.hooks, hooks...)
 }

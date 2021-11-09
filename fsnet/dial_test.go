@@ -38,7 +38,7 @@ func TestDialer_DialContext(t *testing.T) {
 				retConn: nil,
 				retErr:  wantErr,
 			},
-			Hooks: []*DialerHook{
+			Interceptors: []*DialerInterceptor{
 				{
 					DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 						checkNum(4)
@@ -54,18 +54,18 @@ func TestDialer_DialContext(t *testing.T) {
 			},
 		}
 		ctx := context.Background()
-		ctx = ContextWithDialerHook(ctx, &DialerHook{
+		ctx = ContextWithDialerHook(ctx, &DialerInterceptor{
 			DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 				checkNum(2)
 				return fn(ctx, network, address)
 			},
-		}, &DialerHook{
+		}, &DialerInterceptor{
 			DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 				checkNum(1)
 				return fn(ctx, network, address)
 			},
 		})
-		ctx = ContextWithDialerHook(ctx, &DialerHook{
+		ctx = ContextWithDialerHook(ctx, &DialerInterceptor{
 			DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 				checkNum(0)
 				return fn(ctx, network, address)
@@ -92,7 +92,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 		retErr: fmt.Errorf("mustErr"),
 	}
 	t.Run("zero dhs", func(t *testing.T) {
-		var dhs dialerHooks
+		var dhs dialerInterceptors
 		_, err := dhs.HookDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, -1)
 		assert.Equal(t, td.retErr, err)
 	})
@@ -103,7 +103,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 			assert.Equal(t, want, num)
 			num++
 		}
-		dhs := dialerHooks{
+		dhs := dialerInterceptors{
 			{
 				DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 					checkNum(0)
@@ -121,7 +121,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 			assert.Equal(t, want, num)
 			num++
 		}
-		dhs := dialerHooks{
+		dhs := dialerInterceptors{
 			{
 				DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 					checkNum(1)
@@ -146,9 +146,9 @@ func TestMustRegisterDialerHook(t *testing.T) {
 	defer func() {
 		DefaultDialer = &Dialer{}
 	}()
-	hk := NewConnDialerHook(&ConnHook{})
+	hk := NewConnDialerInterceptor(&ConnInterceptor{})
 	MustRegisterDialerHook(hk)
-	hks := DefaultDialer.(*Dialer).Hooks
+	hks := DefaultDialer.(*Dialer).Interceptors
 	assert.Len(t, hks, 1)
 
 	assert.Equal(t, hks[0], hk)

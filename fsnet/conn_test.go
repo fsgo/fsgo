@@ -19,7 +19,7 @@ func TestNewConn(t *testing.T) {
 
 		var readIndex int
 
-		tr := &ConnHook{
+		tr := &ConnInterceptor{
 			Read: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
 				defer func() {
 					readTotal += n
@@ -46,7 +46,7 @@ func TestNewConn(t *testing.T) {
 			},
 		}
 
-		tr2 := &ConnHook{
+		tr2 := &ConnInterceptor{
 			Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 				readIndex++
 				assert.Equal(t, 1, readIndex)
@@ -54,9 +54,9 @@ func TestNewConn(t *testing.T) {
 			},
 		}
 
-		stHook := NewConnStatHook()
+		stHook := NewConnStatInterceptor()
 
-		w1 := NewConn(w, tr, tr2, stHook.ConnHook())
+		w1 := NewConn(w, tr, tr2, stHook.ConnInterceptor())
 		r1 := NewConn(r)
 
 		msg := []byte("hello")
@@ -93,7 +93,7 @@ func TestNewConn(t *testing.T) {
 
 func TestNewConn_merge(t *testing.T) {
 	var id int
-	hk1 := &ConnHook{
+	hk1 := &ConnInterceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			// 先注册的后执行
 			id++
@@ -103,7 +103,7 @@ func TestNewConn_merge(t *testing.T) {
 	}
 	nc := NewConn(&net.TCPConn{}, hk1)
 
-	hk2 := &ConnHook{
+	hk2 := &ConnInterceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			id++
 			assert.Equal(t, 1, id)
