@@ -75,7 +75,7 @@ func TestResolverCached(t *testing.T) {
 		}
 	}
 
-	t.Run("default no hooks", func(t *testing.T) {
+	t.Run("default no its", func(t *testing.T) {
 		std := &testResolver{}
 		std.lookupIPData.Store("def.com", []net.IP{net.ParseIP("127.0.0.1")})
 		std.lookupIPAddrData.Store("def.com", []net.IPAddr{
@@ -110,7 +110,7 @@ func TestResolverCached(t *testing.T) {
 		runTestCases(t, re, tests)
 	})
 
-	t.Run("with hooks", func(t *testing.T) {
+	t.Run("with its", func(t *testing.T) {
 		std := &testResolver{}
 		std.lookupIPData.Store("def.com", []net.IP{net.ParseIP("127.0.0.1")})
 		std.lookupIPAddrData.Store("def.com", []net.IPAddr{

@@ -12,17 +12,17 @@ import (
 
 var _ net.Conn = (*conn)(nil)
 
-// NewConn wrap conn with hooks
-// hooks 将倒序执行：后注册的先执行
-func NewConn(c net.Conn, hooks ...*ConnInterceptor) net.Conn {
+// WrapConn wrap conn with ConnInterceptor
+// its 将倒序执行：后注册的先执行
+func WrapConn(c net.Conn, its ...*ConnInterceptor) net.Conn {
 	if rc, ok := c.(*conn); ok {
-		rc.hooks = append(rc.hooks, hooks...)
+		rc.its = append(rc.its, its...)
 		return rc
 	}
 
 	nc := &conn{
-		raw:   c,
-		hooks: hooks,
+		raw: c,
+		its: its,
 	}
 	return nc
 }
@@ -48,8 +48,8 @@ var _ net.Conn = (*conn)(nil)
 var _ HasRawConn = (*conn)(nil)
 
 type conn struct {
-	raw   net.Conn
-	hooks connInterceptors
+	raw net.Conn
+	its connInterceptors
 }
 
 func (c *conn) Raw() net.Conn {
@@ -57,35 +57,35 @@ func (c *conn) Raw() net.Conn {
 }
 
 func (c *conn) Read(b []byte) (n int, err error) {
-	return c.hooks.HookRead(b, c.raw.Read, len(c.hooks)-1)
+	return c.its.CallRead(b, c.raw.Read, len(c.its)-1)
 }
 
 func (c *conn) Write(b []byte) (n int, err error) {
-	return c.hooks.HookWrite(b, c.raw.Write, len(c.hooks)-1)
+	return c.its.CallWrite(b, c.raw.Write, len(c.its)-1)
 }
 
 func (c *conn) Close() error {
-	return c.hooks.HookClose(c.raw.Close, len(c.hooks)-1)
+	return c.its.CallClose(c.raw.Close, len(c.its)-1)
 }
 
 func (c *conn) LocalAddr() net.Addr {
-	return c.hooks.HookLocalAddr(c.raw.LocalAddr, len(c.hooks)-1)
+	return c.its.CallLocalAddr(c.raw.LocalAddr, len(c.its)-1)
 }
 
 func (c *conn) RemoteAddr() net.Addr {
-	return c.hooks.HookRemoteAddr(c.raw.RemoteAddr, len(c.hooks)-1)
+	return c.its.CallRemoteAddr(c.raw.RemoteAddr, len(c.its)-1)
 }
 
 func (c *conn) SetDeadline(t time.Time) error {
-	return c.hooks.HookSetDeadline(t, c.raw.SetDeadline, len(c.hooks)-1)
+	return c.its.CallSetDeadline(t, c.raw.SetDeadline, len(c.its)-1)
 }
 
 func (c *conn) SetReadDeadline(t time.Time) error {
-	return c.hooks.HookSetReadDeadline(t, c.raw.SetReadDeadline, len(c.hooks)-1)
+	return c.its.CallSetReadDeadline(t, c.raw.SetReadDeadline, len(c.its)-1)
 }
 
 func (c *conn) SetWriteDeadline(t time.Time) error {
-	return c.hooks.HookSetWriteDeadline(t, c.raw.SetWriteDeadline, len(c.hooks)-1)
+	return c.its.CallSetWriteDeadline(t, c.raw.SetWriteDeadline, len(c.its)-1)
 }
 
 // ConnInterceptor conn Interceptor
@@ -104,7 +104,7 @@ type ConnInterceptor struct {
 // 倒序执行,后注册的先执行
 type connInterceptors []*ConnInterceptor
 
-func (chs connInterceptors) HookRead(b []byte, raw func(b []byte) (int, error), idx int) (n int, err error) {
+func (chs connInterceptors) CallRead(b []byte, raw func(b []byte) (int, error), idx int) (n int, err error) {
 	for ; idx >= 0; idx-- {
 		if chs[idx].Read != nil {
 			break
@@ -114,11 +114,11 @@ func (chs connInterceptors) HookRead(b []byte, raw func(b []byte) (int, error), 
 		return raw(b)
 	}
 	return chs[idx].Read(b, func(b []byte) (int, error) {
-		return chs.HookRead(b, raw, idx-1)
+		return chs.CallRead(b, raw, idx-1)
 	})
 }
 
-func (chs connInterceptors) HookWrite(b []byte, raw func(b []byte) (int, error), idx int) (n int, err error) {
+func (chs connInterceptors) CallWrite(b []byte, raw func(b []byte) (int, error), idx int) (n int, err error) {
 	for ; idx >= 0; idx-- {
 		if chs[idx].Write != nil {
 			break
@@ -128,11 +128,11 @@ func (chs connInterceptors) HookWrite(b []byte, raw func(b []byte) (int, error),
 		return raw(b)
 	}
 	return chs[idx].Write(b, func(b []byte) (int, error) {
-		return chs.HookWrite(b, raw, idx-1)
+		return chs.CallWrite(b, raw, idx-1)
 	})
 }
 
-func (chs connInterceptors) HookClose(raw func() error, idx int) error {
+func (chs connInterceptors) CallClose(raw func() error, idx int) error {
 	for ; idx >= 0; idx-- {
 		if chs[idx].Close != nil {
 			break
@@ -142,11 +142,11 @@ func (chs connInterceptors) HookClose(raw func() error, idx int) error {
 		return raw()
 	}
 	return chs[idx].Close(func() error {
-		return chs.HookClose(raw, idx-1)
+		return chs.CallClose(raw, idx-1)
 	})
 }
 
-func (chs connInterceptors) HookLocalAddr(raw func() net.Addr, idx int) net.Addr {
+func (chs connInterceptors) CallLocalAddr(raw func() net.Addr, idx int) net.Addr {
 	for ; idx >= 0; idx-- {
 		if chs[idx].LocalAddr != nil {
 			break
@@ -156,11 +156,11 @@ func (chs connInterceptors) HookLocalAddr(raw func() net.Addr, idx int) net.Addr
 		return raw()
 	}
 	return chs[idx].LocalAddr(func() net.Addr {
-		return chs.HookLocalAddr(raw, idx-1)
+		return chs.CallLocalAddr(raw, idx-1)
 	})
 }
 
-func (chs connInterceptors) HookRemoteAddr(raw func() net.Addr, idx int) net.Addr {
+func (chs connInterceptors) CallRemoteAddr(raw func() net.Addr, idx int) net.Addr {
 	for ; idx >= 0; idx-- {
 		if chs[idx].RemoteAddr != nil {
 			break
@@ -170,11 +170,11 @@ func (chs connInterceptors) HookRemoteAddr(raw func() net.Addr, idx int) net.Add
 		return raw()
 	}
 	return chs[idx].RemoteAddr(func() net.Addr {
-		return chs.HookRemoteAddr(raw, idx-1)
+		return chs.CallRemoteAddr(raw, idx-1)
 	})
 }
 
-func (chs connInterceptors) HookSetDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
+func (chs connInterceptors) CallSetDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
 	for ; idx >= 0; idx-- {
 		if chs[idx].SetDeadline != nil {
 			break
@@ -184,11 +184,11 @@ func (chs connInterceptors) HookSetDeadline(dl time.Time, raw func(time.Time) er
 		return raw(dl)
 	}
 	return chs[idx].SetDeadline(func(dl time.Time) error {
-		return chs.HookSetDeadline(dl, raw, idx-1)
+		return chs.CallSetDeadline(dl, raw, idx-1)
 	})
 }
 
-func (chs connInterceptors) HookSetReadDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
+func (chs connInterceptors) CallSetReadDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
 	for ; idx >= 0; idx-- {
 		if chs[idx].SetReadDeadline != nil {
 			break
@@ -198,11 +198,11 @@ func (chs connInterceptors) HookSetReadDeadline(dl time.Time, raw func(time.Time
 		return raw(dl)
 	}
 	return chs[idx].SetReadDeadline(func(dl time.Time) error {
-		return chs.HookSetReadDeadline(dl, raw, idx-1)
+		return chs.CallSetReadDeadline(dl, raw, idx-1)
 	})
 }
 
-func (chs connInterceptors) HookSetWriteDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
+func (chs connInterceptors) CallSetWriteDeadline(dl time.Time, raw func(time.Time) error, idx int) error {
 	for ; idx >= 0; idx-- {
 		if chs[idx].SetWriteDeadline != nil {
 			break
@@ -212,7 +212,7 @@ func (chs connInterceptors) HookSetWriteDeadline(dl time.Time, raw func(time.Tim
 		return raw(dl)
 	}
 	return chs[idx].SetWriteDeadline(func(dl time.Time) error {
-		return chs.HookSetWriteDeadline(dl, raw, idx-1)
+		return chs.CallSetWriteDeadline(dl, raw, idx-1)
 	})
 }
 
@@ -230,7 +230,7 @@ func ContextWithConnInterceptor(ctx context.Context, hooks ...*ConnInterceptor) 
 	return ctx
 }
 
-// ConnInterceptorsFromContext get conn hooks from context
+// ConnInterceptorsFromContext get conn its from context
 func ConnInterceptorsFromContext(ctx context.Context) []*ConnInterceptor {
 	chm := connHookMapperFormContext(ctx)
 	if chm == nil {

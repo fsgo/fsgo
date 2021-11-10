@@ -42,7 +42,7 @@ func (wf *WatchFile) Start() error {
 		Delay:    time.Second,
 	}
 	watcher.Watch(wf.FileName, func(event *WatcherEvent) {
-		wf.Load()
+		_ = wf.Load()
 		for _, fn := range wf.afterChanges {
 			fn()
 		}

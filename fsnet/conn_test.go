@@ -12,7 +12,7 @@ import (
 )
 
 func TestNewConn(t *testing.T) {
-	t.Run("hooks", func(t *testing.T) {
+	t.Run("its", func(t *testing.T) {
 		w, r := net.Pipe()
 		var readTotal, writeTotal int
 		var closeNum int
@@ -56,8 +56,8 @@ func TestNewConn(t *testing.T) {
 
 		stHook := NewConnStatInterceptor()
 
-		w1 := NewConn(w, tr, tr2, stHook.ConnInterceptor())
-		r1 := NewConn(r)
+		w1 := WrapConn(w, tr, tr2, stHook.ConnInterceptor())
+		r1 := WrapConn(r)
 
 		msg := []byte("hello")
 		go func() {
@@ -101,7 +101,7 @@ func TestNewConn_merge(t *testing.T) {
 			return raw(b)
 		},
 	}
-	nc := NewConn(&net.TCPConn{}, hk1)
+	nc := WrapConn(&net.TCPConn{}, hk1)
 
 	hk2 := &ConnInterceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
@@ -110,7 +110,7 @@ func TestNewConn_merge(t *testing.T) {
 			return raw(b)
 		},
 	}
-	nc1 := NewConn(nc, hk2)
+	nc1 := WrapConn(nc, hk2)
 	assert.Equal(t, nc, nc1)
 	bf := make([]byte, 1)
 	_, _ = nc1.Read(bf)
@@ -118,7 +118,7 @@ func TestNewConn_merge(t *testing.T) {
 
 func TestOriginConn(t *testing.T) {
 	c1 := &net.TCPConn{}
-	c2 := NewConn(c1)
+	c2 := WrapConn(c1)
 
 	assert.Equal(t, c1, OriginConn(c2))
 	assert.Equal(t, c1, OriginConn(c1))

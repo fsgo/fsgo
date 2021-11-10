@@ -70,7 +70,7 @@ func (ch *ConnStatInterceptor) init() {
 				atomic.AddInt64(&ch.dialFailTimes, 1)
 				return nil, err
 			}
-			return NewConn(conn, ch.connHook), nil
+			return WrapConn(conn, ch.connHook), nil
 		},
 	}
 }

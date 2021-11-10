@@ -14,7 +14,7 @@ import (
 )
 
 func TestDialer_DialContext(t *testing.T) {
-	t.Run("default no hooks", func(t *testing.T) {
+	t.Run("default no its", func(t *testing.T) {
 		wantErr := fmt.Errorf("err must")
 		d := &Dialer{
 			StdDialer: &testDialer{
@@ -26,7 +26,7 @@ func TestDialer_DialContext(t *testing.T) {
 		assert.Equal(t, wantErr, err)
 	})
 
-	t.Run("with many hooks", func(t *testing.T) {
+	t.Run("with many its", func(t *testing.T) {
 		wantErr := fmt.Errorf("err must")
 		var num int32
 		checkNum := func(want int32) {
@@ -93,7 +93,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 	}
 	t.Run("zero dhs", func(t *testing.T) {
 		var dhs dialerInterceptors
-		_, err := dhs.HookDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, -1)
+		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, -1)
 		assert.Equal(t, td.retErr, err)
 	})
 
@@ -111,7 +111,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 				},
 			},
 		}
-		_, err := dhs.HookDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, len(dhs)-1)
+		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, len(dhs)-1)
 		assert.Equal(t, td.retErr, err)
 		checkNum(1)
 	})
@@ -135,7 +135,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 				},
 			},
 		}
-		_, err := dhs.HookDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, len(dhs)-1)
+		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, len(dhs)-1)
 		assert.Equal(t, td.retErr, err)
 		checkNum(2)
 	})
@@ -147,7 +147,7 @@ func TestMustRegisterDialerHook(t *testing.T) {
 		DefaultDialer = &Dialer{}
 	}()
 	hk := NewConnDialerInterceptor(&ConnInterceptor{})
-	MustRegisterDialerHook(hk)
+	MustRegisterDialerInterceptor(hk)
 	hks := DefaultDialer.(*Dialer).Interceptors
 	assert.Len(t, hks, 1)
 

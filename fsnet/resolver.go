@@ -56,7 +56,7 @@ type ResolverCached struct {
 
 // LookupIP Lookup IP
 func (r *ResolverCached) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
-	return resolverInterceptors(r.Interceptors).HookLookupIP(ctx, network, host, r.lookupIP, len(r.Interceptors)-1)
+	return resolverInterceptors(r.Interceptors).CallLookupIP(ctx, network, host, r.lookupIP, len(r.Interceptors)-1)
 }
 
 func (r *ResolverCached) lookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
@@ -75,7 +75,7 @@ func (r *ResolverCached) lookupIP(ctx context.Context, network, host string) ([]
 
 // LookupIPAddr Lookup IPAddr
 func (r *ResolverCached) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
-	return resolverInterceptors(r.Interceptors).HookLookupIPAddr(ctx, host, r.lookupIPAddr, len(r.Interceptors)-1)
+	return resolverInterceptors(r.Interceptors).CallLookupIPAddr(ctx, host, r.lookupIPAddr, len(r.Interceptors)-1)
 }
 
 func (r *ResolverCached) lookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
@@ -213,7 +213,7 @@ func (rhm *resolverInterceptorMapper) Register(hooks ...*ResolverInterceptor) {
 
 type resolverInterceptors []*ResolverInterceptor
 
-func (rhs resolverInterceptors) HookLookupIP(ctx context.Context, network, host string, fn LookupIPFunc, idx int) ([]net.IP, error) {
+func (rhs resolverInterceptors) CallLookupIP(ctx context.Context, network, host string, fn LookupIPFunc, idx int) ([]net.IP, error) {
 	for ; idx >= 0; idx-- {
 		if rhs[idx].LookupIP != nil {
 			break
@@ -224,11 +224,11 @@ func (rhs resolverInterceptors) HookLookupIP(ctx context.Context, network, host 
 	}
 
 	return rhs[idx].LookupIP(ctx, network, host, func(ctx context.Context, network string, host string) ([]net.IP, error) {
-		return rhs.HookLookupIP(ctx, network, host, fn, idx-1)
+		return rhs.CallLookupIP(ctx, network, host, fn, idx-1)
 	})
 }
 
-func (rhs resolverInterceptors) HookLookupIPAddr(ctx context.Context, host string, fn LookupIPAddrFunc, idx int) ([]net.IPAddr, error) {
+func (rhs resolverInterceptors) CallLookupIPAddr(ctx context.Context, host string, fn LookupIPAddrFunc, idx int) ([]net.IPAddr, error) {
 	for ; idx >= 0; idx-- {
 		if rhs[idx].LookupIPAddr != nil {
 			break
@@ -239,7 +239,7 @@ func (rhs resolverInterceptors) HookLookupIPAddr(ctx context.Context, host strin
 		return fn(ctx, host)
 	}
 	return rhs[idx].LookupIPAddr(ctx, host, func(ctx context.Context, host string) ([]net.IPAddr, error) {
-		return rhs.HookLookupIPAddr(ctx, host, fn, idx-1)
+		return rhs.CallLookupIPAddr(ctx, host, fn, idx-1)
 	})
 }
 
