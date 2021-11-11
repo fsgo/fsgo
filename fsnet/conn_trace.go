@@ -13,13 +13,13 @@ import (
 	"time"
 )
 
-// NewConnStatInterceptor create instance
-func NewConnStatInterceptor() *ConnStatInterceptor {
-	return &ConnStatInterceptor{}
+// NewConnStatTrace create new ConnStatTrace instance
+func NewConnStatTrace() *ConnStatTrace {
+	return &ConnStatTrace{}
 }
 
-// ConnStatInterceptor 用于获取网络状态的 Hook
-type ConnStatInterceptor struct {
+// ConnStatTrace 用于获取网络状态的拦截器
+type ConnStatTrace struct {
 	readSize int64
 	readCost int64
 
@@ -30,14 +30,14 @@ type ConnStatInterceptor struct {
 	dialTimes     int64
 	dialFailTimes int64
 
-	connHook *ConnInterceptor
-	dialHook *DialerInterceptor
+	connIt   *ConnInterceptor
+	dialerIt *DialerInterceptor
 
 	once sync.Once
 }
 
-func (ch *ConnStatInterceptor) init() {
-	ch.connHook = &ConnInterceptor{
+func (ch *ConnStatTrace) init() {
+	ch.connIt = &ConnInterceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
@@ -57,7 +57,7 @@ func (ch *ConnStatInterceptor) init() {
 		},
 	}
 
-	ch.dialHook = &DialerInterceptor{
+	ch.dialerIt = &DialerInterceptor{
 		DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 			start := time.Now()
 
@@ -70,60 +70,60 @@ func (ch *ConnStatInterceptor) init() {
 				atomic.AddInt64(&ch.dialFailTimes, 1)
 				return nil, err
 			}
-			return WrapConn(conn, ch.connHook), nil
+			return WrapConn(conn, ch.connIt), nil
 		},
 	}
 }
 
 // ConnInterceptor 获取 net.Conn 的状态拦截器
-func (ch *ConnStatInterceptor) ConnInterceptor() *ConnInterceptor {
+func (ch *ConnStatTrace) ConnInterceptor() *ConnInterceptor {
 	ch.once.Do(ch.init)
-	return ch.connHook
+	return ch.connIt
 }
 
 // DialerInterceptor 获取拨号器的拦截器，之后可将其注册到 Dialer
-func (ch *ConnStatInterceptor) DialerInterceptor() *DialerInterceptor {
+func (ch *ConnStatTrace) DialerInterceptor() *DialerInterceptor {
 	ch.once.Do(ch.init)
-	return ch.dialHook
+	return ch.dialerIt
 }
 
 // ReadSize 获取累计读到的的字节大小
-func (ch *ConnStatInterceptor) ReadSize() int64 {
+func (ch *ConnStatTrace) ReadSize() int64 {
 	return atomic.LoadInt64(&ch.readSize)
 }
 
 // ReadCost 获取累积的读耗时
-func (ch *ConnStatInterceptor) ReadCost() time.Duration {
+func (ch *ConnStatTrace) ReadCost() time.Duration {
 	return time.Duration(atomic.LoadInt64(&ch.readCost))
 }
 
 // WriteSize 获取累计写出的的字节大小
-func (ch *ConnStatInterceptor) WriteSize() int64 {
+func (ch *ConnStatTrace) WriteSize() int64 {
 	return atomic.LoadInt64(&ch.writeSize)
 }
 
 // WriteCost 获取累积的写耗时
-func (ch *ConnStatInterceptor) WriteCost() time.Duration {
+func (ch *ConnStatTrace) WriteCost() time.Duration {
 	return time.Duration(atomic.LoadInt64(&ch.writeCost))
 }
 
 // DialCost 获取累积的 Dial 耗时
-func (ch *ConnStatInterceptor) DialCost() time.Duration {
+func (ch *ConnStatTrace) DialCost() time.Duration {
 	return time.Duration(atomic.LoadInt64(&ch.dialCost))
 }
 
 // DialTimes 获取累积的 Dial 总次数
-func (ch *ConnStatInterceptor) DialTimes() int64 {
+func (ch *ConnStatTrace) DialTimes() int64 {
 	return atomic.LoadInt64(&ch.dialTimes)
 }
 
 // DialFailTimes 获取累积的 Dial 失败次数
-func (ch *ConnStatInterceptor) DialFailTimes() int64 {
+func (ch *ConnStatTrace) DialFailTimes() int64 {
 	return atomic.LoadInt64(&ch.dialFailTimes)
 }
 
 // Reset 将所有状态数据重置为 0
-func (ch *ConnStatInterceptor) Reset() {
+func (ch *ConnStatTrace) Reset() {
 	atomic.StoreInt64(&ch.dialCost, 0)
 	atomic.StoreInt64(&ch.dialTimes, 0)
 	atomic.StoreInt64(&ch.dialFailTimes, 0)
@@ -135,20 +135,20 @@ func (ch *ConnStatInterceptor) Reset() {
 	atomic.StoreInt64(&ch.writeCost, 0)
 }
 
-// NewConnReadBytesHook create ConnReadBytesHook ins
-func NewConnReadBytesHook() *ConnReadBytesHook {
-	return &ConnReadBytesHook{}
+// NewConnReadBytesTrace create ConnReadBytesTrace instance
+func NewConnReadBytesTrace() *ConnReadBytesTrace {
+	return &ConnReadBytesTrace{}
 }
 
-// ConnReadBytesHook 获取所有通过 Read 方法读取的数据的副本
-type ConnReadBytesHook struct {
+// ConnReadBytesTrace 获取所有通过 Read 方法读取的数据的副本
+type ConnReadBytesTrace struct {
 	connHook *ConnInterceptor
 	buf      bytes.Buffer
 	once     sync.Once
 	mux      sync.RWMutex
 }
 
-func (ch *ConnReadBytesHook) init() {
+func (ch *ConnReadBytesTrace) init() {
 	ch.connHook = &ConnInterceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			n, err := raw(b)
@@ -163,39 +163,39 @@ func (ch *ConnReadBytesHook) init() {
 }
 
 // ReadBytes Read 方法读取到的数据的副本
-func (ch *ConnReadBytesHook) ReadBytes() []byte {
+func (ch *ConnReadBytesTrace) ReadBytes() []byte {
 	ch.mux.RLock()
 	defer ch.mux.RUnlock()
 	return ch.buf.Bytes()
 }
 
 // ConnInterceptor 获取 ConnInterceptor 实例
-func (ch *ConnReadBytesHook) ConnInterceptor() *ConnInterceptor {
+func (ch *ConnReadBytesTrace) ConnInterceptor() *ConnInterceptor {
 	ch.once.Do(ch.init)
 	return ch.connHook
 }
 
 // Reset 重置 buffer
-func (ch *ConnReadBytesHook) Reset() {
+func (ch *ConnReadBytesTrace) Reset() {
 	ch.mux.Lock()
 	ch.buf.Reset()
 	ch.mux.Unlock()
 }
 
-// NewConnWriteBytesInterceptor create ConnWriteBytesInterceptor
-func NewConnWriteBytesInterceptor() *ConnWriteBytesInterceptor {
-	return &ConnWriteBytesInterceptor{}
+// NewConnWriteBytesTrace create ConnWriteBytesTrace instance
+func NewConnWriteBytesTrace() *ConnWriteBytesTrace {
+	return &ConnWriteBytesTrace{}
 }
 
-// ConnWriteBytesInterceptor 获取所有通过 Write 方法写出的数据的副本
-type ConnWriteBytesInterceptor struct {
+// ConnWriteBytesTrace 获取所有通过 Write 方法写出的数据的副本
+type ConnWriteBytesTrace struct {
 	connHook *ConnInterceptor
 	buf      bytes.Buffer
 	once     sync.Once
 	mux      sync.RWMutex
 }
 
-func (ch *ConnWriteBytesInterceptor) init() {
+func (ch *ConnWriteBytesTrace) init() {
 	ch.connHook = &ConnInterceptor{
 		Write: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			n, err := raw(b)
@@ -210,20 +210,20 @@ func (ch *ConnWriteBytesInterceptor) init() {
 }
 
 // WriteBytes Write 方法写出的数据的副本
-func (ch *ConnWriteBytesInterceptor) WriteBytes() []byte {
+func (ch *ConnWriteBytesTrace) WriteBytes() []byte {
 	ch.mux.RLock()
 	defer ch.mux.RUnlock()
 	return ch.buf.Bytes()
 }
 
 // ConnInterceptor 获取 ConnInterceptor 实例
-func (ch *ConnWriteBytesInterceptor) ConnInterceptor() *ConnInterceptor {
+func (ch *ConnWriteBytesTrace) ConnInterceptor() *ConnInterceptor {
 	ch.once.Do(ch.init)
 	return ch.connHook
 }
 
 // Reset 重置 buffer
-func (ch *ConnWriteBytesInterceptor) Reset() {
+func (ch *ConnWriteBytesTrace) Reset() {
 	ch.mux.Lock()
 	ch.buf.Reset()
 	ch.mux.Unlock()

@@ -54,7 +54,7 @@ func TestNewConn(t *testing.T) {
 			},
 		}
 
-		stHook := NewConnStatInterceptor()
+		stHook := NewConnStatTrace()
 
 		w1 := WrapConn(w, tr, tr2, stHook.ConnInterceptor())
 		r1 := WrapConn(r)

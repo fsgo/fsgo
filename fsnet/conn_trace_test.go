@@ -15,10 +15,10 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestConnReadBytesHook(t *testing.T) {
+func TestConnReadBytesTrace(t *testing.T) {
 	t.Run("read fail", func(t *testing.T) {
 		c1 := &net.TCPConn{}
-		ch := NewConnReadBytesHook()
+		ch := NewConnReadBytesTrace()
 		c2 := WrapConn(c1, ch.ConnInterceptor())
 		bf := make([]byte, 1024)
 		_, err := c2.Read(bf)
@@ -31,7 +31,7 @@ func TestConnReadBytesHook(t *testing.T) {
 		defer w.Close()
 		defer r.Close()
 
-		ch := NewConnReadBytesHook()
+		ch := NewConnReadBytesTrace()
 		c2 := WrapConn(r, ch.ConnInterceptor())
 
 		want := []byte("hello")
@@ -52,10 +52,10 @@ func TestConnReadBytesHook(t *testing.T) {
 	})
 }
 
-func TestConnWriteBytesHook(t *testing.T) {
+func TestConnWriteBytesTrace(t *testing.T) {
 	t.Run("write fail", func(t *testing.T) {
 		c1 := &net.TCPConn{}
-		ch := NewConnWriteBytesInterceptor()
+		ch := NewConnWriteBytesTrace()
 		c2 := WrapConn(c1, ch.ConnInterceptor())
 		_, err := c2.Write([]byte("hello"))
 		assert.NotNil(t, err)
@@ -67,7 +67,7 @@ func TestConnWriteBytesHook(t *testing.T) {
 		defer w.Close()
 		defer r.Close()
 
-		ch := NewConnWriteBytesInterceptor()
+		ch := NewConnWriteBytesTrace()
 		c2 := WrapConn(r, ch.ConnInterceptor())
 
 		go func() {
@@ -87,7 +87,7 @@ func TestConnWriteBytesHook(t *testing.T) {
 	})
 }
 
-func Test_hooks(t *testing.T) {
+func Test_Traces(t *testing.T) {
 	DefaultDialer = &Dialer{}
 	defer func() {
 		DefaultDialer = &Dialer{}
@@ -102,8 +102,8 @@ func Test_hooks(t *testing.T) {
 	ts := httptest.NewServer(rt)
 	defer ts.Close()
 
-	statHK := NewConnStatInterceptor()
-	readHK := NewConnReadBytesHook()
+	statHK := NewConnStatTrace()
+	readHK := NewConnReadBytesTrace()
 	globalHook := NewConnDialerInterceptor(readHK.ConnInterceptor())
 	MustRegisterDialerInterceptor(statHK.DialerInterceptor(), globalHook)
 
