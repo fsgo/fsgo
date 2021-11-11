@@ -1,8 +1,0 @@
-language: go
-
-go:
-  - "1.15"
-  - "1.16"
-  - "1.17"
-
-script: go get github.com/fsgo/fsgo && go test -race -cover ./...
