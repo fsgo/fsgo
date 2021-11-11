@@ -29,9 +29,9 @@ type HasLookupIP interface {
 	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
 }
 
-// ResolverCanHook 支持注册 ResolverInterceptor
-type ResolverCanHook interface {
-	RegisterHook(hooks ...*ResolverInterceptor)
+// ResolverCanIntercept 支持注册 ResolverInterceptor
+type ResolverCanIntercept interface {
+	RegisterInterceptor(its ...*ResolverInterceptor)
 }
 
 // LookupIPFunc lookupIP func type
@@ -48,6 +48,7 @@ type ResolverCached struct {
 
 	StdResolver Resolver
 
+	// Interceptors 可选，拦截器，先注册的后执行
 	Interceptors []*ResolverInterceptor
 
 	caches map[string]fscache.SCache
@@ -141,11 +142,11 @@ func (r *ResolverCached) getCache(key string) fscache.SCache {
 	return c
 }
 
-var _ ResolverCanHook = (*ResolverCached)(nil)
+var _ ResolverCanIntercept = (*ResolverCached)(nil)
 
-// RegisterHook Register Hook
-func (r *ResolverCached) RegisterHook(hooks ...*ResolverInterceptor) {
-	r.Interceptors = append(r.Interceptors, hooks...)
+// RegisterInterceptor Register Interceptor
+func (r *ResolverCached) RegisterInterceptor(its ...*ResolverInterceptor) {
+	r.Interceptors = append(r.Interceptors, its...)
 }
 
 // DefaultResolver default Resolver, result has 3 min cache
@@ -176,7 +177,8 @@ var LookupIPAddr = func(ctx context.Context, host string) ([]net.IPAddr, error) 
 
 // ResolverInterceptor  Resolver Interceptor
 type ResolverInterceptor struct {
-	LookupIP     func(ctx context.Context, network, host string, fn LookupIPFunc) ([]net.IP, error)
+	LookupIP func(ctx context.Context, network, host string, fn LookupIPFunc) ([]net.IP, error)
+
 	LookupIPAddr func(ctx context.Context, host string, fn LookupIPAddrFunc) ([]net.IPAddr, error)
 }
 
@@ -189,14 +191,14 @@ func ContextWithResolverInterceptor(ctx context.Context, its ...*ResolverInterce
 	dhm := resolverInterceptorMapperFormContext(ctx)
 	if dhm == nil {
 		dhm = &resolverInterceptorMapper{}
-		ctx = context.WithValue(ctx, ctxKeyResolverHook, dhm)
+		ctx = context.WithValue(ctx, ctxKeyResolverInterceptor, dhm)
 	}
 	dhm.Register(its...)
 	return ctx
 }
 
 func resolverInterceptorMapperFormContext(ctx context.Context) *resolverInterceptorMapper {
-	val := ctx.Value(ctxKeyResolverHook)
+	val := ctx.Value(ctxKeyResolverInterceptor)
 	if val == nil {
 		return nil
 	}
@@ -204,11 +206,11 @@ func resolverInterceptorMapperFormContext(ctx context.Context) *resolverIntercep
 }
 
 type resolverInterceptorMapper struct {
-	hooks resolverInterceptors
+	its resolverInterceptors
 }
 
-func (rhm *resolverInterceptorMapper) Register(hooks ...*ResolverInterceptor) {
-	rhm.hooks = append(rhm.hooks, hooks...)
+func (rhm *resolverInterceptorMapper) Register(its ...*ResolverInterceptor) {
+	rhm.its = append(rhm.its, its...)
 }
 
 type resolverInterceptors []*ResolverInterceptor
@@ -250,8 +252,8 @@ func init() {
 // TryRegisterResolverInterceptor 尝试给 DefaultResolver 注册 ResolverInterceptor
 // 若注册失败将返回 false
 func TryRegisterResolverInterceptor(its ...*ResolverInterceptor) bool {
-	if d, ok := DefaultResolver.(ResolverCanHook); ok {
-		d.RegisterHook(its...)
+	if d, ok := DefaultResolver.(ResolverCanIntercept); ok {
+		d.RegisterInterceptor(its...)
 		return true
 	}
 	return false

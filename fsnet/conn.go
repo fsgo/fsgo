@@ -217,30 +217,30 @@ func (chs connInterceptors) CallSetWriteDeadline(dl time.Time, raw func(time.Tim
 }
 
 // ContextWithConnInterceptor set conn interceptor to context
-func ContextWithConnInterceptor(ctx context.Context, hooks ...*ConnInterceptor) context.Context {
-	if len(hooks) == 0 {
+func ContextWithConnInterceptor(ctx context.Context, its ...*ConnInterceptor) context.Context {
+	if len(its) == 0 {
 		return ctx
 	}
 	dh := connHookMapperFormContext(ctx)
 	if dh == nil {
 		dh = &connHookMapper{}
-		ctx = context.WithValue(ctx, ctxKeyConnHook, dh)
+		ctx = context.WithValue(ctx, ctxKeyConnInterceptor, dh)
 	}
-	dh.Register(hooks...)
+	dh.Register(its...)
 	return ctx
 }
 
-// ConnInterceptorsFromContext get conn its from context
+// ConnInterceptorsFromContext get conn ConnInterceptors from context
 func ConnInterceptorsFromContext(ctx context.Context) []*ConnInterceptor {
 	chm := connHookMapperFormContext(ctx)
 	if chm == nil {
 		return nil
 	}
-	return chm.hooks
+	return chm.its
 }
 
 func connHookMapperFormContext(ctx context.Context) *connHookMapper {
-	val := ctx.Value(ctxKeyConnHook)
+	val := ctx.Value(ctxKeyConnInterceptor)
 	if val == nil {
 		return nil
 	}
@@ -248,9 +248,9 @@ func connHookMapperFormContext(ctx context.Context) *connHookMapper {
 }
 
 type connHookMapper struct {
-	hooks connInterceptors
+	its connInterceptors
 }
 
-func (chm *connHookMapper) Register(hooks ...*ConnInterceptor) {
-	chm.hooks = append(chm.hooks, hooks...)
+func (chm *connHookMapper) Register(its ...*ConnInterceptor) {
+	chm.its = append(chm.its, its...)
 }

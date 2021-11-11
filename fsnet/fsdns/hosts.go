@@ -10,6 +10,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"os"
 	"strings"
 	"sync"
 
@@ -26,11 +27,15 @@ func HostsLookupIP(ctx context.Context, network, host string) ([]net.IP, error) 
 }
 
 // NewHostsFile create new HostsFile instance
-// if start fail,then panic
+// 	if start fail,then panic
 // 	already start watch the hostPath
-func NewHostsFile(hostPath string) *HostsFile {
+// 	when hostPath is empty, use the default path:
+// 	on unix like system,the default path is /etc/hosts.
+// 	the default hostsPath can set by Environment Variables 'FSGO_HOSTS',
+// 	eg: export FSGO_HOSTS=./my_hosts
+func NewHostsFile(hostsPath string) *HostsFile {
 	hf := &HostsFile{}
-	hf.FileName = hf.getPath(hostPath)
+	hf.FileName = hf.getPath(hostsPath)
 	hf.Parser = hf.parse
 	if err := hf.Start(); err != nil {
 		panic(err)
@@ -47,10 +52,19 @@ type HostsFile struct {
 }
 
 func (hf *HostsFile) getPath(fileName string) string {
-	if fileName == "" {
-		return "/etc/hosts"
+	if len(fileName) == 0 {
+		return getDefaultHostsPath()
 	}
 	return fileName
+}
+
+func getDefaultHostsPath() string {
+	hostPath := os.Getenv("FSGO_HOSTS")
+	if len(hostPath) == 0 {
+		// todo other system,eg windows
+		return "/etc/hosts"
+	}
+	return hostPath
 }
 
 func (hf *HostsFile) parse(content []byte) error {

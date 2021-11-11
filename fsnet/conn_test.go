@@ -37,7 +37,7 @@ func TestNewConn(t *testing.T) {
 				return raw(b)
 			},
 			RemoteAddr: func(raw func() net.Addr) net.Addr {
-				// return the hooked addr
+				// return the intercepted addr
 				return &net.TCPAddr{}
 			},
 			Close: func(raw func() error) error {
@@ -54,9 +54,9 @@ func TestNewConn(t *testing.T) {
 			},
 		}
 
-		stHook := NewConnStatTrace()
+		stTrace := NewConnStatTrace()
 
-		w1 := WrapConn(w, tr, tr2, stHook.ConnInterceptor())
+		w1 := WrapConn(w, tr, tr2, stTrace.ConnInterceptor())
 		r1 := WrapConn(r)
 
 		msg := []byte("hello")
@@ -79,13 +79,13 @@ func TestNewConn(t *testing.T) {
 			assert.Equal(t, 1, closeNum)
 		})
 
-		t.Run("StatHook", func(t *testing.T) {
-			assert.Greater(t, stHook.WriteSize(), int64(0))
+		t.Run("StatTrace", func(t *testing.T) {
+			assert.Greater(t, stTrace.WriteSize(), int64(0))
 
-			assert.Greater(t, int(stHook.WriteCost()), 0)
+			assert.Greater(t, int(stTrace.WriteCost()), 0)
 
-			stHook.Reset()
-			assert.Equal(t, int64(0), stHook.WriteSize())
+			stTrace.Reset()
+			assert.Equal(t, int64(0), stTrace.WriteSize())
 		})
 	})
 

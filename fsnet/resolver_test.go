@@ -126,7 +126,7 @@ func TestResolverCached(t *testing.T) {
 		var lookupIPNum testNum
 		var lookupIPAddrNum testNum
 
-		re.RegisterHook(&ResolverInterceptor{
+		re.RegisterInterceptor(&ResolverInterceptor{
 			LookupIP: func(ctx context.Context, network, host string, fn LookupIPFunc) ([]net.IP, error) {
 				lookupIPNum.Incr()
 				return fn(ctx, network, host)

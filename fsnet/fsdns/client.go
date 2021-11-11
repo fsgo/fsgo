@@ -83,8 +83,8 @@ type Client struct {
 
 	mux sync.RWMutex
 
-	// LookupIPHook after query dns success, hook the result
-	LookupIPHook func(ctx context.Context, network, host string, ns net.Addr, result []net.IP) ([]net.IP, error)
+	// LookupIPFilter after query dns success, filter the result
+	LookupIPFilter func(ctx context.Context, network, host string, ns net.Addr, result []net.IP) ([]net.IP, error)
 }
 
 // SetServers set servers
@@ -117,11 +117,11 @@ func (client *Client) LookupIP(ctx context.Context, network, host string) ([]net
 	}
 }
 
-func (client *Client) callLookupIPHook(ctx context.Context, network, host string, ns net.Addr, result []net.IP) ([]net.IP, error) {
-	if client.LookupIPHook == nil {
+func (client *Client) callLookupIPFilter(ctx context.Context, network, host string, ns net.Addr, result []net.IP) ([]net.IP, error) {
+	if client.LookupIPFilter == nil {
 		return result, nil
 	}
-	ret, err := client.LookupIPHook(ctx, network, host, ns, result)
+	ret, err := client.LookupIPFilter(ctx, network, host, ns, result)
 	if err != nil {
 		return nil, err
 	}
@@ -139,7 +139,7 @@ func (client *Client) lookupIP(ctx context.Context, network, host string) (ret [
 	for _, ns := range servers {
 		ret, err = LookupIPByNS(ctx, network, host, ns)
 		if err == nil && len(ret) > 0 {
-			ret, err = client.callLookupIPHook(ctx, network, host, ns, ret)
+			ret, err = client.callLookupIPFilter(ctx, network, host, ns, ret)
 		}
 		if err == nil && len(ret) > 0 {
 			return ret, nil
@@ -171,8 +171,8 @@ func (client *Client) LookupIPAddr(ctx context.Context, host string) ([]net.IPAd
 	return result, nil
 }
 
-// ResolverHook to ResolverHook
-func (client *Client) ResolverHook() *fsnet.ResolverInterceptor {
+// ResolverInterceptor to ResolverInterceptor
+func (client *Client) ResolverInterceptor() *fsnet.ResolverInterceptor {
 	return &fsnet.ResolverInterceptor{
 		LookupIP: func(ctx context.Context, network, host string, fn fsnet.LookupIPFunc) ([]net.IP, error) {
 			return client.LookupIP(ctx, network, host)

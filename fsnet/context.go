@@ -7,7 +7,7 @@ package fsnet
 type ctxKey uint8
 
 const (
-	ctxKeyDialerHook ctxKey = iota
-	ctxKeyResolverHook
-	ctxKeyConnHook
+	ctxKeyDialerInterceptor ctxKey = iota
+	ctxKeyResolverInterceptor
+	ctxKeyConnInterceptor
 )

@@ -54,7 +54,7 @@ func TestDialer_DialContext(t *testing.T) {
 			},
 		}
 		ctx := context.Background()
-		ctx = ContextWithDialerHook(ctx, &DialerInterceptor{
+		ctx = ContextWithDialerInterceptor(ctx, &DialerInterceptor{
 			DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 				checkNum(2)
 				return fn(ctx, network, address)
@@ -65,7 +65,7 @@ func TestDialer_DialContext(t *testing.T) {
 				return fn(ctx, network, address)
 			},
 		})
-		ctx = ContextWithDialerHook(ctx, &DialerInterceptor{
+		ctx = ContextWithDialerInterceptor(ctx, &DialerInterceptor{
 			DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 				checkNum(0)
 				return fn(ctx, network, address)
