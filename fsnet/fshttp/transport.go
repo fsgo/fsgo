@@ -15,10 +15,11 @@ import (
 	"net/url"
 	"strings"
 
-	"golang.org/x/net/http/httpproxy"
-
 	"github.com/fsgo/fsgo/fsnet"
 )
+
+// DefaultUserAgent default user agent
+var DefaultUserAgent = "fsgo/1.0"
 
 var _ http.RoundTripper = (*Transport)(nil)
 
@@ -26,21 +27,27 @@ var _ http.RoundTripper = (*Transport)(nil)
 //
 // 不管理连接,可以使用外部连接池
 type Transport struct {
-	// Proxy 可选
+	// Proxy 可选, 当前已支持 http_proxy、https_proxy
+	// 若 Proxy 为 nil,将使用 http.ProxyFromEnvironment
 	Proxy func(*http.Request) (*url.URL, error)
 
+	// DialContext 可选，拨号
 	DialContext func(ctx context.Context, network, addr string) (net.Conn, error)
 
+	// DialTLSContext 可选，TLS 拨号
 	DialTLSContext func(ctx context.Context, network, addr string) (net.Conn, error)
 
+	// TLSClientConfig 可选
 	TLSClientConfig *tls.Config
 }
 
 func (t *Transport) dialConn(ctx context.Context, req *http.Request, proxyURL *url.URL, network, addr string) (net.Conn, error) {
+	// has proxy
 	if proxyURL != nil && (proxyURL.Scheme == "http" || proxyURL.Scheme == "https") {
 		return t.dial(ctx, network, addr)
 	}
 
+	// no proxy
 	switch req.URL.Scheme {
 	case "https":
 		return t.dialTLS(ctx, req, network, addr)
@@ -77,8 +84,6 @@ func (t *Transport) dialTLS(ctx context.Context, req *http.Request, network, add
 func (t *Transport) connAddTLS(conn net.Conn, hostName string) net.Conn {
 	cfg := cloneTLSConfig(t.TLSClientConfig)
 
-	// todo check user config？
-	//  if t.TLSClientConfig==nil && cfg.ServerName == "" {}
 	if cfg.ServerName == "" {
 		cfg.ServerName = hostName
 	}
@@ -92,15 +97,11 @@ func cloneTLSConfig(cfg *tls.Config) *tls.Config {
 	return cfg.Clone()
 }
 
-var envProxy = httpproxy.FromEnvironment().ProxyFunc()
-
 func (t *Transport) getProxy() func(*http.Request) (*url.URL, error) {
 	if t.Proxy != nil {
 		return t.Proxy
 	}
-	return func(req *http.Request) (*url.URL, error) {
-		return envProxy(req.URL)
-	}
+	return http.ProxyFromEnvironment
 }
 
 func (t *Transport) getAddress(req *http.Request) (address string, proxyURL *url.URL, err error) {
@@ -128,7 +129,6 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err := checkRequest(req); err != nil {
 		return nil, err
 	}
-
 	address, proxyURL, err := t.getAddress(req)
 	if err != nil {
 		return nil, err
@@ -147,16 +147,16 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		}
 	}
 
-	// https proxy
+	// https_proxy
 	if proxyURL != nil && req.URL.Scheme == "https" {
 		if err = proxyHTTPSConn(conn, req, proxyURL); err != nil {
 			return nil, err
 		}
-		conn = t.connAddTLS(conn, proxyURL.Hostname())
+		conn = t.connAddTLS(conn, req.URL.Hostname())
 	}
 
-	// http proxy 已可以工作
-	// todo https 和 socks 待实现
+	// http_proxy and https_proxy are work fine
+	// todo socks 待实现
 
 	if proxyURL != nil {
 		err = req.WriteProxy(conn)
@@ -190,20 +190,22 @@ func proxyHTTPSConn(conn net.Conn, req *http.Request, proxy *url.URL) error {
 	if proxyAuthVal != "" {
 		hdr.Set(authKey, proxyAuthVal)
 	}
+	address := canonicalAddr(req.URL)
+	hdr.Set("User-Agent", req.UserAgent())
 	connectReq := &http.Request{
 		Method: "CONNECT",
-		URL:    &url.URL{Opaque: req.URL.Host},
-		Host:   req.URL.Host,
+		URL:    &url.URL{Opaque: address},
+		Host:   address,
 		Header: hdr,
 	}
 	err := connectReq.Write(conn)
 	if err != nil {
-		return err
+		return fmt.Errorf("connect to https_proxy(%q) failed: %w", proxy.String(), err)
 	}
 	br := bufio.NewReader(conn)
 	resp, err := http.ReadResponse(br, connectReq)
 	if err != nil {
-		return err
+		return fmt.Errorf("read connect response from https_proxy(%q) failed: %w", proxy.String(), err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
