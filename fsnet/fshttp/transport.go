@@ -13,6 +13,9 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"strings"
+
+	"golang.org/x/net/http/httpproxy"
 
 	"github.com/fsgo/fsgo/fsnet"
 )
@@ -23,6 +26,7 @@ var _ http.RoundTripper = (*Transport)(nil)
 //
 // 不管理连接,可以使用外部连接池
 type Transport struct {
+	// Proxy 可选
 	Proxy func(*http.Request) (*url.URL, error)
 
 	DialContext func(ctx context.Context, network, addr string) (net.Conn, error)
@@ -39,7 +43,7 @@ func (t *Transport) dialConn(ctx context.Context, req *http.Request, proxyURL *u
 
 	switch req.URL.Scheme {
 	case "https":
-		return t.dialTLS(ctx, network, addr)
+		return t.dialTLS(ctx, req, network, addr)
 	}
 	return t.dial(ctx, network, addr)
 }
@@ -51,20 +55,33 @@ func (t *Transport) dial(ctx context.Context, network, addr string) (net.Conn, e
 	return fsnet.DialContext(ctx, network, addr)
 }
 
-func (t *Transport) dialTLS(ctx context.Context, network, addr string) (net.Conn, error) {
+func (t *Transport) dialTLS(ctx context.Context, req *http.Request, network, addr string) (net.Conn, error) {
 	if t.DialTLSContext != nil {
 		return t.DialTLSContext(ctx, network, addr)
 	}
 	conn, err := t.dial(ctx, network, addr)
-
 	if err != nil {
 		return nil, err
 	}
-	return t.connAddTLS(conn), nil
+
+	hostName := req.Host
+	if hostName == "" {
+		hostName, _, _ = net.SplitHostPort(addr)
+	} else if strings.Contains(hostName, ":") {
+		hostName, _, _ = net.SplitHostPort(hostName)
+	}
+
+	return t.connAddTLS(conn, hostName), nil
 }
 
-func (t *Transport) connAddTLS(conn net.Conn) net.Conn {
+func (t *Transport) connAddTLS(conn net.Conn, hostName string) net.Conn {
 	cfg := cloneTLSConfig(t.TLSClientConfig)
+
+	// todo check user config？
+	//  if t.TLSClientConfig==nil && cfg.ServerName == "" {}
+	if cfg.ServerName == "" {
+		cfg.ServerName = hostName
+	}
 	return tls.Client(conn, cfg)
 }
 
@@ -75,31 +92,50 @@ func cloneTLSConfig(cfg *tls.Config) *tls.Config {
 	return cfg.Clone()
 }
 
+var envProxy = httpproxy.FromEnvironment().ProxyFunc()
+
+func (t *Transport) getProxy() func(*http.Request) (*url.URL, error) {
+	if t.Proxy != nil {
+		return t.Proxy
+	}
+	return func(req *http.Request) (*url.URL, error) {
+		return envProxy(req.URL)
+	}
+}
+
+func (t *Transport) getAddress(req *http.Request) (address string, proxyURL *url.URL, err error) {
+	proxyURL, err = t.getProxy()(req)
+	if err != nil {
+		return "", nil, fmt.Errorf("getProxy failed:%w", err)
+	}
+
+	if proxyURL == nil {
+		return canonicalAddr(req.URL), nil, nil
+	}
+
+	address = canonicalAddr(proxyURL)
+
+	proxyAuthVal := proxyAuth(proxyURL)
+	if proxyAuthVal != "" && req.URL.Scheme == "http" {
+		req.Header.Set(authKey, proxyAuthVal)
+	}
+	return address, proxyURL, nil
+}
+
 // RoundTrip 发送请求
 func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	defer closeRequest(req)
 	if err := checkRequest(req); err != nil {
 		return nil, err
 	}
-	var proxyURL *url.URL
-	var err error
 
-	var address string
-	if t.Proxy != nil {
-		proxyURL, err = t.Proxy(req)
-		if err != nil {
-			return nil, err
-		}
-		address = canonicalAddr(proxyURL)
-		proxyAuthVal := proxyAuth(proxyURL)
-		if proxyAuthVal != "" && req.URL.Scheme == "http" {
-			req.Header.Set(authKey, proxyAuthVal)
-		}
-	} else {
-		address = canonicalAddr(req.URL)
+	address, proxyURL, err := t.getAddress(req)
+	if err != nil {
+		return nil, err
 	}
 
 	conn, err := t.dialConn(req.Context(), req, proxyURL, "tcp", address)
+
 	if err != nil {
 		return nil, err
 	}
@@ -116,13 +152,13 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		if err = proxyHTTPSConn(conn, req, proxyURL); err != nil {
 			return nil, err
 		}
-		conn = t.connAddTLS(conn)
+		conn = t.connAddTLS(conn, proxyURL.Hostname())
 	}
 
 	// http proxy 已可以工作
 	// todo https 和 socks 待实现
 
-	if t.Proxy != nil {
+	if proxyURL != nil {
 		err = req.WriteProxy(conn)
 	} else {
 		err = req.Write(conn)
@@ -131,7 +167,6 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	bio := bufio.NewReader(conn)
 	return http.ReadResponse(bio, req)
 }

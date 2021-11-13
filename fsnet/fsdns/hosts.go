@@ -15,7 +15,7 @@ import (
 	"sync"
 
 	"github.com/fsgo/fsgo/fsfs"
-	"github.com/fsgo/fsgo/fsnet/internal"
+	"github.com/fsgo/fsgo/fsnet/fsip"
 )
 
 // DefaultHostsFile os default hosts file
@@ -93,9 +93,9 @@ func (hf *HostsFile) LookupIP(_ context.Context, network, host string) ([]net.IP
 	case "ip":
 		return ips, nil
 	case "ip4":
-		ips = internal.FilterIPList(internal.IPv4only, ips)
+		ips = fsip.FilterList(ips, fsip.IsIPv4only)
 	case "ip6":
-		ips = internal.FilterIPList(internal.IPv6only, ips)
+		ips = fsip.FilterList(ips, fsip.IsIPv6only)
 	default:
 		return nil, fmt.Errorf("not support network=%q", network)
 	}
