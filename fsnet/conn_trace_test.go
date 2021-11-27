@@ -18,7 +18,7 @@ import (
 func TestConnReadBytesTrace(t *testing.T) {
 	t.Run("read fail", func(t *testing.T) {
 		c1 := &net.TCPConn{}
-		ch := NewConnReadBytesTrace()
+		ch := &ConnReadBytesTrace{}
 		c2 := WrapConn(c1, ch.ConnInterceptor())
 		bf := make([]byte, 1024)
 		_, err := c2.Read(bf)
@@ -31,7 +31,7 @@ func TestConnReadBytesTrace(t *testing.T) {
 		defer w.Close()
 		defer r.Close()
 
-		ch := NewConnReadBytesTrace()
+		ch := &ConnReadBytesTrace{}
 		c2 := WrapConn(r, ch.ConnInterceptor())
 
 		want := []byte("hello")
@@ -55,7 +55,7 @@ func TestConnReadBytesTrace(t *testing.T) {
 func TestConnWriteBytesTrace(t *testing.T) {
 	t.Run("write fail", func(t *testing.T) {
 		c1 := &net.TCPConn{}
-		ch := NewConnWriteBytesTrace()
+		ch := &ConnWriteBytesTrace{}
 		c2 := WrapConn(c1, ch.ConnInterceptor())
 		_, err := c2.Write([]byte("hello"))
 		assert.NotNil(t, err)
@@ -67,7 +67,7 @@ func TestConnWriteBytesTrace(t *testing.T) {
 		defer w.Close()
 		defer r.Close()
 
-		ch := NewConnWriteBytesTrace()
+		ch := &ConnWriteBytesTrace{}
 		c2 := WrapConn(r, ch.ConnInterceptor())
 
 		go func() {
@@ -102,8 +102,8 @@ func Test_Traces(t *testing.T) {
 	ts := httptest.NewServer(rt)
 	defer ts.Close()
 
-	statHK := NewConnStatTrace()
-	readHK := NewConnReadBytesTrace()
+	statHK := &ConnStatTrace{}
+	readHK := &ConnReadBytesTrace{}
 	globalHook := NewConnDialerInterceptor(readHK.ConnInterceptor())
 	MustRegisterDialerInterceptor(statHK.DialerInterceptor(), globalHook)
 

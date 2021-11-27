@@ -34,7 +34,7 @@ type ConnStatTrace struct {
 
 func (ch *ConnStatTrace) init() {
 	ch.connInterceptor = &ConnInterceptor{
-		Read: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (n int, err error) {
+		Read: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
 				atomic.AddInt64(&ch.readCost, time.Since(start).Nanoseconds())
@@ -43,7 +43,7 @@ func (ch *ConnStatTrace) init() {
 			return raw(b)
 		},
 
-		Write: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (n int, err error) {
+		Write: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
 				atomic.AddInt64(&ch.writeCost, time.Since(start).Nanoseconds())
@@ -141,7 +141,7 @@ type ConnReadBytesTrace struct {
 
 func (ch *ConnReadBytesTrace) init() {
 	ch.interceptor = &ConnInterceptor{
-		Read: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
+		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			n, err := raw(b)
 			if n > 0 {
 				ch.mux.Lock()
@@ -183,7 +183,7 @@ type ConnWriteBytesTrace struct {
 
 func (ch *ConnWriteBytesTrace) init() {
 	ch.interceptor = &ConnInterceptor{
-		Write: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
+		Write: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			n, err := raw(b)
 			if n > 0 {
 				ch.mux.Lock()
@@ -229,7 +229,7 @@ type ConnDuplicate struct {
 
 func (cc *ConnDuplicate) init() {
 	cc.interceptor = &ConnInterceptor{
-		Read: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
+		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			n, err := raw(b)
 			if n > 0 && cc.ReadTo != nil {
 				_, _ = cc.ReadTo.Write(b[:n])
@@ -237,7 +237,7 @@ func (cc *ConnDuplicate) init() {
 			return n, err
 		},
 
-		Write: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
+		Write: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			n, err := raw(b)
 			if n > 0 && cc.ReadTo != nil {
 				_, _ = cc.WriterTo.Write(b[:n])
