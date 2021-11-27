@@ -41,13 +41,13 @@ func TestDialer_DialContext(t *testing.T) {
 			Interceptors: []*DialerInterceptor{
 				{
 					DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
-						checkNum(4)
+						checkNum(0)
 						return fn(ctx, network, address)
 					},
 				},
 				{
 					DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
-						checkNum(3)
+						checkNum(1)
 						return fn(ctx, network, address)
 					},
 				},
@@ -61,13 +61,13 @@ func TestDialer_DialContext(t *testing.T) {
 			},
 		}, &DialerInterceptor{
 			DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
-				checkNum(1)
+				checkNum(3)
 				return fn(ctx, network, address)
 			},
 		})
 		ctx = ContextWithDialerInterceptor(ctx, &DialerInterceptor{
 			DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
-				checkNum(0)
+				checkNum(4)
 				return fn(ctx, network, address)
 			},
 		})
@@ -93,7 +93,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 	}
 	t.Run("zero dhs", func(t *testing.T) {
 		var dhs dialerInterceptors
-		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, -1)
+		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, 0)
 		assert.Equal(t, td.retErr, err)
 	})
 
@@ -111,7 +111,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 				},
 			},
 		}
-		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, len(dhs)-1)
+		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, 0)
 		assert.Equal(t, td.retErr, err)
 		checkNum(1)
 	})
@@ -124,18 +124,18 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 		dhs := dialerInterceptors{
 			{
 				DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
-					checkNum(1)
+					checkNum(0)
 					return fn(ctx, network, address)
 				},
 			},
 			{
 				DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
-					checkNum(0)
+					checkNum(1)
 					return fn(ctx, network, address)
 				},
 			},
 		}
-		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, len(dhs)-1)
+		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, 0)
 		assert.Equal(t, td.retErr, err)
 		checkNum(2)
 	})

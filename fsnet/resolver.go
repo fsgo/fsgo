@@ -57,7 +57,7 @@ type ResolverCached struct {
 
 // LookupIP Lookup IP
 func (r *ResolverCached) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
-	return resolverInterceptors(r.Interceptors).CallLookupIP(ctx, network, host, r.lookupIP, len(r.Interceptors)-1)
+	return resolverInterceptors(r.Interceptors).CallLookupIP(ctx, network, host, r.lookupIP, 0)
 }
 
 func (r *ResolverCached) lookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
@@ -76,7 +76,7 @@ func (r *ResolverCached) lookupIP(ctx context.Context, network, host string) ([]
 
 // LookupIPAddr Lookup IPAddr
 func (r *ResolverCached) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
-	return resolverInterceptors(r.Interceptors).CallLookupIPAddr(ctx, host, r.lookupIPAddr, len(r.Interceptors)-1)
+	return resolverInterceptors(r.Interceptors).CallLookupIPAddr(ctx, host, r.lookupIPAddr, 0)
 }
 
 func (r *ResolverCached) lookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
@@ -149,6 +149,11 @@ func (r *ResolverCached) RegisterInterceptor(its ...*ResolverInterceptor) {
 	r.Interceptors = append(r.Interceptors, its...)
 }
 
+// GetInterceptors read Interceptor list
+func (r *ResolverCached) GetInterceptors() []*ResolverInterceptor {
+	return r.Interceptors
+}
+
 // DefaultResolver default Resolver, result has 3 min cache
 // 	Environment Variables 'FSGO_RESOLVER_EXP' can set the default cache lifetime
 // 	eg: export FSGO_RESOLVER_EXP="10m" set cache lifetime as 10 minute
@@ -216,32 +221,32 @@ func (rhm *resolverInterceptorMapper) Register(its ...*ResolverInterceptor) {
 type resolverInterceptors []*ResolverInterceptor
 
 func (rhs resolverInterceptors) CallLookupIP(ctx context.Context, network, host string, fn LookupIPFunc, idx int) ([]net.IP, error) {
-	for ; idx >= 0; idx-- {
+	for ; idx < len(rhs); idx++ {
 		if rhs[idx].LookupIP != nil {
 			break
 		}
 	}
-	if len(rhs) == 0 || idx < 0 {
+	if len(rhs) == 0 || idx >= len(rhs) {
 		return fn(ctx, network, host)
 	}
 
 	return rhs[idx].LookupIP(ctx, network, host, func(ctx context.Context, network string, host string) ([]net.IP, error) {
-		return rhs.CallLookupIP(ctx, network, host, fn, idx-1)
+		return rhs.CallLookupIP(ctx, network, host, fn, idx+1)
 	})
 }
 
 func (rhs resolverInterceptors) CallLookupIPAddr(ctx context.Context, host string, fn LookupIPAddrFunc, idx int) ([]net.IPAddr, error) {
-	for ; idx >= 0; idx-- {
+	for ; idx < len(rhs); idx++ {
 		if rhs[idx].LookupIPAddr != nil {
 			break
 		}
 	}
 
-	if len(rhs) == 0 || idx < 0 {
+	if len(rhs) == 0 || idx >= len(rhs) {
 		return fn(ctx, host)
 	}
 	return rhs[idx].LookupIPAddr(ctx, host, func(ctx context.Context, host string) ([]net.IPAddr, error) {
-		return rhs.CallLookupIPAddr(ctx, host, fn, idx-1)
+		return rhs.CallLookupIPAddr(ctx, host, fn, idx+1)
 	})
 }
 

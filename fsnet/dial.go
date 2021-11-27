@@ -12,7 +12,7 @@ import (
 	"github.com/fsgo/fsgo/fsnet/internal"
 )
 
-// DialerType dial conn type
+// DialerType dial connWithIt type
 type DialerType interface {
 	DialContext(ctx context.Context, network string, address string) (net.Conn, error)
 }
@@ -60,7 +60,7 @@ func (d *Dialer) DialContext(ctx context.Context, network string, address string
 		defer cancel()
 	}
 	its := d.getInterceptors(ctx)
-	c, err := its.CallDialContext(ctx, network, address, d.stdDial, len(its)-1)
+	c, err := its.CallDialContext(ctx, network, address, d.stdDial, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -71,7 +71,7 @@ func (d *Dialer) DialContext(ctx context.Context, network string, address string
 	return WrapConn(c, cks...), nil
 }
 
-func (d *Dialer) stdDial(ctx context.Context, network string, address string) (conn net.Conn, err error) {
+func (d *Dialer) stdDial(ctx context.Context, network string, address string) (net.Conn, error) {
 	nt := Network(network).Resolver()
 	if nt.IsIP() {
 		host, port, err := net.SplitHostPort(address)
@@ -91,7 +91,7 @@ func (d *Dialer) stdDial(ctx context.Context, network string, address string) (c
 		// 在超时允许的范围内，将所有 ip 都尝试一遍
 		for _, ip := range ips {
 			ad := net.JoinHostPort(ip.String(), port)
-			conn, err = d.dial(ctx, network, ad)
+			conn, err := d.dial(ctx, network, ad)
 			if err == nil || ctx.Err() != nil {
 				return conn, err
 			}
@@ -136,16 +136,16 @@ type dialerInterceptors []*DialerInterceptor
 // CallDialContext 执行 its
 // 倒序执行
 func (dhs dialerInterceptors) CallDialContext(ctx context.Context, network, address string, fn DialContextFunc, idx int) (net.Conn, error) {
-	for ; idx >= 0; idx-- {
+	for ; idx < len(dhs); idx++ {
 		if dhs[idx].DialContext != nil {
 			break
 		}
 	}
-	if len(dhs) == 0 || idx < 0 {
+	if len(dhs) == 0 || idx >= len(dhs) {
 		return fn(ctx, network, address)
 	}
 	return dhs[idx].DialContext(ctx, network, address, func(ctx context.Context, network string, address string) (net.Conn, error) {
-		return dhs.CallDialContext(ctx, network, address, fn, idx-1)
+		return dhs.CallDialContext(ctx, network, address, fn, idx+1)
 	})
 }
 

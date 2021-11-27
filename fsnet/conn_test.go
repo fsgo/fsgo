@@ -6,9 +6,12 @@ package fsnet
 
 import (
 	"net"
+	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewConn(t *testing.T) {
@@ -95,9 +98,9 @@ func TestNewConn_merge(t *testing.T) {
 	var id int
 	hk1 := &ConnInterceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
-			// 先注册的后执行
+			// 先注册的先执行
 			id++
-			assert.Equal(t, 2, id)
+			assert.Equal(t, 1, id)
 			return raw(b)
 		},
 	}
@@ -106,12 +109,12 @@ func TestNewConn_merge(t *testing.T) {
 	hk2 := &ConnInterceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			id++
-			assert.Equal(t, 1, id)
+			assert.Equal(t, 2, id)
 			return raw(b)
 		},
 	}
 	nc1 := WrapConn(nc, hk2)
-	assert.Equal(t, nc, nc1)
+	assert.NotEqual(t, nc, nc1)
 	bf := make([]byte, 1)
 	_, _ = nc1.Read(bf)
 }
@@ -122,4 +125,34 @@ func TestOriginConn(t *testing.T) {
 
 	assert.Equal(t, c1, OriginConn(c2))
 	assert.Equal(t, c1, OriginConn(c1))
+}
+
+func Test_connInterceptors_CallSetDeadline(t *testing.T) {
+	want := time.Now()
+
+	var num int32
+	RegisterConnInterceptor(&ConnInterceptor{
+		SetDeadline: func(tm time.Time, raw func(tm time.Time) error) error {
+			require.Equal(t, int32(1), atomic.AddInt32(&num, 1))
+			require.Equal(t, want, tm)
+			return raw(tm)
+		},
+	})
+	RegisterConnInterceptor(&ConnInterceptor{
+		SetDeadline: func(tm time.Time, raw func(t time.Time) error) error {
+			require.Equal(t, int32(2), atomic.AddInt32(&num, 1))
+			require.Equal(t, want, tm)
+			return raw(tm)
+		},
+	})
+
+	c1 := &net.TCPConn{}
+	c2 := WrapConn(c1, &ConnInterceptor{
+		SetDeadline: func(tm time.Time, raw func(t time.Time) error) error {
+			require.Equal(t, int32(3), atomic.AddInt32(&num, 1))
+			require.Equal(t, want, tm)
+			return raw(tm)
+		},
+	})
+	_ = c2.SetDeadline(want)
 }
