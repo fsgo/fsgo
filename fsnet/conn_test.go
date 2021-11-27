@@ -23,7 +23,7 @@ func TestNewConn(t *testing.T) {
 		var readIndex int
 
 		tr := &ConnInterceptor{
-			Read: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
+			Read: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (n int, err error) {
 				defer func() {
 					readTotal += n
 				}()
@@ -33,24 +33,24 @@ func TestNewConn(t *testing.T) {
 
 				return raw(b)
 			},
-			Write: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
+			Write: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (n int, err error) {
 				defer func() {
 					writeTotal += n
 				}()
 				return raw(b)
 			},
-			RemoteAddr: func(raw func() net.Addr) net.Addr {
+			RemoteAddr: func(c net.Conn, raw func() net.Addr) net.Addr {
 				// return the intercepted addr
 				return &net.TCPAddr{}
 			},
-			Close: func(raw func() error) error {
+			Close: func(c net.Conn, raw func() error) error {
 				closeNum++
 				return raw()
 			},
 		}
 
 		tr2 := &ConnInterceptor{
-			Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+			Read: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
 				readIndex++
 				assert.Equal(t, 1, readIndex)
 				return raw(b)
@@ -97,7 +97,7 @@ func TestNewConn(t *testing.T) {
 func TestNewConn_merge(t *testing.T) {
 	var id int
 	hk1 := &ConnInterceptor{
-		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+		Read: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
 			// 先注册的先执行
 			id++
 			assert.Equal(t, 1, id)
@@ -107,7 +107,7 @@ func TestNewConn_merge(t *testing.T) {
 	nc := WrapConn(&net.TCPConn{}, hk1)
 
 	hk2 := &ConnInterceptor{
-		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+		Read: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
 			id++
 			assert.Equal(t, 2, id)
 			return raw(b)
@@ -132,14 +132,14 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 
 	var num int32
 	RegisterConnInterceptor(&ConnInterceptor{
-		SetDeadline: func(tm time.Time, raw func(tm time.Time) error) error {
+		SetDeadline: func(c net.Conn, tm time.Time, raw func(tm time.Time) error) error {
 			require.Equal(t, int32(1), atomic.AddInt32(&num, 1))
 			require.Equal(t, want, tm)
 			return raw(tm)
 		},
 	})
 	RegisterConnInterceptor(&ConnInterceptor{
-		SetDeadline: func(tm time.Time, raw func(t time.Time) error) error {
+		SetDeadline: func(c net.Conn, tm time.Time, raw func(t time.Time) error) error {
 			require.Equal(t, int32(2), atomic.AddInt32(&num, 1))
 			require.Equal(t, want, tm)
 			return raw(tm)
@@ -148,7 +148,7 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 
 	c1 := &net.TCPConn{}
 	c2 := WrapConn(c1, &ConnInterceptor{
-		SetDeadline: func(tm time.Time, raw func(t time.Time) error) error {
+		SetDeadline: func(c net.Conn, tm time.Time, raw func(t time.Time) error) error {
 			require.Equal(t, int32(3), atomic.AddInt32(&num, 1))
 			require.Equal(t, want, tm)
 			return raw(tm)

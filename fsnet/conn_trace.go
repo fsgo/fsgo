@@ -7,16 +7,12 @@ package fsnet
 import (
 	"bytes"
 	"context"
+	"io"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 )
-
-// NewConnStatTrace create new ConnStatTrace instance
-func NewConnStatTrace() *ConnStatTrace {
-	return &ConnStatTrace{}
-}
 
 // ConnStatTrace 用于获取网络状态的拦截器
 type ConnStatTrace struct {
@@ -38,7 +34,7 @@ type ConnStatTrace struct {
 
 func (ch *ConnStatTrace) init() {
 	ch.connInterceptor = &ConnInterceptor{
-		Read: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
+		Read: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
 				atomic.AddInt64(&ch.readCost, time.Since(start).Nanoseconds())
@@ -47,7 +43,7 @@ func (ch *ConnStatTrace) init() {
 			return raw(b)
 		},
 
-		Write: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
+		Write: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
 				atomic.AddInt64(&ch.writeCost, time.Since(start).Nanoseconds())
@@ -135,11 +131,6 @@ func (ch *ConnStatTrace) Reset() {
 	atomic.StoreInt64(&ch.writeCost, 0)
 }
 
-// NewConnReadBytesTrace create ConnReadBytesTrace instance
-func NewConnReadBytesTrace() *ConnReadBytesTrace {
-	return &ConnReadBytesTrace{}
-}
-
 // ConnReadBytesTrace 获取所有通过 Read 方法读取的数据的副本
 type ConnReadBytesTrace struct {
 	interceptor *ConnInterceptor
@@ -150,7 +141,7 @@ type ConnReadBytesTrace struct {
 
 func (ch *ConnReadBytesTrace) init() {
 	ch.interceptor = &ConnInterceptor{
-		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+		Read: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
 			n, err := raw(b)
 			if n > 0 {
 				ch.mux.Lock()
@@ -182,11 +173,6 @@ func (ch *ConnReadBytesTrace) Reset() {
 	ch.mux.Unlock()
 }
 
-// NewConnWriteBytesTrace create ConnWriteBytesTrace instance
-func NewConnWriteBytesTrace() *ConnWriteBytesTrace {
-	return &ConnWriteBytesTrace{}
-}
-
 // ConnWriteBytesTrace 获取所有通过 Write 方法写出的数据的副本
 type ConnWriteBytesTrace struct {
 	interceptor *ConnInterceptor
@@ -197,7 +183,7 @@ type ConnWriteBytesTrace struct {
 
 func (ch *ConnWriteBytesTrace) init() {
 	ch.interceptor = &ConnInterceptor{
-		Write: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+		Write: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
 			n, err := raw(b)
 			if n > 0 {
 				ch.mux.Lock()
@@ -227,4 +213,42 @@ func (ch *ConnWriteBytesTrace) Reset() {
 	ch.mux.Lock()
 	ch.buf.Reset()
 	ch.mux.Unlock()
+}
+
+// ConnDuplicate 实现对网络连接读写数据的复制
+type ConnDuplicate struct {
+	interceptor *ConnInterceptor
+	once        sync.Once
+
+	// ReadTo 将 Read 到的数据写入此处,比如 os.Stdout
+	ReadTo io.Writer
+
+	// WriterTo 将 Writer 的数据写入此处，比如 os.Stdout
+	WriterTo io.Writer
+}
+
+func (cc *ConnDuplicate) init() {
+	cc.interceptor = &ConnInterceptor{
+		Read: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
+			n, err := raw(b)
+			if n > 0 && cc.ReadTo != nil {
+				_, _ = cc.ReadTo.Write(b[:n])
+			}
+			return n, err
+		},
+
+		Write: func(c net.Conn, b []byte, raw func([]byte) (int, error)) (int, error) {
+			n, err := raw(b)
+			if n > 0 && cc.ReadTo != nil {
+				_, _ = cc.WriterTo.Write(b[:n])
+			}
+			return n, err
+		},
+	}
+}
+
+// ConnInterceptor 获取 ConnInterceptor 实例
+func (cc *ConnDuplicate) ConnInterceptor() *ConnInterceptor {
+	cc.once.Do(cc.init)
+	return cc.interceptor
 }
