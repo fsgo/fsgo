@@ -5,18 +5,14 @@
 package grace
 
 import (
-	"bytes"
 	"context"
-	"crypto/md5"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"os/signal"
 	"path/filepath"
-	"sort"
-	"strconv"
 	"sync"
 	"syscall"
 	"time"
@@ -24,134 +20,6 @@ import (
 	"github.com/fsgo/fsgo/fsfs"
 	"github.com/fsgo/fsgo/grace/internal/envfile"
 )
-
-// WorkerConfig worker 的配置
-type WorkerConfig struct {
-	// Listen 监听的资源，如 "tcp@127.0.0.1:8909",
-	Listen []string
-
-	// EnvFile 提前配置 Cmd 的环境变量的文件，可选
-	// 在执行 Cmd 前，通过此文件获取env 信息
-	// 1.先直接解析该文件，获取 kv，正确的格式为：
-	// key1=1
-	// key2=2
-	// 若文件不是这个格式，则解析失败
-	// 2.尝试执行当前文件，若文件输出的  kv 对，则解析成功，否则为失败
-	// 若文件行以 # 开头，会当做注释
-	// 允许有 0 个 kv 对
-	EnvFile string
-
-	// RootDir 执行应用程序的根目录
-	// Cmd、Watches 对应的文件路径都是相对于此目录的
-	RootDir string
-
-	// LogDir 当前子进程的日志目录，可选
-	LogDir string
-
-	// Cmd 工作进程的 cmd
-	Cmd string
-
-	// CmdArgs 工作进程 cmd 的其他参数
-	CmdArgs []string
-
-	// StopTimeout  优雅关闭的最长时间，毫秒，若不填写，则使用全局 Config 的
-	StopTimeout int
-
-	// Watches 用于监听版本变化情况的文件列表
-	Watches []string
-}
-
-// Parser 解析当前配置
-func (c *WorkerConfig) Parser() error {
-	return nil
-}
-
-// String 格式化输出，打印输出时时候
-func (c *WorkerConfig) String() string {
-	bf, _ := json.Marshal(c)
-	return string(bf)
-}
-
-func statVersion(info os.FileInfo) string {
-	var bf bytes.Buffer
-	bf.WriteString(info.Mode().String())
-	bf.WriteString(info.ModTime().String())
-	bf.WriteString(strconv.FormatInt(info.Size(), 10))
-	return bf.String()
-}
-
-func (c *WorkerConfig) getFilePath(p string) string {
-	if c.RootDir == "" {
-		return p
-	}
-	if filepath.IsAbs(p) {
-		return p
-	}
-	return filepath.Join(c.RootDir, p)
-}
-
-func (c *WorkerConfig) getEnvFilePath() string {
-	if c.EnvFile == "" {
-		return ""
-	}
-	return c.getFilePath(c.EnvFile)
-}
-
-func (c *WorkerConfig) getWatchFiles() []string {
-	var files []string
-	fm := map[string]int8{}
-	for _, watchPath := range c.Watches {
-		pattern := c.getFilePath(watchPath)
-		ms, _ := filepath.Glob(pattern)
-		for _, f := range ms {
-			if _, has := fm[f]; !has {
-				fm[f] = 1
-				files = append(files, f)
-			}
-		}
-	}
-	sort.SliceStable(files, func(i, j int) bool {
-		return files[i] > files[j]
-	})
-	return files
-}
-
-// version 获取当前的版本信息
-func (c *WorkerConfig) version() string {
-	cmd, _ := c.getWorkerCmd()
-
-	files := make([]string, 0, 3+len(c.Watches))
-	if p := c.getEnvFilePath(); p != "" {
-		files = append(files, p)
-	}
-
-	files = append(files, cmd)                // 可能是在环境变量里的一些命令
-	files = append(files, c.getFilePath(cmd)) // 配置在项目里的文件路径
-
-	files = append(files, c.getWatchFiles()...)
-
-	var buf bytes.Buffer
-	for _, fn := range files {
-		info, err := os.Stat(fn)
-		if err == nil {
-			buf.WriteString(statVersion(info))
-		}
-	}
-	h := md5.New()
-	_, _ = h.Write(buf.Bytes())
-	return hex.EncodeToString(h.Sum(nil))
-}
-
-func (c *WorkerConfig) getWorkerCmd() (string, []string) {
-	if len(c.Cmd) > 0 {
-		return c.Cmd, c.CmdArgs
-	}
-	var args []string
-	if len(os.Args) > 1 {
-		args = os.Args[1:]
-	}
-	return os.Args[0], args
-}
 
 // NewWorker 创建一个新的 worker
 func NewWorker(cfg *WorkerConfig) *Worker {
@@ -173,16 +41,21 @@ func NewWorker(cfg *WorkerConfig) *Worker {
 		ExtRule: "1hour",
 	}
 	_ = stderr.Init()
-	w.stderr = stderr
+	w.stderr = io.MultiWriter(os.Stderr, stderr)
 
 	stdout := &fsfs.Rotator{
 		Path:    filepath.Join(cfg.LogDir, "stdout.log"),
 		ExtRule: "1hour",
 	}
 	_ = stdout.Init()
-	w.stdout = stdout
+	w.stdout = io.MultiWriter(os.Stdout, stdout)
 
 	return w
+}
+
+type resourceAndConsumer struct {
+	Resource Resource
+	Consumer Consumer
 }
 
 // Worker 工作进程的逻辑
@@ -192,7 +65,7 @@ type Worker struct {
 	cmd       *exec.Cmd
 	closeFunc context.CancelFunc
 
-	resources []*resourceServer
+	resources []*resourceAndConsumer
 	mux       sync.Mutex
 	sub       *subProcess
 	stopped   bool
@@ -202,33 +75,42 @@ type Worker struct {
 	// 子进程上次退出时间
 	lastExit time.Time
 
-	stderr *fsfs.Rotator
-	stdout *fsfs.Rotator
+	stderr io.Writer
+	stdout io.Writer
+
+	nextListenDSNIndex int
 }
 
 // Register 注册新的消费者
-func (w *Worker) Register(dsn string, c Consumer) error {
-	res, err := GenResourceByDSN(dsn)
+func (w *Worker) Register(c Consumer, res Resource) error {
+	return w.register(c, res)
+}
+
+// MustRegister 注册，若失败会 panic
+func (w *Worker) MustRegister(c Consumer, res Resource) {
+	err := w.Register(c, res)
 	if err != nil {
-		return err
+		panic("register failed: " + err.Error())
 	}
-	return w.register(res, c)
 }
 
 // RegisterServer 注册/绑定一个 server
-func (w *Worker) RegisterServer(dns string, ser Server) error {
-	c := NewServerConsumer(ser)
-	return w.Register(dns, c)
+func (w *Worker) RegisterServer(ser Server, res Resource) error {
+	c := NewServerConsumer(ser, res)
+	return w.Register(c, res)
+}
+
+// MustRegisterServer 注册一个 server，若失败会 panic
+func (w *Worker) MustRegisterServer(ser Server, res Resource) {
+	c := NewServerConsumer(ser, res)
+	w.MustRegister(c, res)
 }
 
 // register 注册资源
-func (w *Worker) register(res Resource, c Consumer) error {
-	ss := &resourceServer{
-		Resource: res,
+func (w *Worker) register(c Consumer, res Resource) error {
+	ss := &resourceAndConsumer{
 		Consumer: c,
-	}
-	if c != nil {
-		c.Bind(res)
+		Resource: res,
 	}
 	w.resources = append(w.resources, ss)
 	return nil
@@ -237,14 +119,6 @@ func (w *Worker) register(res Resource, c Consumer) error {
 // mainStart 主进程开启开始
 func (w *Worker) mainStart(ctx context.Context) error {
 	go w.watchChange()
-
-	for _, info := range w.resources {
-		err := info.Resource.Open(ctx)
-		w.logit("open resource ", info.Resource.String(), ", error=", err)
-		if err != nil {
-			return err
-		}
-	}
 
 	ctxFork, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -337,17 +211,22 @@ func (w *Worker) subProcessStart(ctx context.Context) error {
 }
 
 func (w *Worker) logit(msgs ...interface{}) {
-	msg := fmt.Sprintf("[grace][worker] pid=%d %s", os.Getpid(), fmt.Sprint(msgs...))
-	_ = w.main.Logger.Output(1, msg)
+	msg := fmt.Sprintf("[grace][worker] %s", fmt.Sprint(msgs...))
+	_ = w.main.Logger.Output(2, msg)
 }
 
 func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 	files := make([]*os.File, len(w.resources))
+	// 依次获取 *os.File,之后将通过 进程的 ExtraFiles 属性传递给子进程
 	for idx, s := range w.resources {
-		f, err := s.Resource.File()
+		f, err := s.Resource.File(ctx)
 		if err != nil {
 			return fmt.Errorf("listener[%d].File() has error: %w", idx, err)
 		}
+		if f == nil {
+			return fmt.Errorf("listener[%d].File(), got nil file", idx)
+		}
+		w.logit("open resource File ", s.Resource.String(), " success, index=", idx, f, f == nil)
 		files[idx] = f
 	}
 
@@ -492,4 +371,26 @@ func (w *Worker) stop(ctx context.Context) error {
 	lastCmd := w.cmd
 	w.mux.Unlock()
 	return w.stopCmd(ctx, lastCmd)
+}
+
+// Resource 将配置的 Listen 的第 index 个 元素解析为可传递使用的 Resource
+// 	如 配置的 "tcp@127.0.0.1:8080" 会解析为 listenDSN
+// 	若解析失败，panic
+func (w *Worker) Resource(index int) Resource {
+	if index < 0 || index >= len(w.option.Listen) {
+		panic(fmt.Sprintf("invalid index %d, should in [0,%d]", index, len(w.option.Listen)-1))
+	}
+	res, err := ParserListenDSN(index, w.option.Listen[index])
+	if err != nil {
+		panic("parser dsn failed: " + err.Error())
+	}
+	return res
+}
+
+// NextResource 自动解析配置的 Listen 的下一个元素为 Resource
+// 	若解析失败，panic
+func (w *Worker) NextResource() Resource {
+	res := w.Resource(w.nextListenDSNIndex)
+	w.nextListenDSNIndex++
+	return res
 }

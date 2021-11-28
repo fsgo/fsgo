@@ -20,9 +20,11 @@ import (
 )
 
 const (
-	actionStart  = "start"
+	actionStart = "start"
+
 	actionReload = "reload"
-	actionStop   = "stop"
+
+	actionStop = "stop"
 
 	actionSubStart = "sub_process_start"
 
@@ -36,7 +38,10 @@ type Option struct {
 	StopTimeout int
 	StatusDir   string
 	LogDir      string
-	Keep        bool
+
+	// Keep 是否保持子进程存活
+	// 若为 true，当子进程不存在时，将自动拉起
+	Keep bool
 
 	// 检查版本的间隔时间，默认为 5 秒
 	CheckInterval int
@@ -85,7 +90,6 @@ type Grace struct {
 // Register 注册一个新的 worker
 func (g *Grace) Register(name string, gg *Worker) error {
 	g.init()
-
 	_, has := g.groups[name]
 	if has {
 		return fmt.Errorf("group=%q already exists", name)
@@ -93,6 +97,14 @@ func (g *Grace) Register(name string, gg *Worker) error {
 	gg.main = g
 	g.groups[name] = gg
 	return nil
+}
+
+// MustRegister 注册，若失败会 panic
+func (g *Grace) MustRegister(name string, gg *Worker) {
+	err := g.Register(name, gg)
+	if err != nil {
+		panic("register " + name + " failed, err=" + err.Error())
+	}
 }
 
 func (g *Grace) init() {
@@ -109,12 +121,16 @@ func (g *Grace) init() {
 }
 
 func (g *Grace) logit(msgs ...interface{}) {
-	msg := fmt.Sprintf("[grace][main] pid=%d %s", os.Getpid(), fmt.Sprint(msgs...))
-	_ = g.Logger.Output(1, msg)
+	msg := fmt.Sprintf("[grace][main] %s", fmt.Sprint(msgs...))
+	_ = g.Logger.Output(2, msg)
 }
 
 // Start 开始服务，阻塞、同步的
-func (g *Grace) Start(ctx context.Context) error {
+func (g *Grace) Start(ctx context.Context) (err error) {
+	startTime := time.Now()
+	defer func() {
+		g.logit("Start() exit, err=", err, ", cost=", time.Since(startTime))
+	}()
 	g.init()
 	action := actionStart
 	if len(os.Args) > 1 {
@@ -171,7 +187,7 @@ func (g *Grace) fireSignal(sig os.Signal) error {
 	return p.Signal(sig)
 }
 
-// actionReceiveStop 发送 sotp 信号
+// actionReceiveStop 发送 stop 信号
 func (g *Grace) actionReceiveStop() error {
 	p, err := g.mainProcess()
 	if err != nil {
@@ -179,7 +195,7 @@ func (g *Grace) actionReceiveStop() error {
 	}
 
 	// 给主进程发送 退出信号
-	if err := p.Signal(syscall.SIGQUIT); err != nil {
+	if err = p.Signal(syscall.SIGQUIT); err != nil {
 		return err
 	}
 

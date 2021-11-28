@@ -6,7 +6,6 @@ package grace
 
 import (
 	"context"
-	"fmt"
 	"net"
 )
 
@@ -17,9 +16,10 @@ type Server interface {
 }
 
 // NewServerConsumer 创建一个新的消费者
-func NewServerConsumer(ser Server) Consumer {
+func NewServerConsumer(ser Server, dsn Resource) Consumer {
 	return &serverConsumer{
 		Server: ser,
+		res:    dsn,
 	}
 }
 
@@ -28,23 +28,8 @@ type serverConsumer struct {
 	res    Resource
 }
 
-func (sc *serverConsumer) Bind(res Resource) {
-	sc.res = res
-}
-
-func (sc *serverConsumer) getListener() (net.Listener, error) {
-	if sc.res == nil {
-		return nil, fmt.Errorf("no resource found")
-	}
-	f, err := sc.res.File()
-	if err != nil {
-		return nil, err
-	}
-	return net.FileListener(f)
-}
-
 func (sc *serverConsumer) Start(ctx context.Context) error {
-	l, err := sc.getListener()
+	l, err := sc.res.Listener(ctx)
 	if err != nil {
 		return err
 	}

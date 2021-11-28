@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 )
 
 // Resource 支持 grace 的资源
@@ -22,80 +23,180 @@ type Resource interface {
 	Open(ctx context.Context) error
 
 	// File 资源的文件，父进程使用，以将file传递给子进程
-	File() (*os.File, error)
+	File(ctx context.Context) (*os.File, error)
 
-	// SetFile 设置文件,子进程使用
-	SetFile(file *os.File) error
+	// Listener 获取 Listener
+	Listener(ctx context.Context) (net.Listener, error)
 
 	// String 资源的描述
 	String() string
 }
 
-// Consumer 资源消费者
-type Consumer interface {
-	Bind(res Resource)
+// TrySetListener 给 Resource 重新设置新的 Listener
+func TrySetListener(res Resource, l net.Listener) error {
+	if rl, ok := res.(canSetListener); ok {
+		rl.SetListener(l)
+		return nil
+	}
+	return fmt.Errorf("cannot Set Listener")
+}
 
-	// Start 开始运行 同步、阻塞
-	Start(ctx context.Context) error
+var _ Resource = (*listenDSN)(nil)
 
-	// Stop 关闭
-	Stop(ctx context.Context) error
+type listenDSN struct {
+	Index int
+	DSN   string
 
-	// String 资源的描述
-	String() string
+	file     *os.File
+	listener net.Listener
+	opened   bool
 }
 
 type filer interface {
 	File() (*os.File, error)
 }
 
-// ListenerResource server 类型的资源
-type ListenerResource struct {
-	NetWork string
-	Address string
+func (d *listenDSN) Open(ctx context.Context) error {
+	if d.opened {
+		return nil
+	}
 
-	file *os.File
+	d.opened = true
+
+	if IsSubProcess() {
+		return d.openFileListener(ctx)
+	}
+	return d.openNetListener(ctx)
 }
 
-// Open 作为主进程启动时，打开资源
-func (s *ListenerResource) Open(ctx context.Context) error {
-	var lc net.ListenConfig
-	l, err := lc.Listen(ctx, s.NetWork, s.Address)
+func (d *listenDSN) openNetListener(ctx context.Context) error {
+	network, address, err := d.parser()
 	if err != nil {
 		return err
 	}
+	var lc net.ListenConfig
+	l, err := lc.Listen(ctx, network, address)
+	if err != nil {
+		return err
+	}
+	d.listener = l
 	if ff, ok := l.(filer); ok {
 		f, err1 := ff.File()
 		if err1 != nil {
 			return err1
 		}
-		s.file = f
+		d.file = f
+		return nil
 	}
-	return nil
+	return fmt.Errorf("listener（%T） has not implement File()(*os.File,error)", l)
 }
 
-// File 获取文件句柄
-func (s *ListenerResource) File() (*os.File, error) {
-	if s.file == nil {
-		return nil, fmt.Errorf("no file, should Open or SetFile first")
+func (d *listenDSN) openFileListener(_ context.Context) error {
+	d.file = os.NewFile(uintptr(3+d.Index), "")
+	l, err := net.FileListener(d.file)
+	d.listener = l
+	return err
+}
+
+func (d *listenDSN) File(ctx context.Context) (*os.File, error) {
+	if err := d.Open(ctx); err != nil {
+		return nil, err
 	}
-	return s.file, nil
-}
-
-// SetFile 设置文件句柄
-// 当作为子进程运行的时候被调用
-func (s *ListenerResource) SetFile(file *os.File) error {
-	if file == nil {
-		return fmt.Errorf("file is nil")
+	if d.file != nil {
+		return d.file, nil
 	}
-	s.file = file
-
-	return nil
+	return nil, fmt.Errorf("file not exists")
 }
 
-// String 格式化的描述信息，打印日志使用
-func (s *ListenerResource) String() string {
-	return fmt.Sprintf("NetWork=%q Address=%q", s.NetWork, s.Address)
+func (d *listenDSN) String() string {
+	return d.DSN
 }
 
-var _ Resource = (*ListenerResource)(nil)
+func (d *listenDSN) Listener(ctx context.Context) (net.Listener, error) {
+	if err := d.Open(ctx); err != nil {
+		return nil, err
+	}
+	if d.listener != nil {
+		return d.listener, nil
+	}
+	return nil, fmt.Errorf("listener not exists")
+}
+
+type canSetListener interface {
+	SetListener(l net.Listener)
+}
+
+var _ canSetListener = (*listenDSN)(nil)
+
+func (d *listenDSN) SetListener(l net.Listener) {
+	d.listener = l
+}
+
+func (d *listenDSN) parser() (network, address string, err error) {
+	arr := strings.SplitN(d.DSN, "@", 2)
+	if len(arr) != 2 {
+		return "", "", fmt.Errorf("wrong dsn format: %q", d.DSN)
+	}
+	return arr[0], arr[1], nil
+}
+
+var drivers = map[string]ResourceDriverFunc{}
+
+// ResourceDriverFunc 解析 DSN 配置
+// dsn like "tcp@127.0.0.1:8080"
+type ResourceDriverFunc func(index int, dsn string) (Resource, error)
+
+// RegisterResourceDriver 注册新的资源解析协议
+func RegisterResourceDriver(scheme string, fn ResourceDriverFunc) {
+	drivers[scheme] = fn
+}
+
+func init() {
+	// 将所有的网络类型全部注册
+	// 也可以注册其他自定义类型的
+	RegisterResourceDriver("tcp", netResourceDrive)
+	RegisterResourceDriver("tcp4", netResourceDrive)
+	RegisterResourceDriver("tcp6", netResourceDrive)
+	RegisterResourceDriver("udp", netResourceDrive)
+	RegisterResourceDriver("udp4", netResourceDrive)
+	RegisterResourceDriver("udp6", netResourceDrive)
+	RegisterResourceDriver("unix", netResourceDrive)
+	RegisterResourceDriver("unixpacket", netResourceDrive)
+}
+
+func netResourceDrive(index int, dsn string) (Resource, error) {
+	ds := &listenDSN{
+		Index: index,
+		DSN:   dsn,
+	}
+	return ds, nil
+}
+
+// ParserListenDSN 通过 DSN 获取一个 Resource
+func ParserListenDSN(index int, dsn string) (Resource, error) {
+	if index < 0 {
+		return nil, fmt.Errorf("index should >=0, got=%d", index)
+	}
+	arr := strings.SplitN(dsn, "@", 2)
+	if len(arr) != 2 {
+		return nil, fmt.Errorf("wrong dsn=%q format", dsn)
+	}
+	scheme := arr[0]
+	driverFunc, has := drivers[scheme]
+	if !has {
+		return nil, fmt.Errorf("scheme=%q not support", scheme)
+	}
+	return driverFunc(index, dsn)
+}
+
+var globalResourceID int
+
+// NextResource 获取下一个资源
+func NextResource(listen string) Resource {
+	res, err := ParserListenDSN(globalResourceID, listen)
+	if err != nil {
+		panic("parser dsn failed:" + err.Error())
+	}
+	globalResourceID++
+	return res
+}

@@ -22,7 +22,7 @@ import (
 
 var startTime = time.Now()
 
-func handler(w http.ResponseWriter, r *http.Request) {
+func handler(w http.ResponseWriter, _ *http.Request) {
 	pid := strconv.Itoa(os.Getpid())
 	var bf bytes.Buffer
 	bf.WriteString("<table>")
@@ -44,11 +44,11 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	w.Write(bf.Bytes())
 }
 
-func handlerSlow(w http.ResponseWriter, r *http.Request) {
+func handlerSlow(w http.ResponseWriter, _ *http.Request) {
 	time.Sleep(5 * time.Second)
 	w.Write([]byte("hello"))
 }
-func handlerPanic(w http.ResponseWriter, r *http.Request) {
+func handlerPanic(_ http.ResponseWriter, _ *http.Request) {
 	panic("must panic")
 }
 
@@ -83,15 +83,12 @@ func main() {
 		log.Fatalf(" load config %q failed, error=%v\n", *config, err)
 	}
 
-	wcf := cf.Workers["default"]
+	worker := cf.MustNewWorker("default")
 
-	worker := grace.NewWorker(nil)
-	worker.RegisterServer(wcf.Listen[0], &http.Server{})
-	worker.RegisterServer(wcf.Listen[1], &http.Server{})
+	worker.RegisterServer(&http.Server{}, worker.NextResource())
+	worker.RegisterServer(&http.Server{}, worker.NextResource())
 
-	g := grace.Grace{
-		Option: cf.ToOption(),
-	}
+	g := cf.NewGrace()
 	g.Register("default", worker)
 
 	err = g.Start(context.Background())
@@ -102,5 +99,6 @@ func main() {
 }
 
 func init() {
-	log.SetPrefix(fmt.Sprintf("pid=%d ", os.Getpid()))
+	log.SetPrefix(fmt.Sprintf("pid=%d ppid=%d ", os.Getpid(), os.Getppid()))
+	log.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmsgprefix)
 }

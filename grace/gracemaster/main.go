@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -27,18 +28,8 @@ func main() {
 		log.Fatalf(" load config %q failed, error=%v\n", *confName, err)
 	}
 
-	lg := &fsfs.Rotator{
-		Path:    filepath.Join(cf.LogDir, "grace", "grace.log"),
-		ExtRule: "1hour",
-	}
-	if err := lg.Init(); err != nil {
-		log.Fatalf("init logger failed, error=%v\n", err)
-	}
-
-	defer lg.Close()
-
-	logger := log.Default()
-	logger.SetOutput(lg)
+	logger, close := getLogger(cf.LogDir)
+	defer close()
 
 	{
 		fn, err := filepath.Abs(*confName)
@@ -56,21 +47,40 @@ func main() {
 
 	for name, wcf := range cf.Workers {
 		group := grace.NewWorker(wcf)
-		for _, dsn := range wcf.Listen {
-			if err = group.Register(dsn, nil); err != nil {
-				panic(err.Error())
-			}
+		for i := 0; i < len(wcf.Listen); i++ {
+			res := group.Resource(i)
+			group.MustRegister(nil, res)
 		}
 		_ = g.Register(name, group)
 	}
 
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
+
 	go func() {
-		ch := make(chan os.Signal, 1)
-		signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 		sig := <-ch
 		logger.Printf("received signal %v, exiting...", sig)
 	}()
 
 	err = g.Start(context.Background())
 	logger.Println("grace_master exit:", err)
+}
+
+func getLogger(logDir string) (*log.Logger, func()) {
+	lg := &fsfs.Rotator{
+		Path:    filepath.Join(logDir, "grace", "grace.log"),
+		ExtRule: "1hour",
+	}
+
+	if err := lg.Init(); err != nil {
+		log.Fatalf("init logger failed, error=%v\n", err)
+	}
+
+	logger := log.Default()
+	logger.SetOutput(lg)
+	logger.SetPrefix(fmt.Sprintf("pid=%d ppid=%d ", os.Getpid(), os.Getppid()))
+	logger.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmsgprefix)
+	return logger, func() {
+		_ = lg.Close()
+	}
 }

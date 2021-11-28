@@ -16,38 +16,30 @@ import (
 	"time"
 )
 
-type resourceServer struct {
-	Resource Resource
-	Consumer Consumer
-}
-
 // subProcess 子进程的逻辑
 type subProcess struct {
 	group *Worker
 }
 
 func (sp *subProcess) logit(msgs ...interface{}) {
-	msg := fmt.Sprintf("[grace][worker.process] pid=%d ppid=%d %s", os.Getpid(), os.Getppid(), fmt.Sprint(msgs...))
-	_ = sp.group.main.Logger.Output(1, msg)
+	msg := fmt.Sprintf("[grace][worker.process] %s", fmt.Sprint(msgs...))
+	_ = sp.group.main.Logger.Output(2, msg)
 }
 
 // Start 子进程的启动逻辑
 func (sp *subProcess) Start(ctx context.Context) (errLast error) {
-	sp.logit("Start() start")
+	sp.logit("Starting ...")
 	start := time.Now()
 	defer func() {
 		cost := time.Since(start)
-		sp.logit("Start() finish, error=", errLast,
+		sp.logit("Start finish, error=", errLast,
 			", start_at=", start.Format("2006-01-02 15:04:05"),
 			", duration=", cost,
 		)
 	}()
 
 	errChan := make(chan error, len(sp.group.resources))
-	for idx, s := range sp.group.resources {
-		f := os.NewFile(uintptr(3+idx), "")
-		_ = s.Resource.SetFile(f)
-
+	for _, s := range sp.group.resources {
 		go func(c Consumer) {
 			errChan <- c.Start(ctx)
 		}(s.Consumer)
@@ -78,13 +70,13 @@ func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 }
 
 func (sp *subProcess) Stop(ctx context.Context) (errStop error) {
-	sp.logit("Stop() start")
+	sp.logit("Stopping ...")
 	defer func() {
-		sp.logit("Stop() finish, error=", errStop)
+		sp.logit("Stopped, error=", errStop)
 	}()
 
 	var wg sync.WaitGroup
-	errChans := make(chan error, len(sp.group.resources))
+	errChains := make(chan error, len(sp.group.resources))
 	for idx, s := range sp.group.resources {
 		wg.Add(1)
 
@@ -92,18 +84,18 @@ func (sp *subProcess) Stop(ctx context.Context) (errStop error) {
 			defer wg.Done()
 
 			if err := res.Stop(ctx); err != nil {
-				errChans <- fmt.Errorf("resource[%d] (%s) Stop error: %w", idx, res.String(), err)
+				errChains <- fmt.Errorf("resource[%d] (%s) Stop error: %w", idx, res.String(), err)
 			} else {
-				errChans <- nil
+				errChains <- nil
 			}
 		}(idx, s.Consumer)
 	}
 	wg.Wait()
 
-	close(errChans)
+	close(errChains)
 
 	var bd strings.Builder
-	for err := range errChans {
+	for err := range errChains {
 		if err != nil {
 			bd.WriteString(err.Error())
 			bd.WriteString(";")

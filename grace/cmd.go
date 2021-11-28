@@ -47,7 +47,8 @@ func stopCmd(ctx context.Context, cmd *exec.Cmd) error {
 			if cmdExited(cmd) {
 				return nil
 			}
-			return cmd.Process.Kill()
+			// return cmd.Process.Kill()
+			return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		case <-time.After(5 * time.Millisecond):
 			if cmdExited(cmd) {
 				return nil
