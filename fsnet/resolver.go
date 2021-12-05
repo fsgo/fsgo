@@ -182,9 +182,9 @@ var LookupIPAddr = func(ctx context.Context, host string) ([]net.IPAddr, error) 
 
 // ResolverInterceptor  Resolver Interceptor
 type ResolverInterceptor struct {
-	LookupIP func(ctx context.Context, network, host string, fn LookupIPFunc) ([]net.IP, error)
+	LookupIP func(ctx context.Context, network, host string, invoker LookupIPFunc) ([]net.IP, error)
 
-	LookupIPAddr func(ctx context.Context, host string, fn LookupIPAddrFunc) ([]net.IPAddr, error)
+	LookupIPAddr func(ctx context.Context, host string, invoker LookupIPAddrFunc) ([]net.IPAddr, error)
 }
 
 // ContextWithResolverInterceptor set Resolver Interceptor to context
@@ -220,22 +220,22 @@ func (rhm *resolverInterceptorMapper) Register(its ...*ResolverInterceptor) {
 
 type resolverInterceptors []*ResolverInterceptor
 
-func (rhs resolverInterceptors) CallLookupIP(ctx context.Context, network, host string, fn LookupIPFunc, idx int) ([]net.IP, error) {
+func (rhs resolverInterceptors) CallLookupIP(ctx context.Context, network, host string, invoker LookupIPFunc, idx int) ([]net.IP, error) {
 	for ; idx < len(rhs); idx++ {
 		if rhs[idx].LookupIP != nil {
 			break
 		}
 	}
 	if len(rhs) == 0 || idx >= len(rhs) {
-		return fn(ctx, network, host)
+		return invoker(ctx, network, host)
 	}
 
 	return rhs[idx].LookupIP(ctx, network, host, func(ctx context.Context, network string, host string) ([]net.IP, error) {
-		return rhs.CallLookupIP(ctx, network, host, fn, idx+1)
+		return rhs.CallLookupIP(ctx, network, host, invoker, idx+1)
 	})
 }
 
-func (rhs resolverInterceptors) CallLookupIPAddr(ctx context.Context, host string, fn LookupIPAddrFunc, idx int) ([]net.IPAddr, error) {
+func (rhs resolverInterceptors) CallLookupIPAddr(ctx context.Context, host string, invoker LookupIPAddrFunc, idx int) ([]net.IPAddr, error) {
 	for ; idx < len(rhs); idx++ {
 		if rhs[idx].LookupIPAddr != nil {
 			break
@@ -243,10 +243,10 @@ func (rhs resolverInterceptors) CallLookupIPAddr(ctx context.Context, host strin
 	}
 
 	if len(rhs) == 0 || idx >= len(rhs) {
-		return fn(ctx, host)
+		return invoker(ctx, host)
 	}
 	return rhs[idx].LookupIPAddr(ctx, host, func(ctx context.Context, host string) ([]net.IPAddr, error) {
-		return rhs.CallLookupIPAddr(ctx, host, fn, idx+1)
+		return rhs.CallLookupIPAddr(ctx, host, invoker, idx+1)
 	})
 }
 

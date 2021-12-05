@@ -34,30 +34,30 @@ type ConnStatTrace struct {
 
 func (ch *ConnStatTrace) init() {
 	ch.connInterceptor = &ConnInterceptor{
-		Read: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
+		Read: func(b []byte, invoker func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
 				atomic.AddInt64(&ch.readCost, time.Since(start).Nanoseconds())
 				atomic.AddInt64(&ch.readSize, int64(n))
 			}()
-			return raw(b)
+			return invoker(b)
 		},
 
-		Write: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
+		Write: func(b []byte, invoker func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
 				atomic.AddInt64(&ch.writeCost, time.Since(start).Nanoseconds())
 				atomic.AddInt64(&ch.writeSize, int64(n))
 			}()
-			return raw(b)
+			return invoker(b)
 		},
 	}
 
 	ch.dialerInterceptor = &DialerInterceptor{
-		DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
+		DialContext: func(ctx context.Context, network string, address string, invoker DialContextFunc) (conn net.Conn, err error) {
 			start := time.Now()
 
-			conn, err = fn(ctx, network, address)
+			conn, err = invoker(ctx, network, address)
 
 			atomic.AddInt64(&ch.dialCost, time.Since(start).Nanoseconds())
 			atomic.AddInt64(&ch.dialTimes, 1)
@@ -141,8 +141,8 @@ type ConnReadBytesTrace struct {
 
 func (ch *ConnReadBytesTrace) init() {
 	ch.interceptor = &ConnInterceptor{
-		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
-			n, err := raw(b)
+		Read: func(b []byte, invoker func([]byte) (int, error)) (int, error) {
+			n, err := invoker(b)
 			if n > 0 {
 				ch.mux.Lock()
 				ch.buf.Write(b[:n])
@@ -183,8 +183,8 @@ type ConnWriteBytesTrace struct {
 
 func (ch *ConnWriteBytesTrace) init() {
 	ch.interceptor = &ConnInterceptor{
-		Write: func(b []byte, raw func([]byte) (int, error)) (int, error) {
-			n, err := raw(b)
+		Write: func(b []byte, invoker func([]byte) (int, error)) (int, error) {
+			n, err := invoker(b)
 			if n > 0 {
 				ch.mux.Lock()
 				ch.buf.Write(b[:n])
@@ -229,16 +229,16 @@ type ConnDuplicate struct {
 
 func (cc *ConnDuplicate) init() {
 	cc.interceptor = &ConnInterceptor{
-		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
-			n, err := raw(b)
+		Read: func(b []byte, invoker func([]byte) (int, error)) (int, error) {
+			n, err := invoker(b)
 			if n > 0 && cc.ReadTo != nil {
 				_, _ = cc.ReadTo.Write(b[:n])
 			}
 			return n, err
 		},
 
-		Write: func(b []byte, raw func([]byte) (int, error)) (int, error) {
-			n, err := raw(b)
+		Write: func(b []byte, invoker func([]byte) (int, error)) (int, error) {
+			n, err := invoker(b)
 			if n > 0 && cc.ReadTo != nil {
 				_, _ = cc.WriterTo.Write(b[:n])
 			}

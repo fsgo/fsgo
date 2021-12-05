@@ -128,32 +128,32 @@ func (d *Dialer) getInterceptors(ctx context.Context) dialerInterceptors {
 
 // DialerInterceptor  dialer interceptor
 type DialerInterceptor struct {
-	DialContext func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error)
+	DialContext func(ctx context.Context, network string, address string, invoker DialContextFunc) (conn net.Conn, err error)
 }
 
 type dialerInterceptors []*DialerInterceptor
 
 // CallDialContext 执行 its
 // 倒序执行
-func (dhs dialerInterceptors) CallDialContext(ctx context.Context, network, address string, fn DialContextFunc, idx int) (net.Conn, error) {
+func (dhs dialerInterceptors) CallDialContext(ctx context.Context, network, address string, invoker DialContextFunc, idx int) (net.Conn, error) {
 	for ; idx < len(dhs); idx++ {
 		if dhs[idx].DialContext != nil {
 			break
 		}
 	}
 	if len(dhs) == 0 || idx >= len(dhs) {
-		return fn(ctx, network, address)
+		return invoker(ctx, network, address)
 	}
 	return dhs[idx].DialContext(ctx, network, address, func(ctx context.Context, network string, address string) (net.Conn, error) {
-		return dhs.CallDialContext(ctx, network, address, fn, idx+1)
+		return dhs.CallDialContext(ctx, network, address, invoker, idx+1)
 	})
 }
 
-type dialerInterceptorMapper struct {
+type dialerItsMapper struct {
 	its dialerInterceptors
 }
 
-func (dhm *dialerInterceptorMapper) Register(its ...*DialerInterceptor) {
+func (dhm *dialerItsMapper) Register(its ...*DialerInterceptor) {
 	dhm.its = append(dhm.its, its...)
 }
 
@@ -165,7 +165,7 @@ func ContextWithDialerInterceptor(ctx context.Context, its ...*DialerInterceptor
 	}
 	dh := dialerItMapperFormContext(ctx)
 	if dh == nil {
-		dh = &dialerInterceptorMapper{}
+		dh = &dialerItsMapper{}
 		ctx = context.WithValue(ctx, ctxKeyDialerInterceptor, dh)
 	}
 	dh.Register(its...)
@@ -181,12 +181,12 @@ func DialerInterceptorsFromContext(ctx context.Context) []*DialerInterceptor {
 	return dhm.its
 }
 
-func dialerItMapperFormContext(ctx context.Context) *dialerInterceptorMapper {
+func dialerItMapperFormContext(ctx context.Context) *dialerItsMapper {
 	val := ctx.Value(ctxKeyDialerInterceptor)
 	if val == nil {
 		return nil
 	}
-	return val.(*dialerInterceptorMapper)
+	return val.(*dialerItsMapper)
 }
 
 // TryRegisterDialerInterceptor 尝试给 DefaultDialer 注册 DialerInterceptor
@@ -211,8 +211,8 @@ func MustRegisterDialerInterceptor(its ...*DialerInterceptor) {
 // 当想给 DefaultDialer 注册 全局的 ConnInterceptor 的时候，可以使用该方法
 func NewConnDialerInterceptor(its ...*ConnInterceptor) *DialerInterceptor {
 	return &DialerInterceptor{
-		DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
-			conn, err = fn(ctx, network, address)
+		DialContext: func(ctx context.Context, network string, address string, invoker DialContextFunc) (conn net.Conn, err error) {
+			conn, err = invoker(ctx, network, address)
 			if err != nil || len(its) == 0 {
 				return conn, err
 			}
