@@ -15,11 +15,12 @@ import (
 	"sync"
 
 	"github.com/fsgo/fsgo/fsfs"
+	"github.com/fsgo/fsgo/fsnet"
 	"github.com/fsgo/fsgo/fsnet/fsip"
 )
 
 // DefaultHostsFile os default hosts file
-var DefaultHostsFile = NewHostsFile("")
+var DefaultHostsFile fsnet.HasLookupIP = NewHostsFile("")
 
 // HostsLookupIP find domain in hosts file
 func HostsLookupIP(ctx context.Context, network, host string) ([]net.IP, error) {

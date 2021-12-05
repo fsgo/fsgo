@@ -104,8 +104,8 @@ func TestResolverCached(t *testing.T) {
 			},
 		}
 		re := &ResolverCached{
-			Expiration:  time.Minute,
-			StdResolver: std,
+			Expiration: time.Minute,
+			Invoker:    std,
 		}
 		runTestCases(t, re, tests)
 	})
@@ -119,8 +119,8 @@ func TestResolverCached(t *testing.T) {
 			},
 		})
 		re := &ResolverCached{
-			Expiration:  time.Minute,
-			StdResolver: std,
+			Expiration: time.Minute,
+			Invoker:    std,
 		}
 
 		var lookupIPNum testNum

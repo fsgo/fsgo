@@ -6,6 +6,7 @@ package fsnet
 
 import (
 	"context"
+	"fmt"
 	"math/rand"
 	"net"
 	"os"
@@ -29,6 +30,25 @@ type HasLookupIP interface {
 	LookupIP(ctx context.Context, network, host string) ([]net.IP, error)
 }
 
+// HasLookupIPs HasLookupIP slice
+type HasLookupIPs []HasLookupIP
+
+// LookupIP Lookup IP
+func (hs HasLookupIPs) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
+	var ret []net.IP
+	var err error
+	for i := 0; i < len(hs); i++ {
+		ret, err = hs[i].LookupIP(ctx, network, host)
+		if err == nil {
+			return ret, nil
+		}
+	}
+	if err != nil {
+		return nil, err
+	}
+	return nil, fmt.Errorf("not found by %d func", len(hs))
+}
+
 // ResolverCanIntercept 支持注册 ResolverInterceptor
 type ResolverCanIntercept interface {
 	RegisterInterceptor(its ...*ResolverInterceptor)
@@ -46,7 +66,7 @@ type ResolverCached struct {
 	// <=0 means disabled
 	Expiration time.Duration
 
-	StdResolver Resolver
+	Invoker Resolver
 
 	// Interceptors 可选，拦截器，先注册的后执行
 	Interceptors []*ResolverInterceptor
@@ -99,8 +119,8 @@ func (r *ResolverCached) lookupIPAddr(ctx context.Context, host string) ([]net.I
 }
 
 func (r *ResolverCached) getStdResolver() Resolver {
-	if r.StdResolver != nil {
-		return r.StdResolver
+	if r.Invoker != nil {
+		return r.Invoker
 	}
 	return net.DefaultResolver
 }
@@ -152,6 +172,11 @@ func (r *ResolverCached) RegisterInterceptor(its ...*ResolverInterceptor) {
 // GetInterceptors read Interceptor list
 func (r *ResolverCached) GetInterceptors() []*ResolverInterceptor {
 	return r.Interceptors
+}
+
+// ExpirationFromEnv parser Expiration from os.env
+func (r *ResolverCached) ExpirationFromEnv() time.Duration {
+	return defaultResolverExpiration()
 }
 
 // DefaultResolver default Resolver, result has 3 min cache
@@ -269,5 +294,17 @@ func TryRegisterResolverInterceptor(its ...*ResolverInterceptor) bool {
 func MustRegisterResolverInterceptor(its ...*ResolverInterceptor) {
 	if !TryRegisterResolverInterceptor(its...) {
 		panic("DefaultResolver cannot Register Interceptor")
+	}
+}
+
+// ResolverToInterceptor convert Resolver to ResolverInterceptor
+func ResolverToInterceptor(r Resolver) *ResolverInterceptor {
+	return &ResolverInterceptor{
+		LookupIP: func(ctx context.Context, network, host string, invoker LookupIPFunc) ([]net.IP, error) {
+			return r.LookupIP(ctx, network, host)
+		},
+		LookupIPAddr: func(ctx context.Context, host string, invoker LookupIPAddrFunc) ([]net.IPAddr, error) {
+			return r.LookupIPAddr(ctx, host)
+		},
 	}
 }
