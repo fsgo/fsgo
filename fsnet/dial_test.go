@@ -17,7 +17,7 @@ func TestDialer_DialContext(t *testing.T) {
 	t.Run("default no its", func(t *testing.T) {
 		wantErr := fmt.Errorf("err must")
 		d := &Dialer{
-			StdDialer: &testDialer{
+			Invoker: &testDialer{
 				retConn: nil,
 				retErr:  wantErr,
 			},
@@ -34,7 +34,7 @@ func TestDialer_DialContext(t *testing.T) {
 			num++
 		}
 		d := &Dialer{
-			StdDialer: &testDialer{
+			Invoker: &testDialer{
 				retConn: nil,
 				retErr:  wantErr,
 			},

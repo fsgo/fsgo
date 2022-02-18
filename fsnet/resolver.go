@@ -212,35 +212,35 @@ type ResolverInterceptor struct {
 	LookupIPAddr func(ctx context.Context, host string, invoker LookupIPAddrFunc) ([]net.IPAddr, error)
 }
 
+type resolverItCtx struct {
+	Ctx context.Context
+	Its []*ResolverInterceptor
+}
+
+func (dc *resolverItCtx) All() []*ResolverInterceptor {
+	var pits []*ResolverInterceptor
+	if pic, ok := dc.Ctx.Value(ctxKeyResolverInterceptor).(*resolverItCtx); ok {
+		pits = pic.All()
+	}
+	if len(pits) == 0 {
+		return dc.Its
+	} else if len(dc.Its) == 0 {
+		return pits
+	}
+	return append(pits, dc.Its...)
+}
+
 // ContextWithResolverInterceptor set Resolver Interceptor to context
 // these interceptors will exec before Dialer.Interceptors
 func ContextWithResolverInterceptor(ctx context.Context, its ...*ResolverInterceptor) context.Context {
 	if len(its) == 0 {
 		return ctx
 	}
-	dhm := resolverInterceptorMapperFormContext(ctx)
-	if dhm == nil {
-		dhm = &resolverInterceptorMapper{}
-		ctx = context.WithValue(ctx, ctxKeyResolverInterceptor, dhm)
+	val := &resolverItCtx{
+		Ctx: ctx,
+		Its: its,
 	}
-	dhm.Register(its...)
-	return ctx
-}
-
-func resolverInterceptorMapperFormContext(ctx context.Context) *resolverInterceptorMapper {
-	val := ctx.Value(ctxKeyResolverInterceptor)
-	if val == nil {
-		return nil
-	}
-	return val.(*resolverInterceptorMapper)
-}
-
-type resolverInterceptorMapper struct {
-	its resolverInterceptors
-}
-
-func (rhm *resolverInterceptorMapper) Register(its ...*ResolverInterceptor) {
-	rhm.its = append(rhm.its, its...)
+	return context.WithValue(ctx, ctxKeyResolverInterceptor, val)
 }
 
 type resolverInterceptors []*ResolverInterceptor

@@ -38,11 +38,14 @@ type Dialer struct {
 	// Timeout 可选，超时时间
 	Timeout time.Duration
 
-	// StdDialer 可选，底层拨号器
-	StdDialer DialerType
+	// Invoker 可选，底层拨号器
+	Invoker DialerType
 
 	// Interceptors 可选，拦截器列表,倒序执行
 	Interceptors []*DialerInterceptor
+
+	// Resolver 可选，dns 解析
+	Resolver Resolver
 }
 
 var _ DialerCanInterceptor = (*Dialer)(nil)
@@ -109,8 +112,8 @@ func (d *Dialer) dial(ctx context.Context, network, address string) (net.Conn, e
 var zeroDialer = &net.Dialer{}
 
 func (d *Dialer) getSTDDialer() DialerType {
-	if d.StdDialer != nil {
-		return d.StdDialer
+	if d.Invoker != nil {
+		return d.Invoker
 	}
 	return zeroDialer
 }
@@ -149,12 +152,22 @@ func (dhs dialerInterceptors) CallDialContext(ctx context.Context, network, addr
 	})
 }
 
-type dialerItsMapper struct {
-	its dialerInterceptors
+type dialerItCtx struct {
+	Ctx context.Context
+	Its []*DialerInterceptor
 }
 
-func (dhm *dialerItsMapper) Register(its ...*DialerInterceptor) {
-	dhm.its = append(dhm.its, its...)
+func (dc *dialerItCtx) All() []*DialerInterceptor {
+	var pits []*DialerInterceptor
+	if pic, ok := dc.Ctx.Value(ctxKeyDialerInterceptor).(*dialerItCtx); ok {
+		pits = pic.All()
+	}
+	if len(pits) == 0 {
+		return dc.Its
+	} else if len(dc.Its) == 0 {
+		return pits
+	}
+	return append(pits, dc.Its...)
 }
 
 // ContextWithDialerInterceptor set dialer Interceptor to context
@@ -163,30 +176,19 @@ func ContextWithDialerInterceptor(ctx context.Context, its ...*DialerInterceptor
 	if len(its) == 0 {
 		return ctx
 	}
-	dh := dialerItMapperFormContext(ctx)
-	if dh == nil {
-		dh = &dialerItsMapper{}
-		ctx = context.WithValue(ctx, ctxKeyDialerInterceptor, dh)
+	val := &dialerItCtx{
+		Ctx: ctx,
+		Its: its,
 	}
-	dh.Register(its...)
-	return ctx
+	return context.WithValue(ctx, ctxKeyDialerInterceptor, val)
 }
 
 // DialerInterceptorsFromContext get DialerInterceptors from contexts
 func DialerInterceptorsFromContext(ctx context.Context) []*DialerInterceptor {
-	dhm := dialerItMapperFormContext(ctx)
-	if dhm == nil {
-		return nil
+	if val, ok := ctx.Value(ctxKeyDialerInterceptor).(*dialerItCtx); ok {
+		return val.All()
 	}
-	return dhm.its
-}
-
-func dialerItMapperFormContext(ctx context.Context) *dialerItsMapper {
-	val := ctx.Value(ctxKeyDialerInterceptor)
-	if val == nil {
-		return nil
-	}
-	return val.(*dialerItsMapper)
+	return nil
 }
 
 // TryRegisterDialerInterceptor 尝试给 DefaultDialer 注册 DialerInterceptor

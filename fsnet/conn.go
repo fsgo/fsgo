@@ -229,38 +229,37 @@ func ContextWithConnInterceptor(ctx context.Context, its ...*ConnInterceptor) co
 	if len(its) == 0 {
 		return ctx
 	}
-	dh := connItsMapperFormContext(ctx)
-	if dh == nil {
-		dh = &connItsMapper{}
-		ctx = context.WithValue(ctx, ctxKeyConnInterceptor, dh)
+	val := &connItCtx{
+		Ctx: ctx,
+		Its: its,
 	}
-	dh.Register(its...)
-	return ctx
+	return context.WithValue(ctx, ctxKeyConnInterceptor, val)
 }
 
 // ConnInterceptorsFromContext get connWithIt ConnInterceptors from context
 func ConnInterceptorsFromContext(ctx context.Context) []*ConnInterceptor {
-	chm := connItsMapperFormContext(ctx)
-	if chm == nil {
-		return nil
+	if val, ok := ctx.Value(ctxKeyConnInterceptor).(*connItCtx); ok {
+		return val.All()
 	}
-	return chm.its
+	return nil
 }
 
-func connItsMapperFormContext(ctx context.Context) *connItsMapper {
-	val := ctx.Value(ctxKeyConnInterceptor)
-	if val == nil {
-		return nil
+type connItCtx struct {
+	Ctx context.Context
+	Its []*ConnInterceptor
+}
+
+func (dc *connItCtx) All() []*ConnInterceptor {
+	var pits []*ConnInterceptor
+	if pic, ok := dc.Ctx.Value(ctxKeyConnInterceptor).(*connItCtx); ok {
+		pits = pic.All()
 	}
-	return val.(*connItsMapper)
-}
-
-type connItsMapper struct {
-	its connInterceptors
-}
-
-func (chm *connItsMapper) Register(its ...*ConnInterceptor) {
-	chm.its = append(chm.its, its...)
+	if len(pits) == 0 {
+		return dc.Its
+	} else if len(dc.Its) == 0 {
+		return pits
+	}
+	return append(pits, dc.Its...)
 }
 
 var globalConnIts []*ConnInterceptor
