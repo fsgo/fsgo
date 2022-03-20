@@ -6,6 +6,7 @@ package fsnet
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"time"
 
@@ -64,6 +65,7 @@ func (d *Dialer) DialContext(ctx context.Context, network string, address string
 	}
 	its := d.getInterceptors(ctx)
 	c, err := its.CallDialContext(ctx, network, address, d.stdDial, 0)
+	fmt.Println("DialContext:", c, err)
 	if err != nil {
 		return nil, err
 	}
@@ -74,10 +76,26 @@ func (d *Dialer) DialContext(ctx context.Context, network string, address string
 	return WrapConn(c, cks...), nil
 }
 
+func splitHostPort(hostPort string) (host string, port string, err error) {
+	host, port, err = net.SplitHostPort(hostPort)
+	if err != nil {
+		return "", "", err
+	}
+
+	if len(host) == 0 {
+		return "", "", &net.AddrError{
+			Err:  "empty host",
+			Addr: hostPort,
+		}
+	}
+
+	return host, port, nil
+}
+
 func (d *Dialer) stdDial(ctx context.Context, network string, address string) (net.Conn, error) {
 	nt := Network(network).Resolver()
 	if nt.IsIP() {
-		host, port, err := net.SplitHostPort(address)
+		host, port, err := splitHostPort(address)
 		if err != nil {
 			return nil, err
 		}
@@ -96,7 +114,7 @@ func (d *Dialer) stdDial(ctx context.Context, network string, address string) (n
 			ad := net.JoinHostPort(ip.String(), port)
 			conn, err := d.dial(ctx, network, ad)
 			if err == nil || ctx.Err() != nil {
-				return conn, err
+				return conn, ctx.Err()
 			}
 		}
 		return nil, err

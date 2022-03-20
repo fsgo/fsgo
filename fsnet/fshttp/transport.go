@@ -124,9 +124,9 @@ func (t *Transport) getAddress(req *http.Request) (address string, proxyURL *url
 }
 
 // RoundTrip 发送请求
-func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error) {
 	defer closeRequest(req)
-	if err := checkRequest(req); err != nil {
+	if err = checkRequest(req); err != nil {
 		return nil, err
 	}
 	address, proxyURL, err := t.getAddress(req)
@@ -135,11 +135,15 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	conn, err := t.dialConn(req.Context(), req, proxyURL, "tcp", address)
-
 	if err != nil {
 		return nil, err
 	}
-	defer conn.Close()
+
+	defer func() {
+		if err != nil {
+			_ = conn.Close()
+		}
+	}()
 
 	if dl, ok := req.Context().Deadline(); ok {
 		if err = conn.SetDeadline(dl); err != nil {
@@ -168,7 +172,8 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return nil, err
 	}
 	bio := bufio.NewReader(conn)
-	return http.ReadResponse(bio, req)
+	resp, err = http.ReadResponse(bio, req)
+	return resp, err
 }
 
 const authKey = "Proxy-Authorization"

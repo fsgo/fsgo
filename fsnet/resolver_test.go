@@ -145,6 +145,11 @@ func TestResolverCached(t *testing.T) {
 				wantIPAddrErr: true,
 			},
 			{
+				host:          "",
+				wantIPErr:     true,
+				wantIPAddrErr: true,
+			},
+			{
 				host:      "def.com",
 				wantIPErr: false,
 				wantIP: []net.IP{
