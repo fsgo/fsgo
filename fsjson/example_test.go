@@ -200,3 +200,37 @@ func ExampleFloat64Slice_UnmarshalJSON() {
 	// {"IDS":1.0}                    -> err=false user=&{IDS:[1]}
 	// {"IDS":"1.0"}                  -> err=false user=&{IDS:[1]}
 }
+
+func ExampleObject_UnmarshalJSON() {
+	type class struct {
+		Name string
+	}
+
+	type user struct {
+		Cl *fsjson.Object
+	}
+
+	txtList := []string{
+		`{"Cl":[]}`,
+		`{"Cl":null}`,
+		`{"Cl":""}`,
+		`{"Cl":{"Name":"hello"}}`,
+		`{"Cl":"abc"}`, // not support
+	}
+
+	for i := 0; i < len(txtList); i++ {
+		txt := txtList[i]
+		c := &class{}
+		u := &user{
+			Cl: fsjson.NewObject(c),
+		}
+		err := json.Unmarshal([]byte(txt), &u)
+		fmt.Printf("%-30s -> err=%v class=%+v\n", txt, err != nil, c)
+	}
+	// Output:
+	// {"Cl":[]}                      -> err=false class=&{Name:}
+	// {"Cl":null}                    -> err=false class=&{Name:}
+	// {"Cl":""}                      -> err=false class=&{Name:}
+	// {"Cl":{"Name":"hello"}}        -> err=false class=&{Name:hello}
+	// {"Cl":"abc"}                   -> err=true class=&{Name:}
+}

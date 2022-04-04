@@ -12,8 +12,8 @@ import (
 var _ json.Unmarshaler = (*Object)(nil)
 var _ json.Marshaler = (*Object)(nil)
 
-// NewStruct 创建一个新的 Object
-func NewStruct(value any) *Object {
+// NewObject 创建一个新的 JSON Object
+func NewObject(value any) *Object {
 	return &Object{
 		Value: value,
 	}
@@ -61,4 +61,20 @@ func (obj *Object) UnmarshalTo(value any) error {
 		return nil
 	}
 	return json.Unmarshal(obj.bf, value)
+}
+
+// String 用于调试查看
+func (obj *Object) String() string {
+	if obj == nil {
+		return "object_nil"
+	}
+	data := map[string]any{
+		"Buffer": string(obj.bf),
+		"Value":  obj.Value,
+	}
+	bb, err := json.Marshal(data)
+	if err != nil {
+		return err.Error()
+	}
+	return string(bb)
 }

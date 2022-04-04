@@ -47,7 +47,7 @@ func TestObject_UnmarshalJSON(t *testing.T) {
 		require.Nil(t, u.Cl)
 	})
 
-	t.Run("has value", func(t *testing.T) {
+	t.Run("has value 1", func(t *testing.T) {
 		var u *user
 		content := []byte(`{"Cl":{"Name":"hello"}}`)
 		err := json.Unmarshal(content, &u)
@@ -57,6 +57,20 @@ func TestObject_UnmarshalJSON(t *testing.T) {
 		require.NoError(t, u.Cl.UnmarshalTo(&c))
 		wantC := &class{Name: "hello"}
 		require.Equal(t, c, wantC)
+	})
+
+	t.Run("has value 2", func(t *testing.T) {
+		c := &class{}
+		u := &user{
+			Cl: NewObject(c),
+		}
+		content := []byte(`{"Cl":{"Name":"hello"}}`)
+		err := json.Unmarshal(content, &u)
+		require.NoError(t, err)
+		require.NotNil(t, u.Cl)
+		wantC := &class{Name: "hello"}
+		require.Equal(t, c, wantC)
+		require.NotNil(t, u.Cl.Value)
 	})
 }
 
@@ -77,7 +91,7 @@ func TestObject_MarshalJSON(t *testing.T) {
 	})
 	t.Run("value not nil", func(t *testing.T) {
 		u := &user{
-			Cl: NewStruct(&class{Name: "hello"}),
+			Cl: NewObject(&class{Name: "hello"}),
 		}
 		bf, err := json.Marshal(u)
 		require.NoError(t, err)
