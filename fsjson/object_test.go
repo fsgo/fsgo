@@ -82,9 +82,16 @@ func TestObject_MarshalJSON(t *testing.T) {
 	type user struct {
 		Cl *Object
 	}
-
-	t.Run("value nil", func(t *testing.T) {
+	t.Run("object nil", func(t *testing.T) {
 		u := &user{}
+		bf, err := json.Marshal(u)
+		require.NoError(t, err)
+		require.Equal(t, `{"Cl":null}`, string(bf))
+	})
+	t.Run("object value nil", func(t *testing.T) {
+		u := &user{
+			Cl: NewObject(nil),
+		}
 		bf, err := json.Marshal(u)
 		require.NoError(t, err)
 		require.Equal(t, `{"Cl":null}`, string(bf))

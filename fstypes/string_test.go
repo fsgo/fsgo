@@ -68,7 +68,7 @@ func TestString_ToInt64Slice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.Int64s(tt.args.sep)
+			got, err := tt.s.Int64Slice(tt.args.sep)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Int64s() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -130,7 +130,7 @@ func TestString_ToIntSlice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.Ints(tt.args.sep)
+			got, err := tt.s.IntSlice(tt.args.sep)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Ints() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -201,7 +201,7 @@ func TestString_ToInt32Slice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.Int32s(tt.args.sep)
+			got, err := tt.s.Int32Slice(tt.args.sep)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Int32s() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -263,7 +263,7 @@ func TestString_ToUint64Slice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.Uint64s(tt.args.sep)
+			got, err := tt.s.Uint64Slice(tt.args.sep)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Uint64s() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -325,7 +325,7 @@ func TestString_ToUint32Slice(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.s.Uint32s(tt.args.sep)
+			got, err := tt.s.Uint32Slice(tt.args.sep)
 			if (err != nil) != tt.wantErr {
 				t.Errorf("Uint32s() error = %v, wantErr %v", err, tt.wantErr)
 				return
@@ -387,7 +387,7 @@ func BenchmarkString_ToInt64Slice(b *testing.B) {
 	var xi []int64
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		xi, _ = xs.Int64s(",")
+		xi, _ = xs.Int64Slice(",")
 	}
 	_ = xi
 }
@@ -400,4 +400,30 @@ func BenchmarkString_split(b *testing.B) {
 		xa = xs.split(",")
 	}
 	_ = xa
+}
+
+func TestStringSlice_Unique(t *testing.T) {
+	tests := []struct {
+		name string
+		ss   StringSlice
+		want StringSlice
+	}{
+		{
+			name: "case 1",
+			ss:   []string{"a", "b", "b"},
+			want: []string{"a", "b"},
+		},
+		{
+			name: "case 2",
+			ss:   []string{"a"},
+			want: []string{"a"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.ss.Unique(); !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("Unique() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

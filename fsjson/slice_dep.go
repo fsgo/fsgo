@@ -6,36 +6,12 @@ package fsjson
 
 import (
 	"bytes"
-	"fmt"
-	"strconv"
 	"strings"
+
+	"github.com/fsgo/fsgo/internal/number"
 )
 
-type signed interface {
-	~int | ~int8 | ~int16 | ~int32 | ~int64
-}
-
-type unsigned interface {
-	~uint | ~uint8 | ~uint16 | ~uint32 | ~uint64
-}
-
-type float interface {
-	~float32 | ~float64
-}
-
-type number interface {
-	signed | unsigned | float
-}
-
-type numberType int8
-
-const (
-	numberTypeSigned = iota
-	numberTypeUnsigned
-	numberTypeFloat
-)
-
-func numberSliceUnmarshalJSON[T number](content []byte, dt numberType) ([]T, error) {
+func numberSliceUnmarshalJSON[T number.Number](content []byte, zero any) ([]T, error) {
 	if bytes.Equal(content, emptyString) || bytes.Equal(content, null) {
 		return nil, nil
 	}
@@ -48,7 +24,7 @@ func numberSliceUnmarshalJSON[T number](content []byte, dt numberType) ([]T, err
 		numbers := make([]T, 0, len(values))
 		for i := 0; i < len(values); i++ {
 			txt := strings.Trim(values[i], `"`)
-			value, err := parseNumber[T](txt, dt)
+			value, err := number.ParseNumber[T](txt, zero)
 			if err != nil {
 				return nil, err
 			}
@@ -62,34 +38,9 @@ func numberSliceUnmarshalJSON[T number](content []byte, dt numberType) ([]T, err
 
 	// 其他情况, eg:
 	// {"IDS":123}
-	value, err := parseNumber[T](string(content), dt)
+	value, err := number.ParseNumber[T](string(content), zero)
 	if err != nil {
 		return nil, err
 	}
 	return []T{value}, nil
-}
-
-func parseNumber[T number](str string, dt numberType) (T, error) {
-	str = strings.TrimSpace(str)
-	switch dt {
-	case numberTypeSigned:
-		ret, err := strconv.ParseInt(str, 10, 64)
-		if err != nil {
-			return 0, err
-		}
-		return T(ret), nil
-	case numberTypeUnsigned:
-		ret, err := strconv.ParseUint(str, 10, 64)
-		if err != nil {
-			return 0, err
-		}
-		return T(ret), nil
-	case numberTypeFloat:
-		ret, err := strconv.ParseFloat(str, 10)
-		if err != nil {
-			return 0, err
-		}
-		return T(ret), nil
-	}
-	return 0, fmt.Errorf("unsupport number type: %v", dt)
 }

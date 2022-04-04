@@ -44,6 +44,59 @@ func ExampleStringSlice_UnmarshalJSON() {
 	// err=true user=(*fsjson_test.user)(nil)
 }
 
+func ExampleInt8Slice_UnmarshalJSON() {
+	type user struct {
+		IDS fsjson.Int8Slice
+	}
+
+	txtList := []string{
+		`{}`,
+		`{"IDS":""}`,
+		`{"IDS":null}`,
+		`{"IDS":123}`,
+		`{"IDS":["123",456,0]}`, // not support, 456 not int8
+		`{"IDS":[1,2,-1]}`,
+		`{"IDS":-2}`,
+		`{"IDS":2.3}`,         // not support
+		`{"IDS":"abc"}`,       // not support
+		`{"IDS":"abc,def,1"}`, // not support
+		`{"IDS":err}`,         // not support
+		`{"IDS":1.0}`,         // not support
+		`{"IDS":"1.0"}`,       // not support
+	}
+
+	printUser := func(u *user) string {
+		if u == nil {
+			return "nil"
+		}
+		if u.IDS == nil {
+			return "&{IDS:nil}"
+		}
+		return fmt.Sprintf("%+v", u)
+	}
+
+	for i := 0; i < len(txtList); i++ {
+		txt := txtList[i]
+		var u *user
+		err := json.Unmarshal([]byte(txt), &u)
+		fmt.Printf("%-30s -> err=%v user=%s\n", txt, err != nil, printUser(u))
+	}
+	// Output:
+	// {}                             -> err=false user=&{IDS:nil}
+	// {"IDS":""}                     -> err=false user=&{IDS:nil}
+	// {"IDS":null}                   -> err=false user=&{IDS:nil}
+	// {"IDS":123}                    -> err=false user=&{IDS:[123]}
+	// {"IDS":["123",456,0]}          -> err=true user=&{IDS:nil}
+	// {"IDS":[1,2,-1]}               -> err=false user=&{IDS:[1 2 -1]}
+	// {"IDS":-2}                     -> err=false user=&{IDS:[-2]}
+	// {"IDS":2.3}                    -> err=true user=&{IDS:nil}
+	// {"IDS":"abc"}                  -> err=true user=&{IDS:nil}
+	// {"IDS":"abc,def,1"}            -> err=true user=&{IDS:nil}
+	// {"IDS":err}                    -> err=true user=nil
+	// {"IDS":1.0}                    -> err=true user=&{IDS:nil}
+	// {"IDS":"1.0"}                  -> err=true user=&{IDS:nil}
+}
+
 func ExampleInt64Slice_UnmarshalJSON() {
 	type user struct {
 		IDS fsjson.Int64Slice

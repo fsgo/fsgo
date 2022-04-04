@@ -35,75 +35,63 @@ var types = []*tplData{
 	{
 		SliceName:         "IntSlice",
 		NumberType:        "int",
-		NumberTypePrivate: "numberTypeSigned",
 		TypeCommentValues: tplCommentSigned,
 	},
 	{
 		SliceName:         "Int8Slice",
 		NumberType:        "int8",
-		NumberTypePrivate: "numberTypeSigned",
 		TypeCommentValues: tplCommentSigned,
 	},
 	{
 		SliceName:         "Int16Slice",
 		NumberType:        "int16",
-		NumberTypePrivate: "numberTypeSigned",
 		TypeCommentValues: tplCommentSigned,
 	},
 	{
 		SliceName:         "Int32Slice",
 		NumberType:        "int32",
-		NumberTypePrivate: "numberTypeSigned",
 		TypeCommentValues: tplCommentSigned,
 	},
 	{
 		SliceName:         "Int64Slice",
 		NumberType:        "int64",
-		NumberTypePrivate: "numberTypeSigned",
 		TypeCommentValues: tplCommentSigned,
 	},
 	// unsigned int
 	{
 		SliceName:         "UintSlice",
 		NumberType:        "uint",
-		NumberTypePrivate: "numberTypeUnsigned",
 		TypeCommentValues: tplCommentUnsigned,
 	},
 	{
 		SliceName:         "Uint8Slice",
 		NumberType:        "uint8",
-		NumberTypePrivate: "numberTypeUnsigned",
 		TypeCommentValues: tplCommentUnsigned,
 	},
 	{
 		SliceName:         "Uint16Slice",
 		NumberType:        "uint16",
-		NumberTypePrivate: "numberTypeUnsigned",
 		TypeCommentValues: tplCommentUnsigned,
 	},
 	{
 		SliceName:         "Uint32Slice",
 		NumberType:        "uint32",
-		NumberTypePrivate: "numberTypeUnsigned",
 		TypeCommentValues: tplCommentUnsigned,
 	},
 	{
 		SliceName:         "Uint64Slice",
 		NumberType:        "uint64",
-		NumberTypePrivate: "numberTypeUnsigned",
 		TypeCommentValues: tplCommentUnsigned,
 	},
 	// float number
 	{
 		SliceName:         "Float32Slice",
 		NumberType:        "float32",
-		NumberTypePrivate: "numberTypeFloat",
 		TypeCommentValues: tplCommentFloat,
 	},
 	{
 		SliceName:         "Float64Slice",
 		NumberType:        "float64",
-		NumberTypePrivate: "numberTypeFloat",
 		TypeCommentValues: tplCommentFloat,
 	},
 }
@@ -111,7 +99,6 @@ var types = []*tplData{
 func render(td *tplData) string {
 	txt := strings.ReplaceAll(tplType, "{SliceName}", td.SliceName)
 	txt = strings.ReplaceAll(txt, "{numberType}", td.NumberType)
-	txt = strings.ReplaceAll(txt, "{numberTypePrivate}", td.NumberTypePrivate)
 	txt = strings.ReplaceAll(txt, "{TypeCommentValues}", strings.TrimSpace(td.TypeCommentValues))
 	return strings.TrimSpace(txt)
 }
@@ -119,7 +106,6 @@ func render(td *tplData) string {
 type tplData struct {
 	SliceName         string
 	NumberType        string
-	NumberTypePrivate string
 	TypeCommentValues string
 }
 
@@ -144,7 +130,7 @@ type {SliceName} []{numberType}
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *{SliceName}) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[{numberType}](bf, {numberTypePrivate})
+	vs, err := numberSliceUnmarshalJSON[{numberType}](bf, {numberType}(0))
 	if err != nil {
 		return err
 	}

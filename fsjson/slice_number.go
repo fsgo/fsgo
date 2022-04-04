@@ -20,7 +20,7 @@ type IntSlice []int
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *IntSlice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[int](bf, numberTypeSigned)
+	vs, err := numberSliceUnmarshalJSON[int](bf, int(0))
 	if err != nil {
 		return err
 	}
@@ -51,7 +51,7 @@ type Int8Slice []int8
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *Int8Slice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[int8](bf, numberTypeSigned)
+	vs, err := numberSliceUnmarshalJSON[int8](bf, int8(0))
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ type Int16Slice []int16
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *Int16Slice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[int16](bf, numberTypeSigned)
+	vs, err := numberSliceUnmarshalJSON[int16](bf, int16(0))
 	if err != nil {
 		return err
 	}
@@ -113,7 +113,7 @@ type Int32Slice []int32
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *Int32Slice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[int32](bf, numberTypeSigned)
+	vs, err := numberSliceUnmarshalJSON[int32](bf, int32(0))
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ type Int64Slice []int64
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *Int64Slice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[int64](bf, numberTypeSigned)
+	vs, err := numberSliceUnmarshalJSON[int64](bf, int64(0))
 	if err != nil {
 		return err
 	}
@@ -175,7 +175,7 @@ type UintSlice []uint
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *UintSlice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[uint](bf, numberTypeUnsigned)
+	vs, err := numberSliceUnmarshalJSON[uint](bf, uint(0))
 	if err != nil {
 		return err
 	}
@@ -206,7 +206,7 @@ type Uint8Slice []uint8
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *Uint8Slice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[uint8](bf, numberTypeUnsigned)
+	vs, err := numberSliceUnmarshalJSON[uint8](bf, uint8(0))
 	if err != nil {
 		return err
 	}
@@ -237,7 +237,7 @@ type Uint16Slice []uint16
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *Uint16Slice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[uint16](bf, numberTypeUnsigned)
+	vs, err := numberSliceUnmarshalJSON[uint16](bf, uint16(0))
 	if err != nil {
 		return err
 	}
@@ -268,7 +268,7 @@ type Uint32Slice []uint32
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *Uint32Slice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[uint32](bf, numberTypeUnsigned)
+	vs, err := numberSliceUnmarshalJSON[uint32](bf, uint32(0))
 	if err != nil {
 		return err
 	}
@@ -299,7 +299,7 @@ type Uint64Slice []uint64
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *Uint64Slice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[uint64](bf, numberTypeUnsigned)
+	vs, err := numberSliceUnmarshalJSON[uint64](bf, uint64(0))
 	if err != nil {
 		return err
 	}
@@ -330,7 +330,7 @@ type Float32Slice []float32
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *Float32Slice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[float32](bf, numberTypeFloat)
+	vs, err := numberSliceUnmarshalJSON[float32](bf, float32(0))
 	if err != nil {
 		return err
 	}
@@ -361,7 +361,7 @@ type Float64Slice []float64
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
 func (ns *Float64Slice) UnmarshalJSON(bf []byte) error {
-	vs, err := numberSliceUnmarshalJSON[float64](bf, numberTypeFloat)
+	vs, err := numberSliceUnmarshalJSON[float64](bf, float64(0))
 	if err != nil {
 		return err
 	}
