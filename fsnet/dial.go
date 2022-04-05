@@ -6,7 +6,6 @@ package fsnet
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"time"
 
@@ -65,7 +64,6 @@ func (d *Dialer) DialContext(ctx context.Context, network string, address string
 	}
 	its := d.getInterceptors(ctx)
 	c, err := its.CallDialContext(ctx, network, address, d.stdDial, 0)
-	fmt.Println("DialContext:", c, err)
 	if err != nil {
 		return nil, err
 	}
