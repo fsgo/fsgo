@@ -214,12 +214,39 @@ var rotateExtRules = map[string]func() string{
 		return "." + time.Now().Format("20060102")
 	},
 	"1hour": func() string {
+		// eg: .2022040611,.2022040612,.2022040613
 		return "." + time.Now().Format("2006010215")
 	},
 	"1minute": func() string {
+		// eg: .202204061100,.202204061101,.202204061102
 		return "." + time.Now().Format("200601021504")
+	},
+	"5minute": func() string {
+		// eg: .202204061100,.202204061105,.202204061110
+		return nMinuteExt(5)
+	},
+	"10minute": func() string {
+		// eg: .202204061100,.202204061110,.202204061120
+		return nMinuteExt(10)
+	},
+	"15minute": func() string {
+		// eg: .202204061100,.202204061115,.202204061130
+		return nMinuteExt(15)
+	},
+	"20minute": func() string {
+		// eg: .202204061100,.202204061120,.202204061140
+		return nMinuteExt(20)
+	},
+	"30minute": func() string {
+		// eg: .202204061100,.202204061130
+		return nMinuteExt(30)
 	},
 	"1second": func() string {
 		return "." + time.Now().Format("20060102150405")
 	},
+}
+
+func nMinuteExt(n int) string {
+	now := time.Now()
+	return "." + now.Format("2006010215") + fmt.Sprintf("%02d", now.Minute()/n*n)
 }

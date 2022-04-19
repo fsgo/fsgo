@@ -55,3 +55,21 @@ func (w *resetWriter) Reset(raw io.Writer) {
 	w.raw = raw
 	w.mux.Unlock()
 }
+
+// MutexWriter wrap a writer with a mutex
+func MutexWriter(w io.Writer) io.Writer {
+	return &mutexWriter{
+		Writer: w,
+	}
+}
+
+type mutexWriter struct {
+	io.Writer
+	mu sync.Mutex
+}
+
+func (w *mutexWriter) Write(b []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.Writer.Write(b)
+}

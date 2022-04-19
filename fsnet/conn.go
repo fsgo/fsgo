@@ -97,22 +97,44 @@ func (c *connWithIt) SetWriteDeadline(t time.Time) error {
 	return c.allIts.CallSetWriteDeadline(t, c.raw.SetWriteDeadline, 0)
 }
 
-// ConnInterceptor connWithIt Interceptor
+// ConnInterceptor  Interceptor for net.Conn
 type ConnInterceptor struct {
-	Read             func(b []byte, invoker func([]byte) (int, error)) (int, error)
-	Write            func(b []byte, invoker func([]byte) (int, error)) (int, error)
-	Close            func(invoker func() error) error
-	LocalAddr        func(invoker func() net.Addr) net.Addr
-	RemoteAddr       func(invoker func() net.Addr) net.Addr
+	Read      func(b []byte, invoker func([]byte) (int, error)) (int, error)
+	AfterRead func(b []byte, readSize int, err error)
+
+	Write      func(b []byte, invoker func([]byte) (int, error)) (int, error)
+	AfterWrite func(b []byte, wroteSize int, err error)
+
+	Close      func(invoker func() error) error
+	AfterClose func(err error)
+
+	LocalAddr  func(invoker func() net.Addr) net.Addr
+	RemoteAddr func(invoker func() net.Addr) net.Addr
+
 	SetDeadline      func(tm time.Time, invoker func(tm time.Time) error) error
-	SetReadDeadline  func(tm time.Time, invoker func(tm time.Time) error) error
-	SetWriteDeadline func(tm time.Time, invoker func(tm time.Time) error) error
+	AfterSetDeadline func(tm time.Time, err error)
+
+	SetReadDeadline      func(tm time.Time, invoker func(tm time.Time) error) error
+	AfterSetReadDeadline func(tm time.Time, err error)
+
+	SetWriteDeadline      func(tm time.Time, invoker func(tm time.Time) error) error
+	AfterSetWriteDeadline func(tm time.Time, err error)
 }
 
 // 先注册的先执行
 type connInterceptors []*ConnInterceptor
 
 func (chs connInterceptors) CallRead(b []byte, invoker func(b []byte) (int, error), idx int) (n int, err error) {
+	if idx == 0 {
+		defer func() {
+			for i := 0; i < len(chs); i++ {
+				if chs[i].AfterRead == nil {
+					continue
+				}
+				chs[i].AfterRead(b, n, err)
+			}
+		}()
+	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].Read != nil {
 			break
@@ -121,12 +143,23 @@ func (chs connInterceptors) CallRead(b []byte, invoker func(b []byte) (int, erro
 	if len(chs) == 0 || idx >= len(chs) {
 		return invoker(b)
 	}
+
 	return chs[idx].Read(b, func(b []byte) (int, error) {
 		return chs.CallRead(b, invoker, idx+1)
 	})
 }
 
 func (chs connInterceptors) CallWrite(b []byte, invoker func(b []byte) (int, error), idx int) (n int, err error) {
+	if idx == 0 {
+		defer func() {
+			for i := 0; i < len(chs); i++ {
+				if chs[i].AfterWrite == nil {
+					continue
+				}
+				chs[i].AfterWrite(b, n, err)
+			}
+		}()
+	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].Write != nil {
 			break
@@ -140,7 +173,17 @@ func (chs connInterceptors) CallWrite(b []byte, invoker func(b []byte) (int, err
 	})
 }
 
-func (chs connInterceptors) CallClose(invoker func() error, idx int) error {
+func (chs connInterceptors) CallClose(invoker func() error, idx int) (err error) {
+	if idx == 0 {
+		defer func() {
+			for i := 0; i < len(chs); i++ {
+				if chs[i].AfterClose == nil {
+					continue
+				}
+				chs[i].AfterClose(err)
+			}
+		}()
+	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].Close != nil {
 			break
@@ -182,7 +225,17 @@ func (chs connInterceptors) CallRemoteAddr(invoker func() net.Addr, idx int) net
 	})
 }
 
-func (chs connInterceptors) CallSetDeadline(dl time.Time, invoker func(time.Time) error, idx int) error {
+func (chs connInterceptors) CallSetDeadline(dl time.Time, invoker func(time.Time) error, idx int) (err error) {
+	if idx == 0 {
+		defer func() {
+			for i := 0; i < len(chs); i++ {
+				if chs[i].AfterSetDeadline == nil {
+					continue
+				}
+				chs[i].AfterSetDeadline(dl, err)
+			}
+		}()
+	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].SetDeadline != nil {
 			break
@@ -196,7 +249,17 @@ func (chs connInterceptors) CallSetDeadline(dl time.Time, invoker func(time.Time
 	})
 }
 
-func (chs connInterceptors) CallSetReadDeadline(dl time.Time, invoker func(time.Time) error, idx int) error {
+func (chs connInterceptors) CallSetReadDeadline(dl time.Time, invoker func(time.Time) error, idx int) (err error) {
+	if idx == 0 {
+		defer func() {
+			for i := 0; i < len(chs); i++ {
+				if chs[i].AfterSetReadDeadline == nil {
+					continue
+				}
+				chs[i].AfterSetReadDeadline(dl, err)
+			}
+		}()
+	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].SetReadDeadline != nil {
 			break
@@ -210,7 +273,17 @@ func (chs connInterceptors) CallSetReadDeadline(dl time.Time, invoker func(time.
 	})
 }
 
-func (chs connInterceptors) CallSetWriteDeadline(dl time.Time, invoker func(time.Time) error, idx int) error {
+func (chs connInterceptors) CallSetWriteDeadline(dl time.Time, invoker func(time.Time) error, idx int) (err error) {
+	if idx == 0 {
+		defer func() {
+			for i := 0; i < len(chs); i++ {
+				if chs[i].AfterSetWriteDeadline == nil {
+					continue
+				}
+				chs[i].AfterSetWriteDeadline(dl, err)
+			}
+		}()
+	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].SetWriteDeadline != nil {
 			break

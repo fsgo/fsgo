@@ -103,6 +103,10 @@ func TestNewConn_merge(t *testing.T) {
 			assert.Equal(t, 1, id)
 			return raw(b)
 		},
+		AfterRead: func(b []byte, readSize int, err error) {
+			id++
+			assert.Equal(t, 4, id)
+		},
 	}
 	nc := WrapConn(&net.TCPConn{}, hk1)
 
@@ -112,11 +116,30 @@ func TestNewConn_merge(t *testing.T) {
 			assert.Equal(t, 2, id)
 			return raw(b)
 		},
+		AfterRead: func(b []byte, readSize int, err error) {
+			id++
+			assert.Equal(t, 5, id)
+		},
 	}
-	nc1 := WrapConn(nc, hk2)
+
+	hk3 := &ConnInterceptor{
+		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+			id++
+			assert.Equal(t, 3, id)
+			return raw(b)
+		},
+	}
+	hk4 := &ConnInterceptor{
+		AfterRead: func(b []byte, readSize int, err error) {
+			id++
+			assert.Equal(t, 6, id)
+		},
+	}
+	nc1 := WrapConn(nc, hk2, hk3, hk4)
 	assert.NotEqual(t, nc, nc1)
 	bf := make([]byte, 1)
 	_, _ = nc1.Read(bf)
+	assert.Equal(t, 6, id)
 }
 
 func TestOriginConn(t *testing.T) {
