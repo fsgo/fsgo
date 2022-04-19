@@ -141,14 +141,12 @@ type ConnReadBytesTrace struct {
 
 func (ch *ConnReadBytesTrace) init() {
 	ch.interceptor = &ConnInterceptor{
-		Read: func(b []byte, invoker func([]byte) (int, error)) (int, error) {
-			n, err := invoker(b)
-			if n > 0 {
+		AfterRead: func(b []byte, readSize int, err error) {
+			if readSize > 0 {
 				ch.mux.Lock()
-				ch.buf.Write(b[:n])
+				ch.buf.Write(b[:readSize])
 				ch.mux.Unlock()
 			}
-			return n, err
 		},
 	}
 }
@@ -157,7 +155,7 @@ func (ch *ConnReadBytesTrace) init() {
 func (ch *ConnReadBytesTrace) ReadBytes() []byte {
 	ch.mux.RLock()
 	defer ch.mux.RUnlock()
-	return ch.buf.Bytes()
+	return append([]byte(nil), ch.buf.Bytes()...)
 }
 
 // ConnInterceptor 获取 ConnInterceptor 实例
@@ -183,14 +181,12 @@ type ConnWriteBytesTrace struct {
 
 func (ch *ConnWriteBytesTrace) init() {
 	ch.interceptor = &ConnInterceptor{
-		Write: func(b []byte, invoker func([]byte) (int, error)) (int, error) {
-			n, err := invoker(b)
-			if n > 0 {
+		AfterWrite: func(b []byte, wroteSize int, err error) {
+			if wroteSize > 0 {
 				ch.mux.Lock()
-				ch.buf.Write(b[:n])
+				ch.buf.Write(b[:wroteSize])
 				ch.mux.Unlock()
 			}
-			return n, err
 		},
 	}
 }
@@ -199,7 +195,7 @@ func (ch *ConnWriteBytesTrace) init() {
 func (ch *ConnWriteBytesTrace) WriteBytes() []byte {
 	ch.mux.RLock()
 	defer ch.mux.RUnlock()
-	return ch.buf.Bytes()
+	return append([]byte(nil), ch.buf.Bytes()...)
 }
 
 // ConnInterceptor 获取 ConnInterceptor 实例
@@ -215,8 +211,8 @@ func (ch *ConnWriteBytesTrace) Reset() {
 	ch.mux.Unlock()
 }
 
-// ConnDuplicate 实现对网络连接读写数据的复制
-type ConnDuplicate struct {
+// ConnCopy 实现对网络连接读写数据的复制
+type ConnCopy struct {
 	interceptor *ConnInterceptor
 	once        sync.Once
 
@@ -227,28 +223,23 @@ type ConnDuplicate struct {
 	WriterTo io.Writer
 }
 
-func (cc *ConnDuplicate) init() {
+func (cc *ConnCopy) init() {
 	cc.interceptor = &ConnInterceptor{
-		Read: func(b []byte, invoker func([]byte) (int, error)) (int, error) {
-			n, err := invoker(b)
-			if n > 0 && cc.ReadTo != nil {
-				_, _ = cc.ReadTo.Write(b[:n])
+		AfterRead: func(b []byte, readSize int, err error) {
+			if readSize > 0 && cc.ReadTo != nil {
+				_, _ = cc.ReadTo.Write(b[:readSize])
 			}
-			return n, err
 		},
-
-		Write: func(b []byte, invoker func([]byte) (int, error)) (int, error) {
-			n, err := invoker(b)
-			if n > 0 && cc.ReadTo != nil {
-				_, _ = cc.WriterTo.Write(b[:n])
+		AfterWrite: func(b []byte, wroteSize int, err error) {
+			if wroteSize > 0 && cc.ReadTo != nil {
+				_, _ = cc.WriterTo.Write(b[:wroteSize])
 			}
-			return n, err
 		},
 	}
 }
 
 // ConnInterceptor 获取 ConnInterceptor 实例
-func (cc *ConnDuplicate) ConnInterceptor() *ConnInterceptor {
+func (cc *ConnCopy) ConnInterceptor() *ConnInterceptor {
 	cc.once.Do(cc.init)
 	return cc.interceptor
 }
