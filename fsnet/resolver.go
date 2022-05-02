@@ -125,7 +125,8 @@ func (r *ResolverCached) getStdResolver() Resolver {
 	return net.DefaultResolver
 }
 
-func (r *ResolverCached) withCache(ctx context.Context, key string, cacheKey interface{}, fn func() (interface{}, error)) (interface{}, error) {
+func (r *ResolverCached) withCache(ctx context.Context, key string, cacheKey interface{},
+	fn func() (interface{}, error)) (interface{}, error) {
 	if r.Expiration <= 0 {
 		data, err := fn()
 		return data, err
@@ -209,7 +210,13 @@ var LookupIPAddr = func(ctx context.Context, host string) ([]net.IPAddr, error) 
 type ResolverInterceptor struct {
 	LookupIP func(ctx context.Context, network, host string, invoker LookupIPFunc) ([]net.IP, error)
 
+	BeforeLookupIP func(ctx context.Context, network, host string) (ctxNew context.Context, networkNew, hostNew string)
+	AfterLookupIP  func(ctx context.Context, network, host string, ips []net.IP, err error)
+
 	LookupIPAddr func(ctx context.Context, host string, invoker LookupIPAddrFunc) ([]net.IPAddr, error)
+
+	BeforeLookupIPAddr func(ctx context.Context, host string) (ctxNew context.Context, hostNew string)
+	AfterLookupIPAddr  func(ctx context.Context, host string, addrs []net.IPAddr, err error)
 }
 
 type resolverItCtx struct {
@@ -245,7 +252,25 @@ func ContextWithResolverInterceptor(ctx context.Context, its ...*ResolverInterce
 
 type resolverInterceptors []*ResolverInterceptor
 
-func (rhs resolverInterceptors) CallLookupIP(ctx context.Context, network, host string, invoker LookupIPFunc, idx int) ([]net.IP, error) {
+func (rhs resolverInterceptors) CallLookupIP(ctx context.Context, network, host string, invoker LookupIPFunc,
+	idx int) (ips []net.IP, err error) {
+	if idx == 0 {
+		for i := 0; i < len(rhs); i++ {
+			if rhs[i].BeforeLookupIP == nil {
+				continue
+			}
+			ctx, network, host = rhs[i].BeforeLookupIP(ctx, network, host)
+		}
+
+		defer func() {
+			for i := 0; i < len(rhs); i++ {
+				if rhs[i].AfterLookupIP == nil {
+					continue
+				}
+				rhs[i].AfterLookupIP(ctx, network, host, ips, err)
+			}
+		}()
+	}
 	for ; idx < len(rhs); idx++ {
 		if rhs[idx].LookupIP != nil {
 			break
@@ -260,7 +285,25 @@ func (rhs resolverInterceptors) CallLookupIP(ctx context.Context, network, host 
 	})
 }
 
-func (rhs resolverInterceptors) CallLookupIPAddr(ctx context.Context, host string, invoker LookupIPAddrFunc, idx int) ([]net.IPAddr, error) {
+func (rhs resolverInterceptors) CallLookupIPAddr(ctx context.Context, host string, invoker LookupIPAddrFunc,
+	idx int) (addrs []net.IPAddr, err error) {
+	if idx == 0 {
+		for i := 0; i < len(rhs); i++ {
+			if rhs[i].BeforeLookupIPAddr == nil {
+				continue
+			}
+			ctx, host = rhs[i].BeforeLookupIPAddr(ctx, host)
+		}
+
+		defer func() {
+			for i := 0; i < len(rhs); i++ {
+				if rhs[i].AfterLookupIPAddr == nil {
+					continue
+				}
+				rhs[i].AfterLookupIPAddr(ctx, host, addrs, err)
+			}
+		}()
+	}
 	for ; idx < len(rhs); idx++ {
 		if rhs[idx].LookupIPAddr != nil {
 			break

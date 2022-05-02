@@ -91,7 +91,6 @@ func TestNewConn(t *testing.T) {
 			assert.Equal(t, int64(0), stTrace.WriteSize())
 		})
 	})
-
 }
 
 func TestNewConn_merge(t *testing.T) {
@@ -178,4 +177,44 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 		},
 	})
 	_ = c2.SetDeadline(want)
+}
+
+func BenchmarkConnInterceptor_Read(b *testing.B) {
+	var id int
+	var its []*ConnInterceptor
+	for i := 0; i < 10; i++ {
+		hk1 := &ConnInterceptor{
+			Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+				id++
+				return raw(b)
+			},
+		}
+
+		its = append(its, hk1)
+	}
+	conn := WrapConn(&net.TCPConn{}, its...)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		bf := make([]byte, 1)
+		_, _ = conn.Read(bf)
+	}
+}
+
+func BenchmarkConnInterceptor_AfterRead(b *testing.B) {
+	var id int
+	var its []*ConnInterceptor
+	for i := 0; i < 10; i++ {
+		hk1 := &ConnInterceptor{
+			AfterRead: func(b []byte, readSize int, err error) {
+				id++
+			},
+		}
+		its = append(its, hk1)
+	}
+	conn := WrapConn(&net.TCPConn{}, its...)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		bf := make([]byte, 1)
+		_, _ = conn.Read(bf)
+	}
 }

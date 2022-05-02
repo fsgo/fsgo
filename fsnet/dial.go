@@ -147,7 +147,10 @@ func (d *Dialer) getInterceptors(ctx context.Context) dialerInterceptors {
 
 // DialerInterceptor  dialer interceptor
 type DialerInterceptor struct {
-	DialContext      func(ctx context.Context, network string, address string, invoker DialContextFunc) (conn net.Conn, err error)
+	DialContext func(ctx context.Context, network string, address string, invoker DialContextFunc) (conn net.Conn, err error)
+
+	BeforeDialContext func(ctx context.Context, network string, address string) (ctxNew context.Context, networkNew string, addressNew string)
+
 	AfterDialContext func(ctx context.Context, network string, address string, conn net.Conn, err error)
 }
 
@@ -157,6 +160,13 @@ type dialerInterceptors []*DialerInterceptor
 // 倒序执行
 func (dhs dialerInterceptors) CallDialContext(ctx context.Context, network, address string, invoker DialContextFunc, idx int) (conn net.Conn, err error) {
 	if idx == 0 {
+		for i := 0; i < len(dhs); i++ {
+			if dhs[i].BeforeDialContext == nil {
+				continue
+			}
+			ctx, network, address = dhs[i].BeforeDialContext(ctx, network, address)
+		}
+
 		defer func() {
 			for i := 0; i < len(dhs); i++ {
 				if dhs[i].AfterDialContext == nil {
