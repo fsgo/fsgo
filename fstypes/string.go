@@ -123,7 +123,8 @@ func (ss StringSlice) Unique() StringSlice {
 	}
 	c := make(map[string]struct{}, len(ss))
 	ret := make(StringSlice, 0, len(ss))
-	for _, v := range ss {
+	for i := 0; i < len(ss); i++ {
+		v := ss[i]
 		if _, ok := c[v]; ok {
 			continue
 		}
@@ -131,4 +132,33 @@ func (ss StringSlice) Unique() StringSlice {
 		ret = append(ret, v)
 	}
 	return ret
+}
+
+func (ss StringSlice) Has(value string) bool {
+	if len(ss) == 0 {
+		return false
+	}
+	for i := 0; i < len(ss); i++ {
+		if ss[i] == value {
+			return true
+		}
+	}
+	return false
+}
+
+func (ss *StringSlice) Delete(values ...string) {
+	if len(values) == 0 || len(*ss) == 0 {
+		return
+	}
+	c := make(map[string]struct{}, len(*ss))
+	for i := 0; i < len(values); i++ {
+		c[values[i]] = struct{}{}
+	}
+	s1 := make([]string, 0, len(*ss))
+	for i := 0; i < len(*ss); i++ {
+		if _, has := c[(*ss)[i]]; !has {
+			s1 = append(s1, (*ss)[i])
+		}
+	}
+	*ss = s1
 }
