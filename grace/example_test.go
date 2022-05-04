@@ -13,7 +13,7 @@ import (
 )
 
 func ExampleNewSimpleConfig() {
-	do:= func() {
+	do := func() {
 		cfg := grace.NewSimpleConfig()
 		g := cfg.NewGrace()
 
@@ -27,5 +27,5 @@ func ExampleNewSimpleConfig() {
 		err := g.Start(context.Background())
 		log.Println("grace server exit:", err)
 	}
-	_=do
+	_ = do
 }

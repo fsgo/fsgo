@@ -28,4 +28,14 @@ func TestNewDiv(t *testing.T) {
 		want := `<div id="#abc"><p></p></div>`
 		require.Equal(t, want, string(got))
 	})
+
+	t.Run("div_attrs", func(t *testing.T) {
+		div := NewDiv()
+		SetClass(div.MustAttr(), "c1", "c2")
+		SetID(div.MustAttr(), "#abc")
+		got, err := div.HTML()
+		require.NoError(t, err)
+		want := `<div class="c1 c2" id="#abc"></div>`
+		require.Equal(t, want, string(got))
+	})
 }
