@@ -1,21 +1,42 @@
 // Copyright(C) 2022 github.com/hidu  All Rights Reserved.
 // Author: hidu <duv123@gmail.com>
-// Date: 2022/5/2
+// Date: 2022/5/4
 
 package fshtml
 
-type HTML interface {
-	HTML() ([]byte, error)
+// NewDiv 创建一个 div
+func NewDiv() *Block {
+	return &Block{
+		Tag: "div",
+	}
 }
 
-type Bytes []byte
-
-func (b Bytes) HTML() ([]byte, error) {
-	return b, nil
+// NewP 创建一个 p
+func NewP() *Block {
+	return &Block{
+		Tag: "p",
+	}
 }
 
-type String string
+// NewBody 创建一个 body
+func NewBody() *Block {
+	return &Block{
+		Tag: "body",
+	}
+}
 
-func (s String) HTML() ([]byte, error) {
-	return []byte(s), nil
+// NewUl 转换为 ul
+func NewUl(values StringSlice) *Block {
+	return &Block{
+		Tag:  "ul",
+		Body: values.Codes("li"),
+	}
+}
+
+// NewOl 转换为 ol
+func NewOl(values StringSlice) *Block {
+	return &Block{
+		Tag:  "ol",
+		Body: values.Codes("li"),
+	}
 }

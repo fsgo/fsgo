@@ -20,7 +20,11 @@ type bufWriter struct {
 	bf  *bytes.Buffer
 }
 
-func (w *bufWriter) WriteWithSep(sep string, values ...any) {
+func (w *bufWriter) WriteWithSep(sep string, value any) {
+	w.writeWithSep(sep, value)
+}
+
+func (w *bufWriter) writeWithSep(sep string, values ...any) {
 	if w.err != nil {
 		return
 	}
@@ -31,7 +35,7 @@ func (w *bufWriter) WriteWithSep(sep string, values ...any) {
 			w.writeBytes(sep, v)
 		case string:
 			w.writeString(sep, v)
-		case HTML:
+		case Code:
 			h, e1 := v.HTML()
 			if e1 != nil {
 				w.err = e1
@@ -40,6 +44,8 @@ func (w *bufWriter) WriteWithSep(sep string, values ...any) {
 			}
 		case error:
 			w.err = v
+		case nil:
+			continue
 		default:
 			panic(fmt.Sprintf("not support type:%T", v))
 		}
@@ -76,7 +82,7 @@ func (w *bufWriter) writeString(sep string, bf string) {
 }
 
 func (w *bufWriter) Write(values ...any) {
-	w.WriteWithSep("", values...)
+	w.writeWithSep("", values...)
 }
 
 func (w *bufWriter) HTML() ([]byte, error) {

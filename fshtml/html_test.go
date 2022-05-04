@@ -10,23 +10,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestElement_HTML(t *testing.T) {
+func TestNewDiv(t *testing.T) {
 	t.Run("div_empty", func(t *testing.T) {
-		div := NewElement("div")
+		div := NewDiv()
 		got, err := div.HTML()
 		require.NoError(t, err)
 		want := `<div></div>`
 		require.Equal(t, want, string(got))
 	})
 
-	t.Run("div_attrs", func(t *testing.T) {
-		div := NewElement("div")
-		div.MustAttr("id").Set("#123")
-		div.MustAttr("name").Set("hello")
-		div.AddChild(String("<p></p>"))
+	t.Run("div_p", func(t *testing.T) {
+		div := NewDiv()
+		SetID(div.MustAttr(), "#abc")
+		div.Body = NewP()
 		got, err := div.HTML()
 		require.NoError(t, err)
-		want := `<div id="#123" name="hello"><p></p></div>`
+		want := `<div id="#abc"><p></p></div>`
 		require.Equal(t, want, string(got))
 	})
 }
