@@ -8,12 +8,12 @@ import (
 	"context"
 	"net"
 
-	"github.com/fsgo/fsgo/fsnet"
+	"github.com/fsgo/fsgo/fsnet/fsresolver"
 	"go.opentelemetry.io/otel/attribute"
 )
 
-var ResolverTracer = &fsnet.ResolverInterceptor{
-	LookupIP: func(ctx context.Context, network, host string, invoker fsnet.LookupIPFunc) (ret []net.IP, err error) {
+var ResolverTracer = &fsresolver.Interceptor{
+	LookupIP: func(ctx context.Context, network, host string, invoker fsresolver.LookupIPFunc) (ret []net.IP, err error) {
 		ctx, span := tracer.Start(ctx, "LookupIP")
 		if span.IsRecording() {
 			span.SetAttributes(

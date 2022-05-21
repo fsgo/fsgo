@@ -8,12 +8,12 @@ import (
 	"context"
 	"net"
 
-	"github.com/fsgo/fsgo/fsnet"
+	"github.com/fsgo/fsgo/fsnet/fsdialer"
 	"go.opentelemetry.io/otel/attribute"
 )
 
-var DialerTracer = &fsnet.DialerInterceptor{
-	DialContext: func(ctx context.Context, network string, address string, invoker fsnet.DialContextFunc) (conn net.Conn, err error) {
+var DialerTracer = &fsdialer.Interceptor{
+	DialContext: func(ctx context.Context, network string, address string, invoker fsdialer.DialContextFunc) (conn net.Conn, err error) {
 		ctx, span := tracer.Start(ctx, "Dial")
 		if span.IsRecording() {
 			span.SetAttributes(
