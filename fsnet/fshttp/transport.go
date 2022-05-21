@@ -39,6 +39,12 @@ type Transport struct {
 
 	// TLSClientConfig 可选
 	TLSClientConfig *tls.Config
+
+	// WriteTimeout 可选，设置写超时时间
+	WriteTimeout func(req *http.Request, conn net.Conn) error
+
+	// ReadTimeout 可选，设置读超时时间
+	ReadTimeout func(req *http.Request, conn net.Conn) error
 }
 
 func (t *Transport) dialConn(ctx context.Context, req *http.Request, proxyURL *url.URL, network, addr string) (net.Conn, error) {
@@ -140,6 +146,8 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 	}
 
 	defer func() {
+		// 只能在异常的时候关闭连接
+		// 正常读取到 response 的时候，body 是一个 stream，若关闭将导致 body 读取不出来
 		if err != nil {
 			_ = conn.Close()
 		}
@@ -151,29 +159,57 @@ func (t *Transport) RoundTrip(req *http.Request) (resp *http.Response, err error
 		}
 	}
 
-	// https_proxy
-	if proxyURL != nil && req.URL.Scheme == "https" {
-		if err = proxyHTTPSConn(conn, req, proxyURL); err != nil {
-			return nil, err
-		}
-		conn = t.connAddTLS(conn, req.URL.Hostname())
+	if conn, err = t.withProxy(proxyURL, conn, req); err != nil {
+		return nil, err
 	}
 
-	// http_proxy and https_proxy are work fine
-	// todo socks 待实现
+	if err = t.setWriteTimeout(req, conn); err != nil {
+		return nil, err
+	}
 
 	if proxyURL != nil {
 		err = req.WriteProxy(conn)
 	} else {
 		err = req.Write(conn)
 	}
-
 	if err != nil {
 		return nil, err
 	}
+
+	if err = t.setReadTimeout(req, conn); err != nil {
+		return nil, err
+	}
+
 	bio := bufio.NewReader(conn)
 	resp, err = http.ReadResponse(bio, req)
 	return resp, err
+}
+
+func (t *Transport) withProxy(proxyURL *url.URL, conn net.Conn, req *http.Request) (net.Conn, error) {
+	if proxyURL == nil || req.URL.Scheme != "https" {
+		return conn, nil
+	}
+	if err := t.proxyHTTPSConn(conn, req, proxyURL); err != nil {
+		return nil, err
+	}
+	conn = t.connAddTLS(conn, req.URL.Hostname())
+	// http_proxy and https_proxy are work fine
+	// todo socks 待实现
+	return conn, nil
+}
+
+func (t *Transport) setWriteTimeout(req *http.Request, conn net.Conn) error {
+	if t.WriteTimeout == nil {
+		return nil
+	}
+	return t.WriteTimeout(req, conn)
+}
+
+func (t *Transport) setReadTimeout(req *http.Request, conn net.Conn) error {
+	if t.ReadTimeout == nil {
+		return nil
+	}
+	return t.ReadTimeout(req, conn)
 }
 
 const authKey = "Proxy-Authorization"
@@ -189,7 +225,7 @@ func proxyAuth(proxy *url.URL) string {
 
 // https://datatracker.ietf.org/doc/html/rfc7230
 // https://datatracker.ietf.org/doc/html/rfc7231#section-4.3.6
-func proxyHTTPSConn(conn net.Conn, req *http.Request, proxy *url.URL) error {
+func (t *Transport) proxyHTTPSConn(conn net.Conn, req *http.Request, proxy *url.URL) error {
 	proxyAuthVal := proxyAuth(proxy)
 	hdr := make(http.Header)
 	if proxyAuthVal != "" {
