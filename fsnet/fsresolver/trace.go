@@ -1,8 +1,8 @@
-// Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
+// Copyright(C) 2022 github.com/fsgo  All Rights Reserved.
 // Author: fsgo
-// Date: 2021/12/5
+// Date: 2021/7/31
 
-package fsnet
+package fsresolver
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 )
 
 // PrintResolverLog print Resolver log interceptor
-var PrintResolverLog = &ResolverInterceptor{
+var PrintResolverLog = &Interceptor{
 	LookupIP: func(ctx context.Context, network, host string, invoker LookupIPFunc) ([]net.IP, error) {
 		start := time.Now()
 		ret, err := invoker(ctx, network, host)

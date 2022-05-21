@@ -1,8 +1,8 @@
-// Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
-// Author: fsgo
-// Date: 2021/8/14
+// Copyright(C) 2022 github.com/hidu  All Rights Reserved.
+// Author: hidu <duv123@gmail.com>
+// Date: 2022/5/21
 
-package fsnet
+package fsconn
 
 import (
 	"net"
@@ -22,7 +22,7 @@ func TestNewConn(t *testing.T) {
 
 		var readIndex int
 
-		tr := &ConnInterceptor{
+		tr := &Interceptor{
 			Read: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
 				defer func() {
 					readTotal += n
@@ -49,7 +49,7 @@ func TestNewConn(t *testing.T) {
 			},
 		}
 
-		tr2 := &ConnInterceptor{
+		tr2 := &Interceptor{
 			Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 				readIndex++
 				assert.Equal(t, 1, readIndex)
@@ -57,10 +57,8 @@ func TestNewConn(t *testing.T) {
 			},
 		}
 
-		stTrace := &ConnStatTrace{}
-
-		w1 := WrapConn(w, tr, tr2, stTrace.ConnInterceptor())
-		r1 := WrapConn(r)
+		w1 := WithInterceptor(w, tr, tr2)
+		r1 := WithInterceptor(r)
 
 		msg := []byte("hello")
 		go func() {
@@ -82,20 +80,12 @@ func TestNewConn(t *testing.T) {
 			assert.Equal(t, 1, closeNum)
 		})
 
-		t.Run("StatTrace", func(t *testing.T) {
-			assert.Greater(t, stTrace.WriteSize(), int64(0))
-
-			assert.Greater(t, int(stTrace.WriteCost()), 0)
-
-			stTrace.Reset()
-			assert.Equal(t, int64(0), stTrace.WriteSize())
-		})
 	})
 }
 
 func TestNewConn_merge(t *testing.T) {
 	var id int
-	hk1 := &ConnInterceptor{
+	hk1 := &Interceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			// 先注册的先执行
 			id++
@@ -107,9 +97,9 @@ func TestNewConn_merge(t *testing.T) {
 			assert.Equal(t, 4, id)
 		},
 	}
-	nc := WrapConn(&net.TCPConn{}, hk1)
+	nc := WithInterceptor(&net.TCPConn{}, hk1)
 
-	hk2 := &ConnInterceptor{
+	hk2 := &Interceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			id++
 			assert.Equal(t, 2, id)
@@ -121,20 +111,20 @@ func TestNewConn_merge(t *testing.T) {
 		},
 	}
 
-	hk3 := &ConnInterceptor{
+	hk3 := &Interceptor{
 		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 			id++
 			assert.Equal(t, 3, id)
 			return raw(b)
 		},
 	}
-	hk4 := &ConnInterceptor{
+	hk4 := &Interceptor{
 		AfterRead: func(b []byte, readSize int, err error) {
 			id++
 			assert.Equal(t, 6, id)
 		},
 	}
-	nc1 := WrapConn(nc, hk2, hk3, hk4)
+	nc1 := WithInterceptor(nc, hk2, hk3, hk4)
 	assert.NotEqual(t, nc, nc1)
 	bf := make([]byte, 1)
 	_, _ = nc1.Read(bf)
@@ -143,7 +133,7 @@ func TestNewConn_merge(t *testing.T) {
 
 func TestOriginConn(t *testing.T) {
 	c1 := &net.TCPConn{}
-	c2 := WrapConn(c1)
+	c2 := WithInterceptor(c1)
 
 	assert.Equal(t, c1, OriginConn(c2))
 	assert.Equal(t, c1, OriginConn(c1))
@@ -153,14 +143,14 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 	want := time.Now()
 
 	var num int32
-	RegisterConnInterceptor(&ConnInterceptor{
+	RegisterInterceptor(&Interceptor{
 		SetDeadline: func(tm time.Time, raw func(tm time.Time) error) error {
 			require.Equal(t, int32(1), atomic.AddInt32(&num, 1))
 			require.Equal(t, want, tm)
 			return raw(tm)
 		},
 	})
-	RegisterConnInterceptor(&ConnInterceptor{
+	RegisterInterceptor(&Interceptor{
 		SetDeadline: func(tm time.Time, raw func(t time.Time) error) error {
 			require.Equal(t, int32(2), atomic.AddInt32(&num, 1))
 			require.Equal(t, want, tm)
@@ -169,7 +159,7 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 	})
 
 	c1 := &net.TCPConn{}
-	c2 := WrapConn(c1, &ConnInterceptor{
+	c2 := WithInterceptor(c1, &Interceptor{
 		SetDeadline: func(tm time.Time, raw func(t time.Time) error) error {
 			require.Equal(t, int32(3), atomic.AddInt32(&num, 1))
 			require.Equal(t, want, tm)
@@ -181,9 +171,9 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 
 func BenchmarkConnInterceptor_Read(b *testing.B) {
 	var id int
-	var its []*ConnInterceptor
+	var its []*Interceptor
 	for i := 0; i < 10; i++ {
-		hk1 := &ConnInterceptor{
+		hk1 := &Interceptor{
 			Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
 				id++
 				return raw(b)
@@ -192,7 +182,7 @@ func BenchmarkConnInterceptor_Read(b *testing.B) {
 
 		its = append(its, hk1)
 	}
-	conn := WrapConn(&net.TCPConn{}, its...)
+	conn := WithInterceptor(&net.TCPConn{}, its...)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		bf := make([]byte, 1)
@@ -202,16 +192,16 @@ func BenchmarkConnInterceptor_Read(b *testing.B) {
 
 func BenchmarkConnInterceptor_AfterRead(b *testing.B) {
 	var id int
-	var its []*ConnInterceptor
+	var its []*Interceptor
 	for i := 0; i < 10; i++ {
-		hk1 := &ConnInterceptor{
+		hk1 := &Interceptor{
 			AfterRead: func(b []byte, readSize int, err error) {
 				id++
 			},
 		}
 		its = append(its, hk1)
 	}
-	conn := WrapConn(&net.TCPConn{}, its...)
+	conn := WithInterceptor(&net.TCPConn{}, its...)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		bf := make([]byte, 1)

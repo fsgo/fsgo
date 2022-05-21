@@ -15,7 +15,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/fsgo/fsgo/fsnet"
+	"github.com/fsgo/fsgo/fsnet/fsdialer"
 )
 
 // DefaultUserAgent default user agent
@@ -59,7 +59,7 @@ func (t *Transport) dial(ctx context.Context, network, addr string) (net.Conn, e
 	if t.DialContext != nil {
 		return t.DialContext(ctx, network, addr)
 	}
-	return fsnet.DialContext(ctx, network, addr)
+	return fsdialer.DialContext(ctx, network, addr)
 }
 
 func (t *Transport) dialTLS(ctx context.Context, req *http.Request, network, addr string) (net.Conn, error) {

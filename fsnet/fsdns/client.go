@@ -13,7 +13,7 @@ import (
 
 	"github.com/miekg/dns"
 
-	"github.com/fsgo/fsgo/fsnet"
+	"github.com/fsgo/fsgo/fsnet/fsresolver"
 	"github.com/fsgo/fsgo/fsnet/internal"
 )
 
@@ -72,14 +72,14 @@ func LookupIPByNS(ctx context.Context, network, host string, ns net.Addr) ([]net
 	return result, nil
 }
 
-var _ fsnet.Resolver = (*Client)(nil)
+var _ fsresolver.Resolver = (*Client)(nil)
 
 // Client prue dns client
 type Client struct {
 	// Servers nameserver list,eg 114.114.114.114:53
 	Servers []net.Addr
 
-	HostsFile fsnet.HasLookupIP
+	HostsFile fsresolver.LookupIPer
 
 	mux sync.RWMutex
 
@@ -172,12 +172,12 @@ func (client *Client) LookupIPAddr(ctx context.Context, host string) ([]net.IPAd
 }
 
 // ResolverInterceptor to ResolverInterceptor
-func (client *Client) ResolverInterceptor() *fsnet.ResolverInterceptor {
-	return &fsnet.ResolverInterceptor{
-		LookupIP: func(ctx context.Context, network, host string, fn fsnet.LookupIPFunc) ([]net.IP, error) {
+func (client *Client) ResolverInterceptor() *fsresolver.Interceptor {
+	return &fsresolver.Interceptor{
+		LookupIP: func(ctx context.Context, network, host string, fn fsresolver.LookupIPFunc) ([]net.IP, error) {
 			return client.LookupIP(ctx, network, host)
 		},
-		LookupIPAddr: func(ctx context.Context, host string, fn fsnet.LookupIPAddrFunc) ([]net.IPAddr, error) {
+		LookupIPAddr: func(ctx context.Context, host string, fn fsresolver.LookupIPAddrFunc) ([]net.IPAddr, error) {
 			return client.LookupIPAddr(ctx, host)
 		},
 	}

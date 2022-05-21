@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/fsgo/fsgo/fsnet"
+	"github.com/fsgo/fsgo/fsnet/fsaddr"
 )
 
 // ServersFromEnv parser nameserver list from os.env 'FSNET_NAMESERVER'
@@ -31,11 +31,11 @@ func ParserServers(lines []string) []net.Addr {
 			continue
 		}
 		if ip := net.ParseIP(host); ip != nil {
-			list = append(list, fsnet.NewAddr("udp", host+":53"))
+			list = append(list, fsaddr.New("udp", host+":53"))
 			continue
 		}
 		if _, _, err := net.SplitHostPort(host); err == nil {
-			list = append(list, fsnet.NewAddr("udp", host))
+			list = append(list, fsaddr.New("udp", host))
 		}
 	}
 	return list

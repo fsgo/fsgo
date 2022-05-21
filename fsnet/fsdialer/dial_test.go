@@ -1,8 +1,8 @@
-// Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
-// Author: fsgo
-// Date: 2021/7/31
+// Copyright(C) 2022 github.com/hidu  All Rights Reserved.
+// Author: hidu <duv123@gmail.com>
+// Date: 2022/5/21
 
-package fsnet
+package fsdialer
 
 import (
 	"context"
@@ -11,12 +11,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/fsgo/fsgo/fsnet/fsconn"
 )
 
 func TestDialer_DialContext(t *testing.T) {
 	t.Run("default no its", func(t *testing.T) {
 		wantErr := fmt.Errorf("err must")
-		d := &Dialer{
+		d := &Simple{
 			Invoker: &testDialer{
 				retConn: nil,
 				retErr:  wantErr,
@@ -33,12 +35,12 @@ func TestDialer_DialContext(t *testing.T) {
 			assert.Equal(t, want, num)
 			num++
 		}
-		d := &Dialer{
+		d := &Simple{
 			Invoker: &testDialer{
 				retConn: nil,
 				retErr:  wantErr,
 			},
-			Interceptors: []*DialerInterceptor{
+			Interceptors: []*Interceptor{
 				{
 					DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 						checkNum(0)
@@ -54,18 +56,18 @@ func TestDialer_DialContext(t *testing.T) {
 			},
 		}
 		ctx := context.Background()
-		ctx = ContextWithDialerInterceptor(ctx, &DialerInterceptor{
+		ctx = ContextWithInterceptor(ctx, &Interceptor{
 			DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 				checkNum(2)
 				return fn(ctx, network, address)
 			},
-		}, &DialerInterceptor{
+		}, &Interceptor{
 			DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 				checkNum(3)
 				return fn(ctx, network, address)
 			},
 		})
-		ctx = ContextWithDialerInterceptor(ctx, &DialerInterceptor{
+		ctx = ContextWithInterceptor(ctx, &Interceptor{
 			DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 				checkNum(4)
 				return fn(ctx, network, address)
@@ -76,7 +78,7 @@ func TestDialer_DialContext(t *testing.T) {
 	})
 }
 
-var _ DialerType = (*testDialer)(nil)
+var _ Dialer = (*testDialer)(nil)
 
 type testDialer struct {
 	retConn net.Conn
@@ -92,7 +94,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 		retErr: fmt.Errorf("mustErr"),
 	}
 	t.Run("zero dhs", func(t *testing.T) {
-		var dhs dialerInterceptors
+		var dhs interceptors
 		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, 0)
 		assert.Equal(t, td.retErr, err)
 	})
@@ -103,7 +105,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 			assert.Equal(t, want, num)
 			num++
 		}
-		dhs := dialerInterceptors{
+		dhs := interceptors{
 			{
 				DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 					checkNum(0)
@@ -121,7 +123,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 			assert.Equal(t, want, num)
 			num++
 		}
-		dhs := dialerInterceptors{
+		dhs := interceptors{
 			{
 				DialContext: func(ctx context.Context, network string, address string, fn DialContextFunc) (conn net.Conn, err error) {
 					checkNum(0)
@@ -142,13 +144,13 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 }
 
 func TestMustRegisterDialerHook(t *testing.T) {
-	DefaultDialer = &Dialer{}
+	Default = &Simple{}
 	defer func() {
-		DefaultDialer = &Dialer{}
+		Default = &Simple{}
 	}()
-	hk := NewConnDialerInterceptor(&ConnInterceptor{})
-	MustRegisterDialerInterceptor(hk)
-	hks := DefaultDialer.(*Dialer).Interceptors
+	hk := TransConnInterceptor(&fsconn.Interceptor{})
+	MustRegisterInterceptor(hk)
+	hks := Default.(*Simple).Interceptors
 	assert.Len(t, hks, 1)
 
 	assert.Equal(t, hks[0], hk)

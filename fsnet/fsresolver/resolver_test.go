@@ -1,8 +1,8 @@
-// Copyright(C) 2021 github.com/fsgo  All Rights Reserved.
+// Copyright(C) 2022 github.com/fsgo  All Rights Reserved.
 // Author: fsgo
 // Date: 2021/7/31
 
-package fsnet
+package fsresolver
 
 import (
 	"context"
@@ -12,6 +12,10 @@ import (
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/fsgo/fsgo/internal/number"
 )
 
 var _ Resolver = (*testResolver)(nil)
@@ -103,7 +107,7 @@ func TestResolverCached(t *testing.T) {
 				},
 			},
 		}
-		re := &ResolverCached{
+		re := &Cached{
 			Expiration: time.Minute,
 			Invoker:    std,
 		}
@@ -118,22 +122,22 @@ func TestResolverCached(t *testing.T) {
 				IP: net.ParseIP("127.0.0.1"),
 			},
 		})
-		re := &ResolverCached{
+		re := &Cached{
 			Expiration: time.Minute,
 			Invoker:    std,
 		}
 
-		var lookupIPNum testNum
-		var lookupIPAddrNum testNum
+		var lookupIPNum number.Checker
+		var lookupIPAddrNum number.Checker
 
-		re.RegisterInterceptor(&ResolverInterceptor{
+		re.RegisterInterceptor(&Interceptor{
 			LookupIP: func(ctx context.Context, network, host string, fn LookupIPFunc) ([]net.IP, error) {
-				lookupIPNum.Incr()
+				lookupIPNum.Inc()
 				return fn(ctx, network, host)
 			},
-		}, &ResolverInterceptor{
+		}, &Interceptor{
 			LookupIPAddr: func(ctx context.Context, host string, fn LookupIPAddrFunc) ([]net.IPAddr, error) {
-				lookupIPAddrNum.Incr()
+				lookupIPAddrNum.Inc()
 				return fn(ctx, host)
 			},
 		})
@@ -166,7 +170,7 @@ func TestResolverCached(t *testing.T) {
 
 		runTestCases(t, re, tests)
 
-		lookupIPNum.Check(t, len(tests))
-		lookupIPAddrNum.Check(t, len(tests))
+		require.NoError(t, lookupIPNum.Want(len(tests)))
+		require.NoError(t, lookupIPAddrNum.Want(len(tests)))
 	})
 }

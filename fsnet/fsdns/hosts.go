@@ -15,15 +15,15 @@ import (
 	"sync"
 
 	"github.com/fsgo/fsgo/fsfs"
-	"github.com/fsgo/fsgo/fsnet"
 	"github.com/fsgo/fsgo/fsnet/fsip"
+	"github.com/fsgo/fsgo/fsnet/fsresolver"
 )
 
 // DefaultHostsFile os default hosts file
-var DefaultHostsFile fsnet.HasLookupIP = NewHostsFile("")
+var DefaultHostsFile fsresolver.LookupIPer = NewHostsFile("")
 
-// HostsLookupIP find domain in hosts file
-func HostsLookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
+// LookupIPFromHosts find domain in hosts file
+func LookupIPFromHosts(ctx context.Context, network, host string) ([]net.IP, error) {
 	return DefaultHostsFile.LookupIP(ctx, network, host)
 }
 
