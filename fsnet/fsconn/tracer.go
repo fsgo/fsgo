@@ -19,7 +19,7 @@ type ReadTracer struct {
 
 func (ch *ReadTracer) init() {
 	ch.interceptor = &Interceptor{
-		AfterRead: func(b []byte, readSize int, _ error) {
+		AfterRead: func(info Info, b []byte, readSize int, _ error) {
 			if readSize > 0 {
 				ch.mux.Lock()
 				ch.buf.Write(b[:readSize])
@@ -59,7 +59,7 @@ type WriteTracer struct {
 
 func (ch *WriteTracer) init() {
 	ch.interceptor = &Interceptor{
-		AfterWrite: func(b []byte, wroteSize int, _ error) {
+		AfterWrite: func(info Info, b []byte, wroteSize int, _ error) {
 			if wroteSize > 0 {
 				ch.mux.Lock()
 				ch.buf.Write(b[:wroteSize])

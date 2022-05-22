@@ -15,4 +15,5 @@ func New(network, host string) net.Addr {
 	return internal.NewAddr(network, host)
 }
 
-var Empty = New("tcp", "")
+// Empty not network and host
+var Empty = New("", "")

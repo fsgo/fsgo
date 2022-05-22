@@ -10,41 +10,49 @@ import (
 	"time"
 )
 
+type Info interface {
+	// LocalAddr returns the local network address, if known.
+	LocalAddr() net.Addr
+
+	// RemoteAddr returns the remote network address, if known.
+	RemoteAddr() net.Addr
+}
+
 // Interceptor  for net.Conn
 type Interceptor struct {
-	Read      func(b []byte, invoker func([]byte) (int, error)) (int, error)
-	AfterRead func(b []byte, readSize int, err error)
+	Read      func(info Info, b []byte, invoker func([]byte) (int, error)) (int, error)
+	AfterRead func(info Info, b []byte, readSize int, err error)
 
-	Write      func(b []byte, invoker func([]byte) (int, error)) (int, error)
-	AfterWrite func(b []byte, wroteSize int, err error)
+	Write      func(info Info, b []byte, invoker func([]byte) (int, error)) (int, error)
+	AfterWrite func(info Info, b []byte, wroteSize int, err error)
 
-	Close      func(invoker func() error) error
-	AfterClose func(err error)
+	Close      func(info Info, invoker func() error) error
+	AfterClose func(info Info, err error)
 
-	LocalAddr  func(invoker func() net.Addr) net.Addr
-	RemoteAddr func(invoker func() net.Addr) net.Addr
+	LocalAddr  func(info Info, invoker func() net.Addr) net.Addr
+	RemoteAddr func(info Info, invoker func() net.Addr) net.Addr
 
-	SetDeadline      func(tm time.Time, invoker func(tm time.Time) error) error
-	AfterSetDeadline func(tm time.Time, err error)
+	SetDeadline      func(info Info, tm time.Time, invoker func(tm time.Time) error) error
+	AfterSetDeadline func(info Info, tm time.Time, err error)
 
-	SetReadDeadline      func(tm time.Time, invoker func(tm time.Time) error) error
-	AfterSetReadDeadline func(tm time.Time, err error)
+	SetReadDeadline      func(info Info, tm time.Time, invoker func(tm time.Time) error) error
+	AfterSetReadDeadline func(info Info, tm time.Time, err error)
 
-	SetWriteDeadline      func(tm time.Time, invoker func(tm time.Time) error) error
-	AfterSetWriteDeadline func(tm time.Time, err error)
+	SetWriteDeadline      func(info Info, tm time.Time, invoker func(tm time.Time) error) error
+	AfterSetWriteDeadline func(info Info, tm time.Time, err error)
 }
 
 // 先注册的先执行
 type interceptors []*Interceptor
 
-func (chs interceptors) CallRead(b []byte, invoker func(b []byte) (int, error), idx int) (n int, err error) {
+func (chs interceptors) CallRead(info Info, b []byte, invoker func(b []byte) (int, error), idx int) (n int, err error) {
 	if idx == 0 {
 		defer func() {
 			for i := 0; i < len(chs); i++ {
 				if chs[i].AfterRead == nil {
 					continue
 				}
-				chs[i].AfterRead(b, n, err)
+				chs[i].AfterRead(info, b, n, err)
 			}
 		}()
 	}
@@ -57,19 +65,19 @@ func (chs interceptors) CallRead(b []byte, invoker func(b []byte) (int, error), 
 		return invoker(b)
 	}
 
-	return chs[idx].Read(b, func(b []byte) (int, error) {
-		return chs.CallRead(b, invoker, idx+1)
+	return chs[idx].Read(info, b, func(b []byte) (int, error) {
+		return chs.CallRead(info, b, invoker, idx+1)
 	})
 }
 
-func (chs interceptors) CallWrite(b []byte, invoker func(b []byte) (int, error), idx int) (n int, err error) {
+func (chs interceptors) CallWrite(info Info, b []byte, invoker func(b []byte) (int, error), idx int) (n int, err error) {
 	if idx == 0 {
 		defer func() {
 			for i := 0; i < len(chs); i++ {
 				if chs[i].AfterWrite == nil {
 					continue
 				}
-				chs[i].AfterWrite(b, n, err)
+				chs[i].AfterWrite(info, b, n, err)
 			}
 		}()
 	}
@@ -81,19 +89,19 @@ func (chs interceptors) CallWrite(b []byte, invoker func(b []byte) (int, error),
 	if len(chs) == 0 || idx >= len(chs) {
 		return invoker(b)
 	}
-	return chs[idx].Write(b, func(b []byte) (int, error) {
-		return chs.CallWrite(b, invoker, idx+1)
+	return chs[idx].Write(info, b, func(b []byte) (int, error) {
+		return chs.CallWrite(info, b, invoker, idx+1)
 	})
 }
 
-func (chs interceptors) CallClose(invoker func() error, idx int) (err error) {
+func (chs interceptors) CallClose(info Info, invoker func() error, idx int) (err error) {
 	if idx == 0 {
 		defer func() {
 			for i := 0; i < len(chs); i++ {
 				if chs[i].AfterClose == nil {
 					continue
 				}
-				chs[i].AfterClose(err)
+				chs[i].AfterClose(info, err)
 			}
 		}()
 	}
@@ -105,12 +113,12 @@ func (chs interceptors) CallClose(invoker func() error, idx int) (err error) {
 	if len(chs) == 0 || idx >= len(chs) {
 		return invoker()
 	}
-	return chs[idx].Close(func() error {
-		return chs.CallClose(invoker, idx+1)
+	return chs[idx].Close(info, func() error {
+		return chs.CallClose(info, invoker, idx+1)
 	})
 }
 
-func (chs interceptors) CallLocalAddr(invoker func() net.Addr, idx int) net.Addr {
+func (chs interceptors) CallLocalAddr(info Info, invoker func() net.Addr, idx int) net.Addr {
 	for ; idx < len(chs); idx++ {
 		if chs[idx].LocalAddr != nil {
 			break
@@ -119,12 +127,12 @@ func (chs interceptors) CallLocalAddr(invoker func() net.Addr, idx int) net.Addr
 	if len(chs) == 0 || idx >= len(chs) {
 		return invoker()
 	}
-	return chs[idx].LocalAddr(func() net.Addr {
-		return chs.CallLocalAddr(invoker, idx+1)
+	return chs[idx].LocalAddr(info, func() net.Addr {
+		return chs.CallLocalAddr(info, invoker, idx+1)
 	})
 }
 
-func (chs interceptors) CallRemoteAddr(invoker func() net.Addr, idx int) net.Addr {
+func (chs interceptors) CallRemoteAddr(info Info, invoker func() net.Addr, idx int) net.Addr {
 	for ; idx < len(chs); idx++ {
 		if chs[idx].RemoteAddr != nil {
 			break
@@ -133,19 +141,19 @@ func (chs interceptors) CallRemoteAddr(invoker func() net.Addr, idx int) net.Add
 	if len(chs) == 0 || idx >= len(chs) {
 		return invoker()
 	}
-	return chs[idx].RemoteAddr(func() net.Addr {
-		return chs.CallRemoteAddr(invoker, idx+1)
+	return chs[idx].RemoteAddr(info, func() net.Addr {
+		return chs.CallRemoteAddr(info, invoker, idx+1)
 	})
 }
 
-func (chs interceptors) CallSetDeadline(dl time.Time, invoker func(time.Time) error, idx int) (err error) {
+func (chs interceptors) CallSetDeadline(info Info, dl time.Time, invoker func(time.Time) error, idx int) (err error) {
 	if idx == 0 {
 		defer func() {
 			for i := 0; i < len(chs); i++ {
 				if chs[i].AfterSetDeadline == nil {
 					continue
 				}
-				chs[i].AfterSetDeadline(dl, err)
+				chs[i].AfterSetDeadline(info, dl, err)
 			}
 		}()
 	}
@@ -157,19 +165,19 @@ func (chs interceptors) CallSetDeadline(dl time.Time, invoker func(time.Time) er
 	if len(chs) == 0 || idx >= len(chs) {
 		return invoker(dl)
 	}
-	return chs[idx].SetDeadline(dl, func(dl time.Time) error {
-		return chs.CallSetDeadline(dl, invoker, idx+1)
+	return chs[idx].SetDeadline(info, dl, func(dl time.Time) error {
+		return chs.CallSetDeadline(info, dl, invoker, idx+1)
 	})
 }
 
-func (chs interceptors) CallSetReadDeadline(dl time.Time, invoker func(time.Time) error, idx int) (err error) {
+func (chs interceptors) CallSetReadDeadline(info Info, dl time.Time, invoker func(time.Time) error, idx int) (err error) {
 	if idx == 0 {
 		defer func() {
 			for i := 0; i < len(chs); i++ {
 				if chs[i].AfterSetReadDeadline == nil {
 					continue
 				}
-				chs[i].AfterSetReadDeadline(dl, err)
+				chs[i].AfterSetReadDeadline(info, dl, err)
 			}
 		}()
 	}
@@ -181,19 +189,19 @@ func (chs interceptors) CallSetReadDeadline(dl time.Time, invoker func(time.Time
 	if len(chs) == 0 || idx >= len(chs) {
 		return invoker(dl)
 	}
-	return chs[idx].SetReadDeadline(dl, func(dl time.Time) error {
-		return chs.CallSetReadDeadline(dl, invoker, idx+1)
+	return chs[idx].SetReadDeadline(info, dl, func(dl time.Time) error {
+		return chs.CallSetReadDeadline(info, dl, invoker, idx+1)
 	})
 }
 
-func (chs interceptors) CallSetWriteDeadline(dl time.Time, invoker func(time.Time) error, idx int) (err error) {
+func (chs interceptors) CallSetWriteDeadline(info Info, dl time.Time, invoker func(time.Time) error, idx int) (err error) {
 	if idx == 0 {
 		defer func() {
 			for i := 0; i < len(chs); i++ {
 				if chs[i].AfterSetWriteDeadline == nil {
 					continue
 				}
-				chs[i].AfterSetWriteDeadline(dl, err)
+				chs[i].AfterSetWriteDeadline(info, dl, err)
 			}
 		}()
 	}
@@ -205,8 +213,8 @@ func (chs interceptors) CallSetWriteDeadline(dl time.Time, invoker func(time.Tim
 	if len(chs) == 0 || idx >= len(chs) {
 		return invoker(dl)
 	}
-	return chs[idx].SetWriteDeadline(dl, func(dl time.Time) error {
-		return chs.CallSetWriteDeadline(dl, invoker, idx+1)
+	return chs[idx].SetWriteDeadline(info, dl, func(dl time.Time) error {
+		return chs.CallSetWriteDeadline(info, dl, invoker, idx+1)
 	})
 }
 

@@ -34,7 +34,7 @@ type ConnStatTracer struct {
 
 func (ch *ConnStatTracer) init() {
 	ch.connInterceptor = &fsconn.Interceptor{
-		Read: func(b []byte, invoker func([]byte) (int, error)) (n int, err error) {
+		Read: func(_ fsconn.Info, b []byte, invoker func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
 				atomic.AddInt64(&ch.readCost, time.Since(start).Nanoseconds())
@@ -43,7 +43,7 @@ func (ch *ConnStatTracer) init() {
 			return invoker(b)
 		},
 
-		Write: func(b []byte, invoker func([]byte) (int, error)) (n int, err error) {
+		Write: func(_ fsconn.Info, b []byte, invoker func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
 				atomic.AddInt64(&ch.writeCost, time.Since(start).Nanoseconds())

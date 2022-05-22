@@ -23,7 +23,7 @@ func TestNewConn(t *testing.T) {
 		var readIndex int
 
 		tr := &Interceptor{
-			Read: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
+			Read: func(info Info, b []byte, raw func([]byte) (int, error)) (n int, err error) {
 				defer func() {
 					readTotal += n
 				}()
@@ -33,24 +33,24 @@ func TestNewConn(t *testing.T) {
 
 				return raw(b)
 			},
-			Write: func(b []byte, raw func([]byte) (int, error)) (n int, err error) {
+			Write: func(info Info, b []byte, raw func([]byte) (int, error)) (n int, err error) {
 				defer func() {
 					writeTotal += n
 				}()
 				return raw(b)
 			},
-			RemoteAddr: func(raw func() net.Addr) net.Addr {
+			RemoteAddr: func(info Info, raw func() net.Addr) net.Addr {
 				// return the intercepted addr
 				return &net.TCPAddr{}
 			},
-			Close: func(raw func() error) error {
+			Close: func(info Info, raw func() error) error {
 				closeNum++
 				return raw()
 			},
 		}
 
 		tr2 := &Interceptor{
-			Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+			Read: func(info Info, b []byte, raw func([]byte) (int, error)) (int, error) {
 				readIndex++
 				assert.Equal(t, 1, readIndex)
 				return raw(b)
@@ -86,13 +86,13 @@ func TestNewConn(t *testing.T) {
 func TestNewConn_merge(t *testing.T) {
 	var id int
 	hk1 := &Interceptor{
-		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+		Read: func(info Info, b []byte, raw func([]byte) (int, error)) (int, error) {
 			// 先注册的先执行
 			id++
 			assert.Equal(t, 1, id)
 			return raw(b)
 		},
-		AfterRead: func(b []byte, readSize int, err error) {
+		AfterRead: func(info Info, b []byte, readSize int, err error) {
 			id++
 			assert.Equal(t, 4, id)
 		},
@@ -100,26 +100,26 @@ func TestNewConn_merge(t *testing.T) {
 	nc := WithInterceptor(&net.TCPConn{}, hk1)
 
 	hk2 := &Interceptor{
-		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+		Read: func(info Info, b []byte, raw func([]byte) (int, error)) (int, error) {
 			id++
 			assert.Equal(t, 2, id)
 			return raw(b)
 		},
-		AfterRead: func(b []byte, readSize int, err error) {
+		AfterRead: func(info Info, b []byte, readSize int, err error) {
 			id++
 			assert.Equal(t, 5, id)
 		},
 	}
 
 	hk3 := &Interceptor{
-		Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+		Read: func(info Info, b []byte, raw func([]byte) (int, error)) (int, error) {
 			id++
 			assert.Equal(t, 3, id)
 			return raw(b)
 		},
 	}
 	hk4 := &Interceptor{
-		AfterRead: func(b []byte, readSize int, err error) {
+		AfterRead: func(info Info, b []byte, readSize int, err error) {
 			id++
 			assert.Equal(t, 6, id)
 		},
@@ -144,14 +144,14 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 
 	var num int32
 	RegisterInterceptor(&Interceptor{
-		SetDeadline: func(tm time.Time, raw func(tm time.Time) error) error {
+		SetDeadline: func(info Info, tm time.Time, raw func(tm time.Time) error) error {
 			require.Equal(t, int32(1), atomic.AddInt32(&num, 1))
 			require.Equal(t, want, tm)
 			return raw(tm)
 		},
 	})
 	RegisterInterceptor(&Interceptor{
-		SetDeadline: func(tm time.Time, raw func(t time.Time) error) error {
+		SetDeadline: func(info Info, tm time.Time, raw func(t time.Time) error) error {
 			require.Equal(t, int32(2), atomic.AddInt32(&num, 1))
 			require.Equal(t, want, tm)
 			return raw(tm)
@@ -160,7 +160,7 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 
 	c1 := &net.TCPConn{}
 	c2 := WithInterceptor(c1, &Interceptor{
-		SetDeadline: func(tm time.Time, raw func(t time.Time) error) error {
+		SetDeadline: func(info Info, tm time.Time, raw func(t time.Time) error) error {
 			require.Equal(t, int32(3), atomic.AddInt32(&num, 1))
 			require.Equal(t, want, tm)
 			return raw(tm)
@@ -174,7 +174,7 @@ func BenchmarkConnInterceptor_Read(b *testing.B) {
 	var its []*Interceptor
 	for i := 0; i < 10; i++ {
 		hk1 := &Interceptor{
-			Read: func(b []byte, raw func([]byte) (int, error)) (int, error) {
+			Read: func(info Info, b []byte, raw func([]byte) (int, error)) (int, error) {
 				id++
 				return raw(b)
 			},
@@ -195,7 +195,7 @@ func BenchmarkConnInterceptor_AfterRead(b *testing.B) {
 	var its []*Interceptor
 	for i := 0; i < 10; i++ {
 		hk1 := &Interceptor{
-			AfterRead: func(b []byte, readSize int, err error) {
+			AfterRead: func(info Info, b []byte, readSize int, err error) {
 				id++
 			},
 		}

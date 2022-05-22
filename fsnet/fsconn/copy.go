@@ -34,7 +34,7 @@ type Copy struct {
 
 func (cc *Copy) init() {
 	cc.interceptor = &Interceptor{
-		AfterRead: func(b []byte, readSize int, err error) {
+		AfterRead: func(_ Info, b []byte, readSize int, err error) {
 			if atomic.LoadInt32(&cc.disableRead) == 1 {
 				return
 			}
@@ -42,7 +42,7 @@ func (cc *Copy) init() {
 				_, _ = cc.ReadTo.Write(b[:readSize])
 			}
 		},
-		AfterWrite: func(b []byte, wroteSize int, err error) {
+		AfterWrite: func(_ Info, b []byte, wroteSize int, err error) {
 			if atomic.LoadInt32(&cc.disableWrite) == 1 {
 				return
 			}
@@ -180,6 +180,7 @@ func (sc *StreamConn) log(args ...interface{}) {
 	_, _ = sc.Logger.Write([]byte(prefix + fmt.Sprint(args...) + "\n"))
 }
 
+// RemoteAddr 当前连接的远端地址
 func (sc *StreamConn) RemoteAddr() net.Addr {
 	sc.mux.Lock()
 	defer sc.mux.Unlock()

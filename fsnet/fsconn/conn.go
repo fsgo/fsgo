@@ -75,33 +75,33 @@ func (c *connWithIt) RawConn() net.Conn {
 }
 
 func (c *connWithIt) Read(b []byte) (n int, err error) {
-	return c.allIts.CallRead(b, c.raw.Read, 0)
+	return c.allIts.CallRead(c.raw, b, c.raw.Read, 0)
 }
 
 func (c *connWithIt) Write(b []byte) (n int, err error) {
-	return c.allIts.CallWrite(b, c.raw.Write, 0)
+	return c.allIts.CallWrite(c.raw, b, c.raw.Write, 0)
 }
 
 func (c *connWithIt) Close() error {
-	return c.allIts.CallClose(c.raw.Close, 0)
+	return c.allIts.CallClose(c.raw, c.raw.Close, 0)
 }
 
 func (c *connWithIt) LocalAddr() net.Addr {
-	return c.allIts.CallLocalAddr(c.raw.LocalAddr, 0)
+	return c.allIts.CallLocalAddr(c.raw, c.raw.LocalAddr, 0)
 }
 
 func (c *connWithIt) RemoteAddr() net.Addr {
-	return c.allIts.CallRemoteAddr(c.raw.RemoteAddr, 0)
+	return c.allIts.CallRemoteAddr(c.raw, c.raw.RemoteAddr, 0)
 }
 
 func (c *connWithIt) SetDeadline(t time.Time) error {
-	return c.allIts.CallSetDeadline(t, c.raw.SetDeadline, 0)
+	return c.allIts.CallSetDeadline(c.raw, t, c.raw.SetDeadline, 0)
 }
 
 func (c *connWithIt) SetReadDeadline(t time.Time) error {
-	return c.allIts.CallSetReadDeadline(t, c.raw.SetReadDeadline, 0)
+	return c.allIts.CallSetReadDeadline(c.raw, t, c.raw.SetReadDeadline, 0)
 }
 
 func (c *connWithIt) SetWriteDeadline(t time.Time) error {
-	return c.allIts.CallSetWriteDeadline(t, c.raw.SetWriteDeadline, 0)
+	return c.allIts.CallSetWriteDeadline(c.raw, t, c.raw.SetWriteDeadline, 0)
 }
