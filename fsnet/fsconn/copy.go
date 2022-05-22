@@ -90,6 +90,9 @@ type StreamConn struct {
 	// Dial 可选，拨号函数
 	Dial func(ctx context.Context, addr net.Addr) (net.Conn, error)
 
+	// Wrap 可选
+	Wrap func(conn net.Conn) net.Conn
+
 	// Retry 可选，重试次数，默认为 0 （不重试）
 	// -1 :无限重试
 	Retry int
@@ -167,6 +170,9 @@ func (sc *StreamConn) connect() error {
 		conn, err = zeroDialer.DialContext(ctx, sc.Addr.Network(), sc.Addr.String())
 	}
 	if conn != nil {
+		if sc.Wrap != nil {
+			conn = sc.Wrap(conn)
+		}
 		sc.conn = conn
 	}
 	return err

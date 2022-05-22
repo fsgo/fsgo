@@ -134,6 +134,7 @@ func (ss StringSlice) Unique() StringSlice {
 	return ret
 }
 
+// Has 是否包含指定的值
 func (ss StringSlice) Has(value string) bool {
 	if len(ss) == 0 {
 		return false
@@ -146,6 +147,7 @@ func (ss StringSlice) Has(value string) bool {
 	return false
 }
 
+// Delete 删除对应的值
 func (ss *StringSlice) Delete(values ...string) {
 	if len(values) == 0 || len(*ss) == 0 {
 		return
