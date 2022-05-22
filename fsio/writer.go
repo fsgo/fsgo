@@ -15,14 +15,14 @@ type ResetWriter interface {
 	Reset(w io.Writer)
 }
 
-// CanFlush can flush
-type CanFlush interface {
+// Flusher can flush
+type Flusher interface {
 	Flush() error
 }
 
 // TryFlush try flush
 func TryFlush(w io.Writer) error {
-	if fw, ok := w.(CanFlush); ok {
+	if fw, ok := w.(Flusher); ok {
 		return fw.Flush()
 	}
 	return nil
@@ -72,4 +72,10 @@ func (w *mutexWriter) Write(b []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.Writer.Write(b)
+}
+
+// WriteStatus status for Write
+type WriteStatus struct {
+	Wrote int
+	Err   error
 }

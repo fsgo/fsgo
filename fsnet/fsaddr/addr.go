@@ -14,3 +14,5 @@ import (
 func New(network, host string) net.Addr {
 	return internal.NewAddr(network, host)
 }
+
+var Empty = New("tcp", "")
