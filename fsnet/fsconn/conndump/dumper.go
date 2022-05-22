@@ -5,12 +5,13 @@
 package conndump
 
 import (
+	"encoding/binary"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/protobuf/proto"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/fsgo/fsgo/fsfs"
 	"github.com/fsgo/fsgo/fsnet/fsconn"
@@ -108,7 +109,10 @@ func (d *Dumper) writeMessage(msg proto.Message) {
 	if err != nil {
 		return
 	}
-	_, _ = d.outFile.Write(bf)
+	b1 := make([]byte, len(bf)+4)
+	binary.LittleEndian.PutUint32(b1, uint32(len(bf)))
+	copy(b1[4:], bf)
+	_, _ = d.outFile.Write(b1)
 }
 
 func (d *Dumper) nextGID() int64 {
