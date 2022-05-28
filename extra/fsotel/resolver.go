@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+// ResolverTracer 对 域名解析提供 otel 支持
 var ResolverTracer = &fsresolver.Interceptor{
 	LookupIP: func(ctx context.Context, network, host string, invoker fsresolver.LookupIPFunc) (ret []net.IP, err error) {
 		ctx, span := tracer.Start(ctx, "LookupIP")

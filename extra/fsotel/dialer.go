@@ -12,6 +12,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
+// DialerTracer 对拨号提供 otel 支持
 var DialerTracer = &fsdialer.Interceptor{
 	DialContext: func(ctx context.Context, network string, address string, invoker fsdialer.DialContextFunc) (conn net.Conn, err error) {
 		ctx, span := tracer.Start(ctx, "Dial")
