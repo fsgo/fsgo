@@ -35,7 +35,7 @@ func (w *bufWriter) writeWithSep(sep string, values ...any) {
 			w.writeBytes(sep, v)
 		case string:
 			w.writeString(sep, v)
-		case Code:
+		case Element:
 			h, e1 := v.HTML()
 			if e1 != nil {
 				w.err = e1
@@ -57,6 +57,10 @@ func (w *bufWriter) writeWithSep(sep string, values ...any) {
 }
 
 func (w *bufWriter) writeBytes(sep string, bf []byte) {
+	// 当 bf 不为空时，才写入 sep
+	// 这样在输出的时候，如 sep=" "
+	// 可以避免出现 <div ></div> 这种情况
+	// 输出的会是 <div></div> 这样
 	if len(sep) > 0 && len(bf) > 0 {
 		_, w.err = w.bf.WriteString(sep)
 		if w.err != nil {
@@ -69,6 +73,7 @@ func (w *bufWriter) writeBytes(sep string, bf []byte) {
 	}
 }
 func (w *bufWriter) writeString(sep string, bf string) {
+	// 当 bf 不为空时，才写入 sep
 	if len(sep) > 0 && len(bf) > 0 {
 		_, w.err = w.bf.WriteString(sep)
 		if w.err != nil {

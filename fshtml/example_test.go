@@ -24,8 +24,8 @@ func ExampleNewUl() {
 func ExampleNewOl() {
 	values := []string{"1", "2", "3"}
 	ul := fshtml.NewOl(values)
-	style := &fshtml.AttrStyle{}
-	_ = style.Width("180px").Height("20px").SetTo(ul.MustAttr())
+	style := &fshtml.StyleAttributes{}
+	_ = style.Width("180px").Height("20px").SetTo(ul.MustAttrs())
 
 	got, _ := ul.HTML()
 	fmt.Println(string(got))

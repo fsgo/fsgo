@@ -11,94 +11,105 @@ import (
 	"github.com/fsgo/fsgo/fstypes"
 )
 
-type (
-	// Attributes HTML 的属性接口定义
-	Attributes interface {
-		SetAttr(key string, val AttrValue)
-		Attr(key string) AttrValue
-		MustAttr(key string) AttrValue
-		DeleteAttr(key ...string)
-		AttrKeys() []string
-		Code
-	}
+// Attributes 多个属性
+type Attributes struct {
+	// Sep 多个属性间的连接符，当为空时，使用默认值 " " (一个空格)
+	Sep string
 
-	// AttrValue 属性的值的接口定义
-	AttrValue interface {
-		Code
+	// KVSep key 和 value 之间的连接符，当为空时，使用默认值 =
+	KVSep string
 
-		Value() []string
-		Sep() string
-		SetSep(sep string)
-		Set(value ...string)
-		Add(value ...string)
-		Delete(value ...string)
-	}
-)
+	// Quote 属性值的引号，为空时，使用默认值 "
+	Quote string
 
-// NewAttributes 一个新的属性集合
-func NewAttributes() Attributes {
-	return &attrs{}
+	attrs map[string]*Attribute
+	keys  fstypes.StringSlice
 }
 
-var _ Attributes = (*attrs)(nil)
-
-type attrs struct {
-	values map[string]AttrValue
-	keys   fstypes.StringSlice
-}
-
-func (a *attrs) MustAttr(key string) AttrValue {
-	if val := a.Attr(key); val != nil {
-		return val
+// GetSep  多个属性间的连接符，当为空时，返回默认值 " " (一个空格)
+func (a *Attributes) GetSep() string {
+	if len(a.Sep) == 0 {
+		return " "
 	}
-	val := NewAttrValue(" ")
-	a.SetAttr(key, val)
-	return val
+	return a.Sep
 }
 
-func (a *attrs) Attr(key string) AttrValue {
-	if a.values == nil {
+// GetKVSep key 和 value 之间的连接符，当为空时， 返回默认值 =
+func (a *Attributes) GetKVSep() string {
+	if len(a.KVSep) == 0 {
+		return "="
+	}
+	return a.KVSep
+}
+
+// GetQuote 属性值的引号，为空时，使用默认值 "
+func (a *Attributes) GetQuote() string {
+	if len(a.Quote) == 0 {
+		return `"`
+	}
+	return a.Quote
+}
+
+// Find 返回一个指定的属性，若不存在，返回 nil
+func (a *Attributes) Find(key string) *Attribute {
+	if len(a.attrs) == 0 {
 		return nil
 	}
-	return a.values[key]
+	return a.attrs[key]
 }
 
-func (a *attrs) DeleteAttr(keys ...string) {
-	if len(a.values) == 0 {
+// FindOrCreate 返回一个指定的属性，若不存在，返回 nil
+func (a *Attributes) FindOrCreate(key string) *Attribute {
+	if val := a.Find(key); val != nil {
+		return val
+	}
+	attr := &Attribute{
+		Key: key,
+	}
+	a.Set(attr)
+	return attr
+}
+
+// Delete 删除指定 key 的属性
+func (a *Attributes) Delete(keys ...string) {
+	if len(a.attrs) == 0 {
 		return
 	}
 	for i := 0; i < len(keys); i++ {
 		key := keys[i]
-		delete(a.values, key)
-		if a.keys.Has(key) {
-			a.keys.Delete(key)
-		}
+		delete(a.attrs, key)
+		a.keys.Delete(key)
 	}
 }
 
-func (a *attrs) AttrKeys() []string {
+// Keys 返回所有属性的 key
+func (a *Attributes) Keys() []string {
 	return a.keys
 }
 
-func (a *attrs) SetAttr(key string, val AttrValue) {
-	if a.values == nil {
-		a.values = map[string]AttrValue{
-			key: val,
+// Set 设置属性值
+func (a *Attributes) Set(attr ...*Attribute) {
+	if a.attrs == nil {
+		a.attrs = make(map[string]*Attribute, len(attr))
+	}
+	for _, item := range attr {
+		if _, has := a.attrs[item.Key]; !has {
+			a.keys = append(a.keys, item.Key)
 		}
-	} else {
-		a.values[key] = val
-	}
-	if !a.keys.Has(key) {
-		a.keys = append(a.keys, key)
+		a.attrs[item.Key] = item
 	}
 }
 
-func (a *attrs) HTML() ([]byte, error) {
-	return attrsHTML(a, "=", `"`, " ")
+// HTML 转换为 HTML
+func (a *Attributes) HTML() ([]byte, error) {
+	if a == nil {
+		return nil, nil
+	}
+	return attrsHTML(a, a.GetKVSep(), a.GetQuote(), a.GetSep())
 }
 
-func attrsHTML(attrs Attributes, kvSep string, quota string, sep string) ([]byte, error) {
-	keys := attrs.AttrKeys()
+func attrsHTML(attrs *Attributes, kvSep string, quote string, sep string) ([]byte, error) {
+	keys := attrs.Keys()
 	if len(keys) == 0 {
 		return nil, nil
 	}
@@ -106,12 +117,12 @@ func attrsHTML(attrs Attributes, kvSep string, quota string, sep string) ([]byte
 	for i := 0; i < len(keys); i++ {
 		attrKey := keys[i]
 		bw.Write(attrKey)
-		bf, err := attrs.Attr(attrKey).HTML()
+		bf, err := attrs.Find(attrKey).HTML()
 		if err != nil {
 			return nil, err
 		}
 		if len(bf) > 0 {
-			bw.Write(kvSep, quota, bf, quota)
+			bw.Write(kvSep, quote, bf, quote)
 		}
 		if i != len(keys)-1 {
 			bw.Write(sep)
@@ -120,53 +131,54 @@ func attrsHTML(attrs Attributes, kvSep string, quota string, sep string) ([]byte
 	return bw.HTML()
 }
 
-// NewAttrValue 创建一个属性值
-// sep 是用于连接多个属性值的分隔符
-func NewAttrValue(sep string) AttrValue {
-	return &attrValue{
-		sep: sep,
-	}
+// Attribute  一个属性
+type Attribute struct {
+	// Key 属性的名字
+	Key string
+	// Values 属性值，可以有多个
+	Values fstypes.StringSlice
+
+	// Sep 多个属性值的连接符
+	Sep string
 }
 
-var _ AttrValue = (*attrValue)(nil)
-
-type attrValue struct {
-	values fstypes.StringSlice // 属性值，允许多个
-	sep    string              // 多个属性值的分隔符/连接符
-}
-
-func (a *attrValue) Sep() string {
-	if len(a.sep) == 0 {
+// GetSep 多个属性值的连接符，当为空时，返回 " "(一个空格)
+func (a *Attribute) GetSep() string {
+	if len(a.Sep) == 0 {
 		return " "
 	}
-	return a.sep
+	return a.Sep
 }
 
-func (a *attrValue) SetSep(sep string) {
-	a.sep = sep
+// Set 设置属性值
+func (a *Attribute) Set(value ...string) {
+	a.Values = value
 }
 
-func (a *attrValue) Value() []string {
-	return a.values
+// First 返回首个属性值
+func (a *Attribute) First() string {
+	if len(a.Values) == 0 {
+		return ""
+	}
+	return a.Values[0]
 }
 
-func (a *attrValue) Set(value ...string) {
-	a.values = fstypes.StringSlice(value).Unique()
+// Add 添加新的属性值
+func (a *Attribute) Add(value ...string) {
+	a.Values = append(a.Values, value...).Unique()
 }
 
-func (a *attrValue) Add(value ...string) {
-	a.values = append(a.values, value...).Unique()
+// Delete 删除属性值
+func (a *Attribute) Delete(value ...string) {
+	a.Values.Delete(value...)
 }
 
-func (a *attrValue) Delete(value ...string) {
-	a.values.Delete(value...)
-}
-
-func (a *attrValue) HTML() ([]byte, error) {
-	if len(a.values) == 0 {
+// HTML 转换为 HTML
+func (a *Attribute) HTML() ([]byte, error) {
+	if len(a.Values) == 0 {
 		return nil, nil
 	}
-	txt := strings.Join(a.Value(), a.Sep())
+	txt := strings.Join(a.Values, a.GetSep())
 	if len(txt) > 0 {
 		return []byte(html.EscapeString(txt)), nil
 	}
@@ -180,29 +192,32 @@ const (
 	attrStyle = "style"
 )
 
-func findOrCreateAttr(w Attributes, key string, sep string) AttrValue {
-	attr := w.Attr(key)
+func findOrCreateAttr(w *Attributes, key string, sep string) *Attribute {
+	attr := w.Find(key)
 	if attr != nil {
 		return attr
 	}
-	attr = NewAttrValue(" ")
-	w.SetAttr(key, attr)
+	attr = &Attribute{
+		Key: key,
+		Sep: sep,
+	}
+	w.Set(attr)
 	return attr
 }
 
 // SetClass 设置 class 属性
-func SetClass(w Attributes, class ...string) {
+func SetClass(w *Attributes, class ...string) {
 	findOrCreateAttr(w, attrClass, " ").Set(class...)
 }
 
 // AddClass 添加 class 属性
-func AddClass(w Attributes, class ...string) {
+func AddClass(w *Attributes, class ...string) {
 	findOrCreateAttr(w, attrClass, " ").Add(class...)
 }
 
 // DeleteClass 删除 class 属性
-func DeleteClass(w Attributes, class ...string) {
-	attr := w.Attr(attrClass)
+func DeleteClass(w *Attributes, class ...string) {
+	attr := w.Find(attrClass)
 	if attr == nil {
 		return
 	}
@@ -210,132 +225,134 @@ func DeleteClass(w Attributes, class ...string) {
 }
 
 // SetID 设置元素的 id
-func SetID(w Attributes, id string) {
+func SetID(w *Attributes, id string) {
 	findOrCreateAttr(w, attrID, " ").Set(id)
 }
 
 // SetName 涉足元素的 name
-func SetName(w Attributes, name string) {
+func SetName(w *Attributes, name string) {
 	findOrCreateAttr(w, attrName, " ").Set(name)
 }
 
-// AttrStyle style 属性
-type AttrStyle struct {
-	attrs Attributes
+// StyleAttributes style 属性
+type StyleAttributes struct {
+	attrs *Attributes
 }
 
 // Set 设置 key 的属性值为 value
-func (s *AttrStyle) Set(key, value string) *AttrStyle {
+func (s StyleAttributes) Set(key, value string) StyleAttributes {
 	if s.attrs == nil {
-		s.attrs = NewAttributes()
+		s.attrs = &Attributes{}
 	}
-	attr := s.attrs.Attr(key)
+	attr := s.attrs.Find(key)
 	if attr == nil {
-		attr = NewAttrValue(";")
-		s.attrs.SetAttr(key, attr)
+		attr = &Attribute{
+			Key:    key,
+			Values: []string{value},
+		}
+		s.attrs.Set(attr)
 	}
 	attr.Set(value)
 	return s
 }
 
 // Get 获取属性值
-func (s *AttrStyle) Get(key string) string {
+func (s StyleAttributes) Get(key string) string {
 	if s.attrs == nil {
 		return ""
 	}
-	attr := s.attrs.Attr(key)
+	attr := s.attrs.Find(key)
 	if attr == nil {
 		return ""
 	}
-	vs := attr.Value()
-	if len(vs) == 0 {
+	if len(attr.Values) == 0 {
 		return ""
 	}
-	return vs[0]
+	return attr.Values[0]
 }
 
 // Width 设置宽度
-func (s *AttrStyle) Width(w string) *AttrStyle {
+func (s StyleAttributes) Width(w string) StyleAttributes {
 	return s.Set("width", w)
 }
 
 // MinWidth 设置最小宽度
-func (s *AttrStyle) MinWidth(w string) *AttrStyle {
+func (s StyleAttributes) MinWidth(w string) StyleAttributes {
 	return s.Set("min-width", w)
 }
 
 // MaxWidth 设置最大新宽度
-func (s *AttrStyle) MaxWidth(w string) *AttrStyle {
+func (s StyleAttributes) MaxWidth(w string) StyleAttributes {
 	return s.Set("max-width", w)
 }
 
 // Height 设置高度
-func (s *AttrStyle) Height(h string) *AttrStyle {
+func (s StyleAttributes) Height(h string) StyleAttributes {
 	return s.Set("height", h)
 }
 
 // MinHeight 设置最小高度
-func (s *AttrStyle) MinHeight(h string) *AttrStyle {
+func (s StyleAttributes) MinHeight(h string) StyleAttributes {
 	return s.Set("min-height", h)
 }
 
 // MaxHeight 设置最大高度
-func (s *AttrStyle) MaxHeight(h string) *AttrStyle {
+func (s StyleAttributes) MaxHeight(h string) StyleAttributes {
 	return s.Set("max-height", h)
 }
 
 // Color 设置前景/字体颜色
-func (s *AttrStyle) Color(color string) *AttrStyle {
+func (s StyleAttributes) Color(color string) StyleAttributes {
 	return s.Set("color", color)
 }
 
 // BackgroundColor 设置背景演示
-func (s *AttrStyle) BackgroundColor(color string) *AttrStyle {
+func (s StyleAttributes) BackgroundColor(color string) StyleAttributes {
 	return s.Set("background-color", color)
 }
 
 // TextAlign 设置内容对齐方式
-func (s *AttrStyle) TextAlign(align string) *AttrStyle {
+func (s StyleAttributes) TextAlign(align string) StyleAttributes {
 	return s.Set("text-align", align)
 }
 
 // Margin 设置外边距
-func (s *AttrStyle) Margin(val string) *AttrStyle {
+func (s StyleAttributes) Margin(val string) StyleAttributes {
 	return s.Set("margin", val)
 }
 
 // Padding 设置内边距
-func (s *AttrStyle) Padding(val string) *AttrStyle {
+func (s StyleAttributes) Padding(val string) StyleAttributes {
 	return s.Set("padding", val)
 }
 
 // Font 设置字体
-func (s *AttrStyle) Font(val string) *AttrStyle {
+func (s StyleAttributes) Font(val string) StyleAttributes {
 	return s.Set("font", val)
 }
 
 // FontSize 设置字体大小
-func (s *AttrStyle) FontSize(val string) *AttrStyle {
+func (s StyleAttributes) FontSize(val string) StyleAttributes {
 	return s.Set("font-size", val)
 }
 
 // FontWeight 设置字体粗细
-func (s *AttrStyle) FontWeight(val string) *AttrStyle {
+func (s StyleAttributes) FontWeight(val string) StyleAttributes {
 	return s.Set("font-weight", val)
 }
 
 // FontFamily 设置字体系列（字体族）
-func (s *AttrStyle) FontFamily(val string) *AttrStyle {
+func (s StyleAttributes) FontFamily(val string) StyleAttributes {
 	return s.Set("font-family", val)
 }
 
 // Border 设置边框属性
-func (s *AttrStyle) Border(val string) *AttrStyle {
+func (s StyleAttributes) Border(val string) StyleAttributes {
 	return s.Set("border", val)
 }
 
-// HTML 实现 Code 接口
-func (s *AttrStyle) HTML() ([]byte, error) {
+// HTML 实现 Element 接口
+func (s StyleAttributes) HTML() ([]byte, error) {
 	if s.attrs == nil {
 		return nil, nil
 	}
@@ -343,7 +360,7 @@ func (s *AttrStyle) HTML() ([]byte, error) {
 }
 
 // SetTo 将样式信息设置到指定的属性集合
-func (s *AttrStyle) SetTo(a Attributes) error {
+func (s StyleAttributes) SetTo(a *Attributes) error {
 	code, err := s.HTML()
 	if err != nil {
 		return err
@@ -351,6 +368,6 @@ func (s *AttrStyle) SetTo(a Attributes) error {
 	if len(code) == 0 {
 		return nil
 	}
-	a.MustAttr(attrStyle).Set(string(code))
+	a.FindOrCreate(attrStyle).Set(string(code))
 	return nil
 }

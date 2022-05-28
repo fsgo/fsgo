@@ -2,28 +2,30 @@
 // Author: hidu <duv123@gmail.com>
 // Date: 2022/5/4
 
-package fshtml
+package fshtml_test
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/fsgo/fsgo/fshtml"
 )
 
-func TestAttribute_HTML(t *testing.T) {
+func TestAttributes(t *testing.T) {
 	t.Run("case 1", func(t *testing.T) {
-		attr := NewAttributes()
-		SetID(attr, "#abc")
-		SetName(attr, "hello")
-		DeleteClass(attr, "c0")
+		attr := &fshtml.Attributes{}
+		fshtml.SetID(attr, "#abc")
+		fshtml.SetName(attr, "hello")
+		fshtml.DeleteClass(attr, "c0")
 
-		attr.MustAttr("data").Set("a")
-		attr.DeleteAttr("data")
+		attr.FindOrCreate("data").Set("a")
+		attr.Delete("data")
 
-		SetClass(attr, "c1", "c2")
-		SetClass(attr, "c3", "c4")
-		AddClass(attr, "c5")
-		DeleteClass(attr, "c4", "c6")
+		fshtml.SetClass(attr, "c1", "c2")
+		fshtml.SetClass(attr, "c3", "c4")
+		fshtml.AddClass(attr, "c5")
+		fshtml.DeleteClass(attr, "c4", "c6")
 
 		bf, err := attr.HTML()
 		require.NoError(t, err)
@@ -31,6 +33,6 @@ func TestAttribute_HTML(t *testing.T) {
 		require.Equal(t, want, string(bf))
 
 		wantKeys := []string{"id", "name", "class"}
-		require.Equal(t, wantKeys, attr.AttrKeys())
+		require.Equal(t, wantKeys, attr.Keys())
 	})
 }

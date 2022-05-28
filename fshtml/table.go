@@ -6,41 +6,41 @@ package fshtml
 
 // Table1 一个简单的表格
 type Table1 struct {
-	attr Attributes
-	head []Code
-	rows [][]Code
-	foot []Code
+	attr *Attributes
+	head []Element
+	rows [][]Element
+	foot []Element
 }
 
 // Attr 表格的属性集合
-func (t *Table1) Attr() Attributes {
+func (t *Table1) Attr() *Attributes {
 	if t.attr == nil {
-		t.attr = NewAttributes()
+		t.attr = &Attributes{}
 	}
 	return t.attr
 }
 
 // SetHeader 设置表头
-func (t *Table1) SetHeader(cells ...Code) {
+func (t *Table1) SetHeader(cells ...Element) {
 	t.head = cells
 }
 
 // AddRow 添加一行内容
-func (t *Table1) AddRow(cells ...Code) {
+func (t *Table1) AddRow(cells ...Element) {
 	t.rows = append(t.rows, cells)
 }
 
 // AddRows 添加多行内容
-func (t *Table1) AddRows(rows ...[]Code) {
+func (t *Table1) AddRows(rows ...[]Element) {
 	t.rows = append(t.rows, rows...)
 }
 
 // SetFooter 设置表格的页脚
-func (t *Table1) SetFooter(cells ...Code) {
+func (t *Table1) SetFooter(cells ...Element) {
 	t.foot = cells
 }
 
-// HTML 实现 Code 接口
+// HTML 实现 Element 接口
 func (t *Table1) HTML() ([]byte, error) {
 	bw := newBufWriter()
 	bw.Write("<table")
@@ -71,7 +71,7 @@ func (t *Table1) HTML() ([]byte, error) {
 }
 
 // NewTd 创建一个新的 td
-func NewTd(val Code) *Block {
+func NewTd(val Element) *Block {
 	return &Block{
 		Tag:  "td",
 		Body: val,
@@ -79,7 +79,7 @@ func NewTd(val Code) *Block {
 }
 
 // NewTh 创建一个新的 th
-func NewTh(val Code) *Block {
+func NewTh(val Element) *Block {
 	return &Block{
 		Tag:  "th",
 		Body: val,

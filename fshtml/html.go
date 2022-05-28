@@ -29,7 +29,7 @@ func NewBody() *Block {
 func NewUl(values StringSlice) *Block {
 	return &Block{
 		Tag:  "ul",
-		Body: values.Blocks("li"),
+		Body: values.Blocks("li", nil),
 	}
 }
 
@@ -37,6 +37,6 @@ func NewUl(values StringSlice) *Block {
 func NewOl(values StringSlice) *Block {
 	return &Block{
 		Tag:  "ol",
-		Body: values.Blocks("li"),
+		Body: values.Blocks("li", nil),
 	}
 }
