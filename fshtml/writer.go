@@ -36,12 +36,7 @@ func (w *bufWriter) writeWithSep(sep string, values ...any) {
 		case string:
 			w.writeString(sep, v)
 		case Element:
-			h, e1 := v.HTML()
-			if e1 != nil {
-				w.err = e1
-			} else {
-				w.writeBytes(sep, h)
-			}
+			w.writeElement(sep, v)
 		case error:
 			w.err = v
 		case nil:
@@ -53,6 +48,15 @@ func (w *bufWriter) writeWithSep(sep string, values ...any) {
 		if w.err != nil {
 			return
 		}
+	}
+}
+
+func (w *bufWriter) writeElement(sep string, e Element) {
+	h, e1 := e.HTML()
+	if e1 != nil {
+		w.err = e1
+	} else {
+		w.writeBytes(sep, h)
 	}
 }
 

@@ -13,6 +13,11 @@ type Element interface {
 	HTML() ([]byte, error)
 }
 
+// ToElements 转换为 Elements 类型
+func ToElements(es ...Element) Elements {
+	return es
+}
+
 // Elements alias of []Element
 type Elements []Element
 
@@ -23,7 +28,7 @@ func (hs Elements) HTML() ([]byte, error) {
 	}
 	bw := newBufWriter()
 	for i := 0; i < len(hs); i++ {
-		bw.Write(hs[i], "\n")
+		bw.Write(hs[i])
 	}
 	return bw.HTML()
 }
@@ -38,65 +43,47 @@ func (hs *Elements) Add(values ...Element) {
 	*hs = append(*hs, values...)
 }
 
+// Set 设置内容
+func (hs *Elements) Set(values ...Element) {
+	*hs = values
+}
+
 // ErrEmptyTagName tag 值为空的错误
 var ErrEmptyTagName = errors.New("empty tag name")
 
-var _ Element = (*Block)(nil)
+var _ Element = (*Any)(nil)
+var _ AttrsMapper = (*Any)(nil)
 
-// Block 一块 HTML 内容
-type Block struct {
-	Tag   string
-	Attrs *Attributes
-	Body  Element
-}
+// Any 一块 HTML 内容
+type Any struct {
+	// Tag 标签名称，必填，如 div
+	Tag string
 
-// MustAttrs 返回 Attributes,若为 nil，则初始化一个并返回
-func (c *Block) MustAttrs() *Attributes {
-	if c.Attrs == nil {
-		c.Attrs = &Attributes{}
-	}
-	return c.Attrs
+	// WithAttrs 可选，属性信息
+	WithAttrs
+
+	// Body 内容，可选
+	Body Elements
+
+	// SelfClose 当前标签是否自关闭,默认为 false
+	// 如 img 标签就是自关闭的：<img src="/a.jpg"/>
+	SelfClose bool
 }
 
 // HTML 实现 Element 接口
-func (c *Block) HTML() ([]byte, error) {
+func (c *Any) HTML() ([]byte, error) {
 	if len(c.Tag) == 0 {
 		return nil, ErrEmptyTagName
 	}
 	bw := newBufWriter()
 	bw.Write("<", c.Tag)
 	bw.WriteWithSep(" ", c.Attrs)
-	bw.Write(">")
-	bw.Write(c.Body)
-	bw.Write("</", c.Tag, ">")
-	return bw.HTML()
-}
-
-var _ Element = (Blocks)(nil)
-
-// Blocks alias of []*Block
-type Blocks []*Block
-
-// HTML 实现 Element 接口
-func (bs Blocks) HTML() ([]byte, error) {
-	if len(bs) == 0 {
-		return nil, nil
-	}
-	bw := newBufWriter()
-	for i := 0; i < len(bs); i++ {
-		bw.Write(bs[i], "\n")
+	if c.SelfClose {
+		bw.Write("/>")
+	} else {
+		bw.Write(">")
+		bw.Write(c.Body)
+		bw.Write("</", c.Tag, ">")
 	}
 	return bw.HTML()
-}
-
-// Elements 转换为 []Element
-func (bs Blocks) Elements() Elements {
-	if len(bs) == 0 {
-		return nil
-	}
-	cs := make(Elements, len(bs))
-	for i := 0; i < len(bs); i++ {
-		cs[i] = bs
-	}
-	return cs
 }

@@ -6,18 +6,10 @@ package fshtml
 
 // Table1 一个简单的表格
 type Table1 struct {
-	attr *Attributes
+	WithAttrs
 	head []Element
 	rows [][]Element
 	foot []Element
-}
-
-// Attr 表格的属性集合
-func (t *Table1) Attr() *Attributes {
-	if t.attr == nil {
-		t.attr = &Attributes{}
-	}
-	return t.attr
 }
 
 // SetHeader 设置表头
@@ -44,7 +36,7 @@ func (t *Table1) SetFooter(cells ...Element) {
 func (t *Table1) HTML() ([]byte, error) {
 	bw := newBufWriter()
 	bw.Write("<table")
-	bw.WriteWithSep(" ", t.attr)
+	bw.WriteWithSep(" ", t.Attrs)
 	bw.Write(">\n")
 	bw.Write("<thead>\n<tr>")
 	for i := 0; i < len(t.head); i++ {
@@ -67,20 +59,21 @@ func (t *Table1) HTML() ([]byte, error) {
 		}
 		bw.Write("</tr>\n</tfoot>\n")
 	}
+	bw.Write("</table>\n")
 	return bw.HTML()
 }
 
 // NewTd 创建一个新的 td
-func NewTd(val Element) *Block {
-	return &Block{
+func NewTd(val ...Element) *Any {
+	return &Any{
 		Tag:  "td",
 		Body: val,
 	}
 }
 
 // NewTh 创建一个新的 th
-func NewTh(val Element) *Block {
-	return &Block{
+func NewTh(val ...Element) *Any {
+	return &Any{
 		Tag:  "th",
 		Body: val,
 	}

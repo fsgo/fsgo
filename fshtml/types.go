@@ -23,35 +23,16 @@ func (s String) HTML() ([]byte, error) {
 // StringSlice 将 []string 转换为 Code类型
 type StringSlice []string
 
-// Blocks 转换为 字段 tag 的 []Block
-func (ss StringSlice) Blocks(tag string, fn func(b *Block)) Blocks {
-	if len(ss) == 0 {
-		return nil
-	}
-	cs := make([]*Block, len(ss))
-	for i := 0; i < len(ss); i++ {
-		b := &Block{
-			Tag:  tag,
-			Body: String(ss[i]),
-		}
-		if fn != nil {
-			fn(b)
-		}
-		cs[i] = b
-	}
-	return cs
-}
-
-// Elements 转换为 字段 tag 的 []Element
-func (ss StringSlice) Elements(tag string, fn func(b *Block)) Elements {
+// ToElements 转换为 字段 tag 的 []Element
+func (ss StringSlice) ToElements(tag string, fn func(b *Any)) Elements {
 	if len(ss) == 0 {
 		return nil
 	}
 	cs := make([]Element, len(ss))
 	for i := 0; i < len(ss); i++ {
-		b := &Block{
+		b := &Any{
 			Tag:  tag,
-			Body: String(ss[i]),
+			Body: ToElements(String(ss[i])),
 		}
 		if fn != nil {
 			fn(b)

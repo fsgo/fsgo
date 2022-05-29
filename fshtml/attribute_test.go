@@ -14,25 +14,23 @@ import (
 
 func TestAttributes(t *testing.T) {
 	t.Run("case 1", func(t *testing.T) {
-		attr := &fshtml.Attributes{}
+		attr := &fshtml.WithAttrs{}
 		fshtml.SetID(attr, "#abc")
 		fshtml.SetName(attr, "hello")
 		fshtml.DeleteClass(attr, "c0")
-
-		attr.FindOrCreate("data").Set("a")
-		attr.Delete("data")
 
 		fshtml.SetClass(attr, "c1", "c2")
 		fshtml.SetClass(attr, "c3", "c4")
 		fshtml.AddClass(attr, "c5")
 		fshtml.DeleteClass(attr, "c4", "c6")
 
-		bf, err := attr.HTML()
+		attrs := attr.FindAttrs()
+		bf, err := attrs.HTML()
 		require.NoError(t, err)
 		want := `id="#abc" name="hello" class="c3 c5"`
 		require.Equal(t, want, string(bf))
 
 		wantKeys := []string{"id", "name", "class"}
-		require.Equal(t, wantKeys, attr.Keys())
+		require.Equal(t, wantKeys, attrs.Keys())
 	})
 }
