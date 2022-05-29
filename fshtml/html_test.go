@@ -78,3 +78,47 @@ func TestIMG(t *testing.T) {
 		require.Equal(t, want, string(got))
 	})
 }
+
+func TestA(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		a := fshtml.NewA("/gogo")
+		a.Title("hello")
+		got, err := a.HTML()
+		require.NoError(t, err)
+		want := `<a href="/gogo" title="hello"/>`
+		require.Equal(t, want, string(got))
+	})
+}
+
+func TestMeta(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		a := fshtml.NewMeta()
+		a.Name("robots").Content("all")
+		got, err := a.HTML()
+		require.NoError(t, err)
+		want := `<meta name="robots" content="all"/>`
+		require.Equal(t, want, string(got))
+	})
+}
+
+func TestLink(t *testing.T) {
+	t.Run("normal", func(t *testing.T) {
+		a := fshtml.NewLink()
+		a.Rel("stylesheet").Type("text/css").Href("/a.css")
+		got, err := a.HTML()
+		require.NoError(t, err)
+		want := `<link rel="stylesheet" type="text/css" href="/a.css"/>`
+		require.Equal(t, want, string(got))
+	})
+}
+
+func TestScript(t *testing.T) {
+	t.Run("async", func(t *testing.T) {
+		a := fshtml.NewScript()
+		fshtml.SetAsync(a)
+		got, err := a.HTML()
+		require.NoError(t, err)
+		want := `<script async></script>`
+		require.Equal(t, want, string(got))
+	})
+}

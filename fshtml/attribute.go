@@ -5,10 +5,14 @@
 package fshtml
 
 import (
-	"html"
 	"strings"
 
 	"github.com/fsgo/fsgo/fstypes"
+)
+
+const (
+	// onlyKey 属性只需要 key，不需要 value
+	onlyKey = ":only-key"
 )
 
 // Attrs 多个属性
@@ -116,13 +120,13 @@ func attrsHTML(attrs *Attrs, kvSep string, quote string, sep string) ([]byte, er
 	bw := newBufWriter()
 	for i := 0; i < len(keys); i++ {
 		attrKey := keys[i]
-		bw.Write(attrKey)
-		bf, err := attrs.Attr(attrKey).HTML()
-		if err != nil {
-			return nil, err
+		vs := attrs.Attr(attrKey).Values
+		if len(vs) == 0 {
+			continue
 		}
-		if len(bf) > 0 {
-			bw.Write(kvSep, quote, bf, quote)
+		bw.Write(attrKey)
+		if vs[0] != onlyKey {
+			bw.Write(kvSep, quote, strings.Join(vs, " "), quote)
 		}
 		if i != len(keys)-1 {
 			bw.Write(sep)
@@ -174,19 +178,9 @@ func DeleteAttr(w AttrsMapper, key string, values ...string) {
 type Attr struct {
 	// Key 属性的名字
 	Key string
+
 	// Values 属性值，可以有多个
 	Values fstypes.StringSlice
-
-	// Sep 多个属性值的连接符
-	Sep string
-}
-
-// GetSep 多个属性值的连接符，当为空时，返回 " "(一个空格)
-func (a *Attr) GetSep() string {
-	if len(a.Sep) == 0 {
-		return " "
-	}
-	return a.Sep
 }
 
 // Set 设置属性值
@@ -212,18 +206,6 @@ func (a *Attr) Delete(value ...string) {
 	a.Values.Delete(value...)
 }
 
-// HTML 转换为 HTML
-func (a *Attr) HTML() ([]byte, error) {
-	if len(a.Values) == 0 {
-		return nil, nil
-	}
-	txt := strings.Join(a.Values, a.GetSep())
-	if len(txt) > 0 {
-		return []byte(html.EscapeString(txt)), nil
-	}
-	return nil, nil
-}
-
 func findOrCreateAttr(w AttrsMapper, key string, sep string) *Attr {
 	as := w.MustAttrs()
 	attr := as.Attr(key)
@@ -232,10 +214,24 @@ func findOrCreateAttr(w AttrsMapper, key string, sep string) *Attr {
 	}
 	attr = &Attr{
 		Key: key,
-		Sep: sep,
 	}
 	as.Set(attr)
 	return attr
+}
+
+// SetAttr 设置属性值
+func SetAttr(w AttrsMapper, key string, value ...string) {
+	findOrCreateAttr(w, key, " ").Set(value...)
+}
+
+// SetAttrNoValue 设置只有 key，不需要 value 的属性
+func SetAttrNoValue(w AttrsMapper, key string) {
+	findOrCreateAttr(w, key, " ").Set(onlyKey)
+}
+
+// SetAsync 设置 async  属性
+func SetAsync(w AttrsMapper) {
+	SetAttrNoValue(w, "async")
 }
 
 // SetClass 设置 class 属性
@@ -271,6 +267,32 @@ func SetWidth(w AttrsMapper, width string) {
 // SetHeight 设置元素的 height
 func SetHeight(w AttrsMapper, height string) {
 	findOrCreateAttr(w, "height", " ").Set(height)
+}
+
+// SetLang 设置元素的 lang 属性
+// 	如 en-US、zh-CN
+func SetLang(w AttrsMapper, lang string) {
+	findOrCreateAttr(w, "lang", " ").Set(lang)
+}
+
+// SetTitle 设置 title 属性
+func SetTitle(w AttrsMapper, title string) {
+	findOrCreateAttr(w, "title", " ").Set(title)
+}
+
+// SetSrc 设置 src 属性
+func SetSrc(w AttrsMapper, src string) {
+	findOrCreateAttr(w, "src", " ").Set(src)
+}
+
+// SetTarget 设置 target 属性
+func SetTarget(w AttrsMapper, target string) {
+	findOrCreateAttr(w, "target", " ").Set(target)
+}
+
+// SetType 设置 type 属性
+func SetType(w AttrsMapper, tp string) {
+	findOrCreateAttr(w, "type", " ").Set(tp)
 }
 
 // StyleAttr style 属性

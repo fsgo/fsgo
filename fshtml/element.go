@@ -6,6 +6,7 @@ package fshtml
 
 import (
 	"errors"
+	"html"
 )
 
 // Element 所有 HTML 组件的基础定义
@@ -54,6 +55,13 @@ var ErrEmptyTagName = errors.New("empty tag name")
 var _ Element = (*Any)(nil)
 var _ AttrsMapper = (*Any)(nil)
 
+// NewAny 创建任意的 tag
+func NewAny(tag string) *Any {
+	return &Any{
+		Tag: tag,
+	}
+}
+
 // Any 一块 HTML 内容
 type Any struct {
 	// Tag 标签名称，必填，如 div
@@ -85,5 +93,18 @@ func (c *Any) HTML() ([]byte, error) {
 		bw.Write(c.Body)
 		bw.Write("</", c.Tag, ">")
 	}
+	return bw.HTML()
+}
+
+// Comment 注释
+type Comment string
+
+// HTML 转换为 HTML
+func (c Comment) HTML() ([]byte, error) {
+	if len(c) == 0 {
+		return nil, nil
+	}
+	bw := newBufWriter()
+	bw.Write("<!-- ", html.EscapeString(string(c)), " -->\n")
 	return bw.HTML()
 }
