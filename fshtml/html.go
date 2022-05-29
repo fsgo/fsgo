@@ -281,3 +281,50 @@ func (a *Link) Href(href string) *Link {
 func (a *Link) HTML() ([]byte, error) {
 	return a.html("<link")
 }
+
+// NewInput 创建一个 input 标签
+func NewInput(tp string) *Any {
+	input := &Any{
+		Tag:       "input",
+		SelfClose: true,
+	}
+	SetType(input, tp)
+	return input
+}
+
+// NewForm 创建一个 form
+func NewForm(method string, action string) *Any {
+	f := NewAny("form")
+	SetMethod(f, method)
+	SetAction(f, action)
+	return f
+}
+
+// NewSubmit 创建一个 submit 标签
+func NewSubmit(value string) *Any {
+	s := NewInput("submit")
+	SetValue(s, value)
+	return s
+}
+
+// NewFieldSet 创建一个 fieldset
+func NewFieldSet() *Any {
+	return NewAny("fieldset")
+}
+
+// NewLegend 创建一个 legend
+func NewLegend(e Element) *Any {
+	a := &Any{
+		Tag:  "legend",
+		Body: ToElements(e),
+	}
+	return a
+}
+
+// NewLabel 创建一个 label
+func NewLabel(e Element) *Any {
+	return &Any{
+		Tag:  "label",
+		Body: ToElements(e),
+	}
+}

@@ -41,3 +41,14 @@ func (ss StringSlice) ToElements(tag string, fn func(b *Any)) Elements {
 	}
 	return cs
 }
+
+var (
+	// NL 换行: \n
+	NL = Bytes("\n")
+
+	// BR HTML 换行 br
+	BR = Bytes("<br/>")
+
+	// HR HTML 分割符 hr
+	HR = Bytes("<hr/>")
+)

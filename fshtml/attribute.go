@@ -5,6 +5,7 @@
 package fshtml
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/fsgo/fsgo/fstypes"
@@ -22,9 +23,6 @@ type Attrs struct {
 
 	// KVSep key 和 value 之间的连接符，当为空时，使用默认值 =
 	KVSep string
-
-	// Quote 属性值的引号，为空时，使用默认值 "
-	Quote string
 
 	attrs map[string]*Attr
 	keys  fstypes.StringSlice
@@ -44,14 +42,6 @@ func (a *Attrs) GetKVSep() string {
 		return "="
 	}
 	return a.KVSep
-}
-
-// GetQuote 属性值的引号，为空时，使用默认值 "
-func (a *Attrs) GetQuote() string {
-	if len(a.Quote) == 0 {
-		return `"`
-	}
-	return a.Quote
 }
 
 // Attr 返回一个指定的属性，若不存在，返回 nil
@@ -109,10 +99,10 @@ func (a *Attrs) HTML() ([]byte, error) {
 	if a == nil {
 		return nil, nil
 	}
-	return attrsHTML(a, a.GetKVSep(), a.GetQuote(), a.GetSep())
+	return attrsHTML(a, a.GetKVSep(), strconv.Quote, a.GetSep())
 }
 
-func attrsHTML(attrs *Attrs, kvSep string, quote string, sep string) ([]byte, error) {
+func attrsHTML(attrs *Attrs, kvSep string, quote func(string) string, sep string) ([]byte, error) {
 	keys := attrs.Keys()
 	if len(keys) == 0 {
 		return nil, nil
@@ -126,7 +116,7 @@ func attrsHTML(attrs *Attrs, kvSep string, quote string, sep string) ([]byte, er
 		}
 		bw.Write(attrKey)
 		if vs[0] != onlyKey {
-			bw.Write(kvSep, quote, strings.Join(vs, " "), quote)
+			bw.Write(kvSep, quote(strings.Join(vs, " ")))
 		}
 		if i != len(keys)-1 {
 			bw.Write(sep)
@@ -234,9 +224,14 @@ func SetAsync(w AttrsMapper) {
 	SetAttrNoValue(w, "async")
 }
 
+// SetAccept 设置 accept 属性
+func SetAccept(w AttrsMapper, accept string) {
+	SetAttr(w, "accept", accept)
+}
+
 // SetClass 设置 class 属性
 func SetClass(w AttrsMapper, class ...string) {
-	findOrCreateAttr(w, "class", " ").Set(class...)
+	SetAttr(w, "class", class...)
 }
 
 // AddClass 添加 class 属性
@@ -251,48 +246,218 @@ func DeleteClass(w AttrsMapper, class ...string) {
 
 // SetID 设置元素的 id
 func SetID(w AttrsMapper, id string) {
-	findOrCreateAttr(w, "id", " ").Set(id)
+	SetAttr(w, "id", id)
 }
 
 // SetName 设置元素的 name
 func SetName(w AttrsMapper, name string) {
-	findOrCreateAttr(w, "name", " ").Set(name)
+	SetAttr(w, "name", name)
 }
 
 // SetWidth 设置元素的 width
 func SetWidth(w AttrsMapper, width string) {
-	findOrCreateAttr(w, "width", " ").Set(width)
+	SetAttr(w, "width", width)
 }
 
 // SetHeight 设置元素的 height
 func SetHeight(w AttrsMapper, height string) {
-	findOrCreateAttr(w, "height", " ").Set(height)
+	SetAttr(w, "height", height)
+}
+
+// SetSize 设置元素的 size
+func SetSize(w AttrsMapper, size int) {
+	SetAttr(w, "size", strconv.Itoa(size))
 }
 
 // SetLang 设置元素的 lang 属性
 // 	如 en-US、zh-CN
 func SetLang(w AttrsMapper, lang string) {
-	findOrCreateAttr(w, "lang", " ").Set(lang)
+	SetAttr(w, "lang", lang)
 }
 
 // SetTitle 设置 title 属性
 func SetTitle(w AttrsMapper, title string) {
-	findOrCreateAttr(w, "title", " ").Set(title)
+	SetAttr(w, "title", title)
 }
 
 // SetSrc 设置 src 属性
 func SetSrc(w AttrsMapper, src string) {
-	findOrCreateAttr(w, "src", " ").Set(src)
+	SetAttr(w, "src", src)
 }
 
 // SetTarget 设置 target 属性
 func SetTarget(w AttrsMapper, target string) {
-	findOrCreateAttr(w, "target", " ").Set(target)
+	SetAttr(w, "target", target)
 }
 
 // SetType 设置 type 属性
 func SetType(w AttrsMapper, tp string) {
-	findOrCreateAttr(w, "type", " ").Set(tp)
+	SetAttr(w, "type", tp)
+}
+
+// SetValue 设置 value 属性
+func SetValue(w AttrsMapper, value string) {
+	SetAttr(w, "value", value)
+}
+
+// SetMax 设置 max 属性
+func SetMax(w AttrsMapper, max string) {
+	SetAttr(w, "max", max)
+}
+
+// SetMaxLength 设置 maxlength 属性
+func SetMaxLength(w AttrsMapper, maxLen int) {
+	SetAttr(w, "maxlength", strconv.Itoa(maxLen))
+}
+
+// SetMin 设置 min 属性
+func SetMin(w AttrsMapper, min string) {
+	SetAttr(w, "min", min)
+}
+
+// SetMinLength 设置 minlength 属性
+func SetMinLength(w AttrsMapper, minLen int) {
+	SetAttr(w, "minlength", strconv.Itoa(minLen))
+}
+
+// SetForm 设置 form 属性
+func SetForm(w AttrsMapper, form string) {
+	SetAttr(w, "form", form)
+}
+
+// SetFormAction 设置 formaction 属性
+func SetFormAction(w AttrsMapper, formAction string) {
+	SetAttr(w, "formaction", formAction)
+}
+
+// SetMethod 设置 method 属性
+func SetMethod(w AttrsMapper, method string) {
+	SetAttr(w, "method", method)
+}
+
+// SetAction 设置 action 属性
+func SetAction(w AttrsMapper, action string) {
+	SetAttr(w, "action", action)
+}
+
+// SetList 设置 list 属性
+func SetList(w AttrsMapper, list string) {
+	SetAttr(w, "list", list)
+}
+
+// SetChecked 设置 form 属性
+func SetChecked(w AttrsMapper, checked bool) {
+	if checked {
+		SetAttr(w, "checked", "checked")
+	} else {
+		DeleteAttr(w, "checked")
+	}
+}
+
+// SetDisabled 设置 disabled 属性
+func SetDisabled(w AttrsMapper, disabled bool) {
+	if disabled {
+		SetAttr(w, "disabled", "disabled")
+	} else {
+		DeleteAttr(w, "checked")
+	}
+}
+
+// SetRequired 设置 required 属性
+func SetRequired(w AttrsMapper, required bool) {
+	if required {
+		SetAttr(w, "required", "required")
+	} else {
+		DeleteAttr(w, "required")
+	}
+}
+
+// SetReadOnly 设置 readonly 属性
+func SetReadOnly(w AttrsMapper, readonly bool) {
+	if readonly {
+		SetAttr(w, "readonly", "required")
+	} else {
+		DeleteAttr(w, "readonly")
+	}
+}
+
+// SetAutoComplete 设置 autocomplete 属性
+func SetAutoComplete(w AttrsMapper, on bool) {
+	if on {
+		SetAttr(w, "autocomplete", "on")
+	} else {
+		SetAttr(w, "autocomplete", "on")
+	}
+}
+
+// SetOnChange 设置 onchange 属性
+func SetOnChange(w AttrsMapper, script string) {
+	SetAttr(w, "onchange", script)
+}
+
+// SetOnBlur 设置 onblur 属性
+func SetOnBlur(w AttrsMapper, script string) {
+	SetAttr(w, "onblur", script)
+}
+
+// SetOnFocus 设置 onfocus 属性
+func SetOnFocus(w AttrsMapper, script string) {
+	SetAttr(w, "onfocus", script)
+}
+
+// SetOnFormChange 设置 onformchange 属性
+func SetOnFormChange(w AttrsMapper, script string) {
+	SetAttr(w, "onformchange", script)
+}
+
+// SetOnFormInput 设置 onforminput 属性
+func SetOnFormInput(w AttrsMapper, script string) {
+	SetAttr(w, "onforminput", script)
+}
+
+// SetOnInput 设置 oninput 属性
+func SetOnInput(w AttrsMapper, script string) {
+	SetAttr(w, "oninput", script)
+}
+
+// SetOnInvalid 设置 oninvalid 属性
+func SetOnInvalid(w AttrsMapper, script string) {
+	SetAttr(w, "oninvalid", script)
+}
+
+// SetOnSubmit 设置 onsubmit 属性
+func SetOnSubmit(w AttrsMapper, script string) {
+	SetAttr(w, "onsubmit", script)
+}
+
+// SetOnSelect 设置 onselect 属性
+func SetOnSelect(w AttrsMapper, script string) {
+	SetAttr(w, "onselect", script)
+}
+
+// SetOnReset 设置 onreset 属性
+func SetOnReset(w AttrsMapper, script string) {
+	SetAttr(w, "onreset", script)
+}
+
+// SetOnKeyUp 设置 onkeyup 属性
+func SetOnKeyUp(w AttrsMapper, script string) {
+	SetAttr(w, "onkeyup", script)
+}
+
+// SetOnKeyPress 设置 onkeypress 属性
+func SetOnKeyPress(w AttrsMapper, script string) {
+	SetAttr(w, "onkeypress", script)
+}
+
+// SetOnKeyDown 设置 onkeydown 属性
+func SetOnKeyDown(w AttrsMapper, script string) {
+	SetAttr(w, "onkeydown", script)
+}
+
+// SetOnClick 设置 onclick 属性
+func SetOnClick(w AttrsMapper, script string) {
+	SetAttr(w, "onclick", script)
 }
 
 // StyleAttr style 属性
@@ -418,7 +583,11 @@ func (s *StyleAttr) HTML() ([]byte, error) {
 	if attrs == nil {
 		return nil, nil
 	}
-	return attrsHTML(attrs, ":", "", "; ")
+	return attrsHTML(attrs, ":", noQuote, "; ")
+}
+
+func noQuote(t string) string {
+	return t
 }
 
 // SetTo 将样式信息设置到指定的属性集合

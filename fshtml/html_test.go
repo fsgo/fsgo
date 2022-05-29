@@ -122,3 +122,15 @@ func TestScript(t *testing.T) {
 		require.Equal(t, want, string(got))
 	})
 }
+
+func TestInput(t *testing.T) {
+	t.Run("text", func(t *testing.T) {
+		a := fshtml.NewInput("text")
+		fshtml.SetValue(a, "hello")
+		fshtml.SetOnChange(a, `alter("ok")`)
+		got, err := a.HTML()
+		require.NoError(t, err)
+		want := `<input type="text" value="hello" onchange="alter(\"ok\")"/>`
+		require.Equal(t, want, string(got))
+	})
+}
