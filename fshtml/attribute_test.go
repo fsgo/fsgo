@@ -24,13 +24,15 @@ func TestAttributes(t *testing.T) {
 		fshtml.AddClass(attr, "c5")
 		fshtml.DeleteClass(attr, "c4", "c6")
 
+		fshtml.SetValue(attr, `"你好<>"`)
+
 		attrs := attr.FindAttrs()
 		bf, err := attrs.HTML()
 		require.NoError(t, err)
-		want := `id="#abc" name="hello" class="c3 c5"`
+		want := `id="#abc" name="hello" class="c3 c5" value="\"你好<>\""`
 		require.Equal(t, want, string(bf))
 
-		wantKeys := []string{"id", "name", "class"}
+		wantKeys := []string{"id", "name", "class", "value"}
 		require.Equal(t, wantKeys, attrs.Keys())
 	})
 }

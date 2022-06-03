@@ -62,6 +62,18 @@ func NewAny(tag string) *Any {
 	}
 }
 
+// HasChildren 允许添加子元素
+type HasChildren interface {
+	Add(values ...Element)
+	Element
+}
+
+// WithAny 对 any 元素进行处理
+func WithAny(a *Any, fn func(*Any)) *Any {
+	fn(a)
+	return a
+}
+
 // Any 一块 HTML 内容
 type Any struct {
 	// Tag 标签名称，必填，如 div
@@ -76,6 +88,11 @@ type Any struct {
 	// SelfClose 当前标签是否自关闭,默认为 false
 	// 如 img 标签就是自关闭的：<img src="/a.jpg"/>
 	SelfClose bool
+}
+
+// Add 添加子元素
+func (c *Any) Add(values ...Element) {
+	c.Body.Add(values...)
 }
 
 // HTML 实现 Element 接口
@@ -107,4 +124,9 @@ func (c Comment) HTML() ([]byte, error) {
 	bw := newBufWriter()
 	bw.Write("<!-- ", html.EscapeString(string(c)), " -->\n")
 	return bw.HTML()
+}
+
+// Add 给指定的对象添加子元素
+func Add(to HasChildren, add ...Element) {
+	to.Add(add...)
 }

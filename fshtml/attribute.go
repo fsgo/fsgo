@@ -211,7 +211,11 @@ func findOrCreateAttr(w AttrsMapper, key string, sep string) *Attr {
 
 // SetAttr 设置属性值
 func SetAttr(w AttrsMapper, key string, value ...string) {
-	findOrCreateAttr(w, key, " ").Set(value...)
+	if len(value) == 1 && len(value[0]) == 0 {
+		DeleteAttr(w, key)
+	} else {
+		findOrCreateAttr(w, key, " ").Set(value...)
+	}
 }
 
 // SetAttrNoValue 设置只有 key，不需要 value 的属性
@@ -351,6 +355,15 @@ func SetChecked(w AttrsMapper, checked bool) {
 		SetAttr(w, "checked", "checked")
 	} else {
 		DeleteAttr(w, "checked")
+	}
+}
+
+// SetSelected 设置 selected 属性
+func SetSelected(w AttrsMapper, checked bool) {
+	if checked {
+		SetAttr(w, "selected", "selected")
+	} else {
+		DeleteAttr(w, "selected")
 	}
 }
 

@@ -125,7 +125,7 @@ func TestScript(t *testing.T) {
 
 func TestInput(t *testing.T) {
 	t.Run("text", func(t *testing.T) {
-		a := fshtml.NewInput("text")
+		a := fshtml.NewInput("text", "")
 		fshtml.SetValue(a, "hello")
 		fshtml.SetOnChange(a, `alter("ok")`)
 		got, err := a.HTML()

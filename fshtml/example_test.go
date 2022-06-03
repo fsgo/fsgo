@@ -29,3 +29,19 @@ func ExampleNewOl() {
 	// Output:
 	// <ol style="width:180px; height:20px"><li>1</li><li>2</li><li>3</li></ol>
 }
+
+func ExampleNewHTML() {
+	h := fshtml.NewHTML()
+	fshtml.Add(h,
+		fshtml.WithAny(fshtml.NewHead(), func(a *fshtml.Any) {
+			fshtml.Add(a, fshtml.NewTitle(fshtml.Text("hello")))
+		}),
+		fshtml.WithAny(fshtml.NewBody(), func(a *fshtml.Any) {
+			fshtml.Add(a, fshtml.Text("Hello World"))
+		}),
+	)
+	got, _ := h.HTML()
+	fmt.Println(string(got))
+	// Output:
+	// <html><head><title>hello</title></head><body>Hello World</body></html>
+}

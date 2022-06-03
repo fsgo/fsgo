@@ -4,7 +4,11 @@
 
 package fshtml
 
-// Bytes 将 []byte 转换为 Code类型
+import (
+	"html"
+)
+
+// Bytes 将 []byte 转换为 Element 类型
 type Bytes []byte
 
 // HTML 实现 Element 接口
@@ -12,7 +16,15 @@ func (b Bytes) HTML() ([]byte, error) {
 	return b, nil
 }
 
-// String 将 String 转换为 Code类型
+// Text 文本，输出的时候会自动调用 html.EscapeString
+type Text String
+
+// HTML 实现 Element 接口
+func (b Text) HTML() ([]byte, error) {
+	return []byte(html.EscapeString(string(b))), nil
+}
+
+// String 将 String 转换为 Element 类型，html 内容会原样输出
 type String string
 
 // HTML 实现 Element 接口
@@ -20,7 +32,7 @@ func (s String) HTML() ([]byte, error) {
 	return []byte(s), nil
 }
 
-// StringSlice 将 []string 转换为 Code类型
+// StringSlice 将 []string 转换为 Element 类型
 type StringSlice []string
 
 // ToElements 转换为 字段 tag 的 []Element

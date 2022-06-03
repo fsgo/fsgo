@@ -7,6 +7,29 @@
 
 package fshtml
 
+// NewHTML html 标签
+func NewHTML() *Any {
+	return NewAny("html")
+}
+
+// NewHead 创建一个 <head>
+func NewHead() *Any {
+	return NewAny("head")
+}
+
+// NewTitle 创建一个 <title>
+func NewTitle(c Element) *Any {
+	return &Any{
+		Tag:  "title",
+		Body: ToElements(c),
+	}
+}
+
+// NewBody 创建一个 <body>
+func NewBody() *Any {
+	return NewAny("body")
+}
+
 // NewDiv 创建一个 <div>
 func NewDiv() *Any {
 	return NewAny("div")
@@ -20,16 +43,6 @@ func NewNav() *Any {
 // NewP 创建一个 <p>
 func NewP() *Any {
 	return NewAny("p")
-}
-
-// NewHead 创建一个 <head>
-func NewHead() *Any {
-	return NewAny("head")
-}
-
-// NewBody 创建一个 <body>
-func NewBody() *Any {
-	return NewAny("body")
 }
 
 // NewDL 创建一个 <dl>
@@ -70,8 +83,8 @@ func NewFigure() *Any {
 	return NewAny("figure")
 }
 
-// NewFigcaption 创建一个 <figcaption>
-func NewFigcaption() *Any {
+// NewFigCaption 创建一个 <figcaption>
+func NewFigCaption() *Any {
 	return NewAny("figcaption")
 }
 
@@ -283,12 +296,13 @@ func (a *Link) HTML() ([]byte, error) {
 }
 
 // NewInput 创建一个 input 标签
-func NewInput(tp string) *Any {
+func NewInput(tp string, name string) *Any {
 	input := &Any{
 		Tag:       "input",
 		SelfClose: true,
 	}
 	SetType(input, tp)
+	SetName(input, name)
 	return input
 }
 
@@ -302,7 +316,14 @@ func NewForm(method string, action string) *Any {
 
 // NewSubmit 创建一个 submit 标签
 func NewSubmit(value string) *Any {
-	s := NewInput("submit")
+	s := NewInput("submit", "")
+	SetValue(s, value)
+	return s
+}
+
+// NewButton 创建一个 button 标签
+func NewButton(value string) *Any {
+	s := NewInput("button", "")
 	SetValue(s, value)
 	return s
 }
@@ -326,5 +347,21 @@ func NewLabel(e Element) *Any {
 	return &Any{
 		Tag:  "label",
 		Body: ToElements(e),
+	}
+}
+
+// NewSelect 创建一个 select
+func NewSelect(opts ...Element) *Any {
+	return &Any{
+		Tag:  "select",
+		Body: opts,
+	}
+}
+
+// NewOption 创建一个 option
+func NewOption(value string, b Element) *Any {
+	return &Any{
+		Tag:  "legend",
+		Body: ToElements(b),
 	}
 }
