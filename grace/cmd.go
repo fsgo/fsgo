@@ -6,34 +6,38 @@ package grace
 
 import (
 	"context"
-	"os/exec"
 	"syscall"
 	"time"
 )
 
-func cmdExited(cmd *exec.Cmd) bool {
-	if cmd.ProcessState != nil && cmd.ProcessState.Exited() {
-		return true
+//
+// https://man7.org/linux/man-pages/man2/kill.2.html
+// If sig is 0, then no signal is sent, but existence and permission
+// checks are still performed; this can be used to check for the
+// existence of a process ID or process worker ID that the caller is
+// permitted to signal.
+func pidExists(pid int) bool {
+	if pid == 0 {
+		return false
 	}
-	return false
+	return syscall.Kill(pid, syscall.Signal(0)) == nil
 }
 
 // stopCmd 停止指定 cmd
-func stopCmd(ctx context.Context, cmd *exec.Cmd) error {
-	if cmd == nil {
+func stopCmd(ctx context.Context, pid int) error {
+	if pid == 0 {
 		return nil
 	}
-
-	if cmdExited(cmd) {
+	if !pidExists(pid) {
 		return nil
 	}
 
 	// 发送信号给子进程，让其退出
-	if err := cmd.Process.Signal(syscall.SIGQUIT); err != nil {
+	if err := syscall.Kill(-pid, syscall.SIGQUIT); err != nil {
 		return err
 	}
 
-	if cmdExited(cmd) {
+	if !pidExists(pid) {
 		return nil
 	}
 
@@ -44,13 +48,12 @@ func stopCmd(ctx context.Context, cmd *exec.Cmd) error {
 	for {
 		select {
 		case <-ctx.Done():
-			if cmdExited(cmd) {
+			if !pidExists(pid) {
 				return nil
 			}
-			// return cmd.Process.Kill()
-			return syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+			return syscall.Kill(-pid, syscall.SIGKILL)
 		case <-time.After(5 * time.Millisecond):
-			if cmdExited(cmd) {
+			if !pidExists(pid) {
 				return nil
 			}
 

@@ -18,12 +18,12 @@ import (
 
 // subProcess 子进程的逻辑
 type subProcess struct {
-	group *Worker
+	worker *Worker
 }
 
 func (sp *subProcess) logit(msgs ...interface{}) {
-	msg := fmt.Sprintf("[grace][worker.process] %s", fmt.Sprint(msgs...))
-	_ = sp.group.main.Logger.Output(2, msg)
+	msg := fmt.Sprintf("[subProcess] %s", fmt.Sprint(msgs...))
+	sp.worker.logitDepth(3, msg)
 }
 
 // Start 子进程的启动逻辑
@@ -38,8 +38,8 @@ func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 		)
 	}()
 
-	errChan := make(chan error, len(sp.group.resources))
-	for _, s := range sp.group.resources {
+	errChan := make(chan error, len(sp.worker.resources))
+	for _, s := range sp.worker.resources {
 		go func(c Consumer) {
 			errChan <- c.Start(ctx)
 		}(s.Consumer)
@@ -61,7 +61,7 @@ func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 		err = fmt.Errorf("exit by signal(%v)", sig)
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, sp.group.getStopTimeout())
+	ctx, cancel := context.WithTimeout(ctx, sp.worker.getStopTimeout())
 	defer cancel()
 
 	_ = sp.Stop(ctx)
@@ -76,8 +76,8 @@ func (sp *subProcess) Stop(ctx context.Context) (errStop error) {
 	}()
 
 	var wg sync.WaitGroup
-	errChains := make(chan error, len(sp.group.resources))
-	for idx, s := range sp.group.resources {
+	errChains := make(chan error, len(sp.worker.resources))
+	for idx, s := range sp.worker.resources {
 		wg.Add(1)
 
 		go func(idx int, res Consumer) {

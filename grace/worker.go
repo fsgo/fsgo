@@ -27,13 +27,12 @@ func NewWorker(cfg *WorkerConfig) *Worker {
 		cfg = &WorkerConfig{}
 	}
 	w := &Worker{
-		option:  cfg,
-		stopped: false,
-		event:   make(chan string, 1),
+		option: cfg,
+		event:  make(chan string, 1),
 	}
 
 	w.sub = &subProcess{
-		group: w,
+		worker: w,
 	}
 
 	stderr := &fsfs.Rotator{
@@ -60,15 +59,18 @@ type resourceAndConsumer struct {
 
 // Worker 工作进程的逻辑
 type Worker struct {
-	main      *Grace
-	option    *WorkerConfig
-	cmd       *exec.Cmd
-	closeFunc context.CancelFunc
+	main   *Grace
+	option *WorkerConfig
+
+	cmd *exec.Cmd
+	pid int // cmd 对应的 pid
+
+	// 创建当前 cmd 是对应的 cancel 反复
+	cmdClose context.CancelFunc
 
 	resources []*resourceAndConsumer
 	mux       sync.Mutex
 	sub       *subProcess
-	stopped   bool
 
 	event chan string
 
@@ -79,6 +81,12 @@ type Worker struct {
 	stdout io.Writer
 
 	nextListenDSNIndex int
+
+	// 是否正在加载进程
+	isReloading bool
+
+	// 用于控制 cmd 子进程的 ctx
+	cmdCtx context.Context
 }
 
 // Register 注册新的消费者
@@ -118,26 +126,47 @@ func (w *Worker) register(c Consumer, res Resource) error {
 
 // mainStart 主进程开启开始
 func (w *Worker) mainStart(ctx context.Context) error {
-	go w.watchChange()
+	start := time.Now()
+	w.logit("worker starting ...")
+	defer func() {
+		dur := time.Since(start)
+		w.logit("worker stopped, start_at= ", start.String(), ", duration=", dur.String())
+	}()
 
-	ctxFork, cancel := context.WithCancel(ctx)
-	defer cancel()
-	w.closeFunc = cancel
+	var cmdCancel context.CancelFunc
+	w.cmdCtx, cmdCancel = context.WithCancel(context.Background())
+	defer cmdCancel()
+
+	ctxWatch, watchCancel := context.WithCancel(context.Background())
+	defer watchCancel()
+	go w.watch(ctxWatch)
 
 	// 启动一个子进程，用于处理请求
-	if err := w.forkAndStart(ctxFork); err != nil {
-		return err
+	err := w.forkAndStart(w.cmdCtx)
+	w.logit("first forkAndStart sub process: ", err)
+	if err != nil {
+		if IsSubProcess() {
+			w.logit("start sub process failed")
+			return err
+		}
+		// 非独立子进程方式，可以忽略错误，以方便后续解除问题后，自动恢复
+		w.logit("start sub process failed, it will retry later")
 	}
 
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR2, syscall.SIGQUIT)
 
+	var stopped bool
+
 	// hold on
 	for {
 		select {
 		case <-ctx.Done():
-			w.stopped = true
+			watchCancel()
+			stopped = true
 			_ = w.stop(context.Background())
+			cmdCancel() // 在 stop 之后，让 cmd 尽量完成优雅退出
+
 			return ctx.Err()
 		case sig := <-ch:
 			w.logit(fmt.Sprintf("receive signal(%v)", sig))
@@ -145,54 +174,68 @@ func (w *Worker) mainStart(ctx context.Context) error {
 			case syscall.SIGINT,
 				syscall.SIGQUIT,
 				syscall.SIGTERM:
-				w.stopped = true
+				stopped = true
+				watchCancel()
 				_ = w.stop(context.Background())
+				cmdCancel() // 在 stop 之后，让 cmd 尽量完成优雅退出
 				return fmt.Errorf("shutdown by signal(%v)", sig)
 			case syscall.SIGUSR2:
-				_ = w.mainReload(context.Background())
+				_ = w.reload(w.cmdCtx)
 			}
 		case e := <-w.event:
 			switch e {
-			case actionSubProcessExit:
-				if !w.stopped {
-					_ = w.keepPrecess(context.Background())
+			case actionKeepSubProcess:
+				if !stopped {
+					_ = w.keepPrecess(w.cmdCtx)
 				}
 			}
 		}
 	}
 }
 
-type watchReloadStats struct {
-	CheckTimes uint64
-	FailTimes  uint64
-	SucTimes   uint64
+type watchStats struct {
+	CheckTimes uint64 // 检查总次数
+	FailTimes  uint64 // 失败总次数
+	SucTimes   uint64 //
 	LastSuc    time.Time
 	LastFail   time.Time
 }
 
-func (rs *watchReloadStats) String() string {
+func (rs *watchStats) String() string {
 	bf, _ := json.Marshal(rs)
 	return string(bf)
 }
 
-func (w *Worker) watchChange() {
+func (w *Worker) watch(ctx context.Context) {
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	oldVersion := w.option.version()
 
 	dur := w.main.Option.GetCheckInterval()
 	tk := time.NewTimer(dur)
-
-	st := &watchReloadStats{}
-
 	defer tk.Stop()
+	st := &watchStats{}
+
 	for range tk.C {
+		if err := ctx.Err(); err != nil {
+			w.logit("[watch] exit by ctx.Err():", err)
+			return
+		}
 		st.CheckTimes++
+
+		var err error
+
 		newVersion := w.option.version()
 		change := oldVersion != newVersion
-		// w.logit("watchChange ",change,oldVersion,newVersion)
-		if change {
-			w.logit("version changed, reload it start...", st.String())
-			err := w.mainReload(context.Background())
-			w.logit("version changed, reload it finish, err=", err)
+		pid := w.getLastPID()
+
+		exists := pidExists(pid)
+
+		if !exists || change {
+			w.logit("[watch] reload it start...", "pid=", pid, ", exists=", exists, ", version_change=", change, ", ", st.String())
+			err = w.reload(w.cmdCtx)
+			w.logit("[watch] reload it finish, err=", err)
 			if err == nil {
 				oldVersion = newVersion
 				st.SucTimes++
@@ -201,6 +244,8 @@ func (w *Worker) watchChange() {
 				st.FailTimes++
 				st.LastFail = time.Now()
 			}
+		} else {
+			w.logit("[watch] not change, pid=", pid, ", version=", newVersion)
 		}
 		tk.Reset(dur)
 	}
@@ -211,8 +256,12 @@ func (w *Worker) subProcessStart(ctx context.Context) error {
 }
 
 func (w *Worker) logit(msgs ...interface{}) {
-	msg := fmt.Sprintf("[grace][worker] %s", fmt.Sprint(msgs...))
-	_ = w.main.Logger.Output(2, msg)
+	w.logitDepth(3, msgs...)
+}
+
+func (w *Worker) logitDepth(depth int, msgs ...interface{}) {
+	msg := fmt.Sprintf("[grace][worker][%s] %s", w.option.Cmd, fmt.Sprint(msgs...))
+	_ = w.main.Logger.Output(depth, msg)
 }
 
 func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
@@ -245,7 +294,7 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 
 	cmdName, args := w.option.getWorkerCmd()
 	cmd := exec.CommandContext(ctx, cmdName, args...)
-	cmd.Dir = w.option.RootDir
+	cmd.Dir = w.option.HomeDir
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	w.logit("fork new sub_process, work_dir=", cmd.Dir, ", cmd=", cmd.String())
@@ -257,29 +306,29 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 	cmd.Stderr = w.stderr
 	cmd.ExtraFiles = files
 	err := cmd.Start()
+	w.logit("cmd.Start, err=", err)
 	if err != nil {
 		return err
 	}
 
-	go func() {
-		start := time.Now()
-		errWait := cmd.Wait()
-		cost := time.Since(start)
-
-		logFiles := make(map[string]interface{})
-		if cmd.Process != nil {
-			logFiles["pid"] = cmd.Process.Pid
-		}
-
-		w.logit("cmd.Wait, error=", errWait, ", duration=", cost, ", sub_process_info=", logFiles)
-		w.event <- actionSubProcessExit
-	}()
-
 	_ = w.withLock(func() error {
 		w.cmd = cmd
+		w.pid = cmd.Process.Pid
 		return nil
 	})
 
+	go func() {
+		start := time.Now()
+		logFiles := make(map[string]interface{})
+		errWait := cmd.Wait()
+		if cmd.Process != nil {
+			logFiles["pid"] = cmd.Process.Pid
+		}
+		cost := time.Since(start)
+
+		w.logit("sub process exit, error=", errWait, ", duration=", cost, ", sub_process_info=", logFiles)
+		w.event <- actionKeepSubProcess
+	}()
 	return nil
 }
 
@@ -289,17 +338,34 @@ func (w *Worker) withLock(fn func() error) error {
 	return fn()
 }
 
+func (w *Worker) subProcessExists() bool {
+	pid := w.getLastPID()
+	if !pidExists(pid) {
+		return false
+	}
+	var ok bool
+	w.withLock(func() error {
+		if w.cmd != nil && w.cmd.ProcessState != nil {
+			ok = !w.cmd.ProcessState.Exited()
+		}
+		return nil
+	})
+	return ok
+}
+
 // keepPrecess 检查检查是否存在
 func (w *Worker) keepPrecess(ctx context.Context) (err error) {
 	w.mux.Lock()
-	lastCmd := w.cmd
 	lastExit := w.lastExit
 	w.mux.Unlock()
-	if !cmdExited(lastCmd) {
+
+	pid := w.getLastPID()
+	if w.subProcessExists() {
+		w.logit("work process exists ", pid)
 		return nil
 	}
 
-	// 避免子进程 不停重启服务导致 CPU 消耗特别高
+	// 避免子进程有异常时， 不停重启服务导致 CPU 消耗特别高
 	if !lastExit.IsZero() && time.Since(lastExit) < time.Second {
 		time.Sleep(time.Second)
 	}
@@ -308,40 +374,66 @@ func (w *Worker) keepPrecess(ctx context.Context) (err error) {
 	w.lastExit = time.Now()
 	w.mux.Unlock()
 
-	// 若进程不存在，则执行reload
-	return w.mainReload(ctx)
+	// 若进程不存在，则执行 reload
+	return w.reload(ctx)
 }
 
-// mainReload 主进程-执行 reload 动作
+func (w *Worker) getLastPID() int {
+	w.mux.Lock()
+	defer w.mux.Unlock()
+	return w.pid
+}
+
+// reload 执行 reload 动作
 //
 // 	1. fork 新子进程
 // 	2. stop 旧的子进程
-func (w *Worker) mainReload(ctx context.Context) (err error) {
-	w.logit("mainReload start")
+func (w *Worker) reload(ctx context.Context) (err error) {
+	// -----------------------------------------------------------------
+	// 添加状态判断，避免多种条件在同时触发 reload
+	w.mux.Lock()
+	isReloading := w.isReloading
+	if !isReloading {
+		w.isReloading = true
+	}
+	w.mux.Unlock()
+	if isReloading {
+		return fmt.Errorf("already in reloading, cannot reload it")
+	}
+
 	defer func() {
-		w.logit("mainReload finish, error=", err)
+		w.mux.Lock()
+		w.isReloading = false
+		w.mux.Unlock()
+	}()
+	// -----------------------------------------------------------------
+
+	w.logit("reload starting ...")
+	defer func() {
+		w.logit("reload finish, error=", err)
 	}()
 
 	if err1 := ctx.Err(); err != nil {
 		return err1
 	}
 
-	lastSubCancel := w.closeFunc
+	lastSubCancel := w.cmdClose
 
-	w.mux.Lock()
-	lastCmd := w.cmd
-	w.mux.Unlock()
+	lastPID := w.getLastPID()
 
 	ctxN, cancel := context.WithCancel(ctx)
-	w.closeFunc = cancel
+	w.cmdClose = cancel
 
 	// 启动新进程
 	if errFork := w.forkAndStart(ctxN); errFork != nil {
 		return errFork
 	}
 
+	time.Sleep(w.getStartWait())
+
 	// 优雅关闭老的子进程
-	_ = w.stopCmd(ctx, lastCmd)
+	err = w.stopCmd(ctx, lastPID)
+	w.logit("stop pid=", lastPID, ", err=", err)
 
 	if lastSubCancel != nil {
 		lastSubCancel()
@@ -350,27 +442,31 @@ func (w *Worker) mainReload(ctx context.Context) (err error) {
 }
 
 // stopCmd 停止指定的cmd
-func (w *Worker) stopCmd(ctx context.Context, cmd *exec.Cmd) error {
-	if cmd == nil {
+func (w *Worker) stopCmd(ctx context.Context, pid int) error {
+	if pid == 0 {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, w.getStopTimeout())
 	defer cancel()
-	return stopCmd(ctx, cmd)
+	return stopCmd(ctx, pid)
 }
 
 func (w *Worker) getStopTimeout() time.Duration {
-	if w.option.StopTimeout > 0 {
-		return time.Duration(w.option.StopTimeout) * time.Millisecond
+	if t := w.option.getStopTimeout(); t > 0 {
+		return t
 	}
 	return w.main.Option.GetStopTimeout()
 }
 
+func (w *Worker) getStartWait() time.Duration {
+	if t := w.option.getStartWait(); t > 0 {
+		return t
+	}
+	return w.main.Option.GetStartWait()
+}
+
 func (w *Worker) stop(ctx context.Context) error {
-	w.mux.Lock()
-	lastCmd := w.cmd
-	w.mux.Unlock()
-	return w.stopCmd(ctx, lastCmd)
+	return w.stopCmd(ctx, w.getLastPID())
 }
 
 // Resource 将配置的 Listen 的第 index 个 元素解析为可传递使用的 Resource

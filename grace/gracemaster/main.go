@@ -10,9 +10,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"os/signal"
 	"path/filepath"
-	"syscall"
 
 	"github.com/fsgo/fsgo/fsfs"
 	"github.com/fsgo/fsgo/grace"
@@ -28,17 +26,8 @@ func main() {
 		log.Fatalf(" load config %q failed, error=%v\n", *confName, err)
 	}
 
-	logger, close := getLogger(cf.LogDir)
-	defer close()
-
-	{
-		fn, err := filepath.Abs(*confName)
-		if err != nil {
-			logger.Fatalf("filepath.Abs(%q) failed, err=%v", *confName, err)
-		}
-		wd := filepath.Dir(filepath.Dir(fn))
-		logger.Println("[grace][master] working dir=", wd)
-	}
+	logger, closeFn := getLogger(cf.LogDir)
+	defer closeFn()
 
 	g := grace.Grace{
 		Option: cf.ToOption(),
@@ -53,14 +42,6 @@ func main() {
 		}
 		_ = g.Register(name, group)
 	}
-
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
-
-	go func() {
-		sig := <-ch
-		logger.Printf("received signal %v, exiting...", sig)
-	}()
 
 	err = g.Start(context.Background())
 	logger.Println("grace_master exit:", err)

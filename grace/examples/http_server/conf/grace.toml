@@ -1,15 +1,15 @@
 StatusDir = "./var/"
 LogDir = "./log/"
 Keep = true
-StopTimeout = 10000
+StopTimeout = "10s"
 
 [Workers.default]
-RootDir="cmds/httpserver/"
+HomeDir="cmds/httpserver/"
 EnvFile = "prepare.sh"
 Listen = [ "tcp@127.0.0.1:8909", "tcp@127.0.0.1:8910" ]
 Cmd = "./http_server"
 CmdArgs=["-conf","../../conf/grace.toml"]
 
 [Workers.sleep]
-RootDir="cmds/"
+HomeDir="cmds/"
 Cmd = "./sleep.sh"

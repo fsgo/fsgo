@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"time"
 
 	"github.com/fsgo/fsconf"
 	"github.com/fsgo/fsenv"
@@ -25,8 +26,8 @@ func NewSimpleConfig() *Config {
 		StatusDir:     filepath.Join(fsenv.AppRootDir(), "var"),
 		LogDir:        fsenv.LogRootDir(),
 		Keep:          true,
-		StopTimeout:   10000, // 10s
-		CheckInterval: 5,
+		StopTimeout:   "10s",
+		CheckInterval: "5s",
 	}
 }
 
@@ -39,8 +40,8 @@ type Config struct {
 	// 每个子进程一个子目录
 	LogDir string
 
-	// StopTimeout 可选，优雅关闭的最长时间，毫秒，若不填写使用默认值  10000
-	StopTimeout int
+	// StopTimeout 可选，优雅关闭的最长时间，若不填写使用默认值  10s
+	StopTimeout string
 
 	// Keep 可选，是否保持子进程一直存在
 	Keep bool
@@ -48,8 +49,11 @@ type Config struct {
 	// Workers 可选，工作进程配置
 	Workers map[string]*WorkerConfig
 
-	// CheckInterval 可选，检查版本的间隔时间,单位秒，默认为 5 秒
-	CheckInterval int
+	// CheckInterval 可选，检查版本的间隔时间，默认为 5s
+	CheckInterval string
+
+	// StartWait 可选，启动新进程后，老进程退出前的等待时间,默认为 3 秒
+	StartWait string
 }
 
 // Parser 解析配置
@@ -82,16 +86,27 @@ func (c *Config) ToOption() *Option {
 		StatusDir:     c.StatusDir,
 		LogDir:        c.LogDir,
 		Keep:          c.Keep,
-		CheckInterval: c.CheckInterval,
+		CheckInterval: c.GetCheckInterval(),
+		StartWait:     c.GetStartWait(),
 	}
 }
 
 // GetStopTimeout 获取配置的停止服务的超时时间
-func (c *Config) GetStopTimeout() int {
-	if c.StopTimeout < 1 {
-		return 10 * 1000
-	}
-	return c.StopTimeout
+func (c *Config) GetStopTimeout() time.Duration {
+	t, _ := time.ParseDuration(c.StopTimeout)
+	return t
+}
+
+// GetCheckInterval 获取检查的间隔时间
+func (c *Config) GetCheckInterval() time.Duration {
+	t, _ := time.ParseDuration(c.CheckInterval)
+	return t
+}
+
+// GetStartWait 获取启动等待间隔
+func (c *Config) GetStartWait() time.Duration {
+	t, _ := time.ParseDuration(c.StartWait)
+	return t
 }
 
 // MustNewWorker 加载配置中指定 name 的 worker
@@ -138,9 +153,9 @@ type WorkerConfig struct {
 	// 允许有 0 个 kv 对
 	EnvFile string
 
-	// RootDir 可选，执行应用程序的根目录
+	// HomeDir 可选，执行应用程序的根目录
 	// Cmd、Watches 对应的文件路径都是相对于此目录的
-	RootDir string
+	HomeDir string
 
 	// LogDir 必填，当前子进程的日志目录
 	LogDir string
@@ -151,11 +166,14 @@ type WorkerConfig struct {
 	// CmdArgs 可选，工作进程 cmd 的其他参数
 	CmdArgs []string
 
-	// StopTimeout  优雅关闭的最长时间，毫秒，若不填写，则使用全局 Config 的
-	StopTimeout int
+	// StopTimeout  优雅关闭的最长时间，若不填写，则使用全局 Config 的
+	StopTimeout string
 
 	// Watches 可选，用于监听版本变化情况的文件列表
 	Watches []string
+
+	// StartWait 可选，启动新进程后，老进程退出前的等待时间,若不填写，则使用全局 Config 的
+	StartWait string
 }
 
 // Parser 解析当前配置
@@ -169,6 +187,16 @@ func (c *WorkerConfig) String() string {
 	return string(bf)
 }
 
+func (c *WorkerConfig) getStartWait() time.Duration {
+	t, _ := time.ParseDuration(c.StartWait)
+	return t
+}
+
+func (c *WorkerConfig) getStopTimeout() time.Duration {
+	t, _ := time.ParseDuration(c.StopTimeout)
+	return t
+}
+
 func statVersion(info os.FileInfo) string {
 	var bf bytes.Buffer
 	bf.WriteString(info.Mode().String())
@@ -178,13 +206,13 @@ func statVersion(info os.FileInfo) string {
 }
 
 func (c *WorkerConfig) getFilePath(p string) string {
-	if c.RootDir == "" {
+	if c.HomeDir == "" {
 		return p
 	}
 	if filepath.IsAbs(p) {
 		return p
 	}
-	return filepath.Join(c.RootDir, p)
+	return filepath.Join(c.HomeDir, p)
 }
 
 func (c *WorkerConfig) getEnvFilePath() string {

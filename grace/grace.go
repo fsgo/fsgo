@@ -28,23 +28,29 @@ const (
 
 	actionSubStart = "sub_process_start"
 
-	actionSubProcessExit = "sub_process_exit"
+	actionKeepSubProcess = "keep_sub_process"
 )
 
 const envActionKey = "fsgo_grace_action"
 
 // Option  grace 的配置选项
 type Option struct {
-	StopTimeout int
-	StatusDir   string
-	LogDir      string
+	// StopTimeout 子进程优雅退出的超时时间
+	StopTimeout time.Duration
+
+	StatusDir string
+
+	LogDir string
 
 	// Keep 是否保持子进程存活
 	// 若为 true，当子进程不存在时，将自动拉起
 	Keep bool
 
 	// 检查版本的间隔时间，默认为 5 秒
-	CheckInterval int
+	CheckInterval time.Duration
+
+	// StartWait 可选，启动新进程后，老进程退出前的等待时间,默认为 3 秒
+	StartWait time.Duration
 }
 
 // Parser 参数解析、检查
@@ -60,7 +66,14 @@ func (c *Option) GetStopTimeout() time.Duration {
 	if c.StopTimeout < 1 {
 		return 10 * time.Second
 	}
-	return time.Duration(c.StopTimeout) * time.Millisecond
+	return c.StopTimeout
+}
+
+func (c *Option) GetStartWait() time.Duration {
+	if c.StartWait > 0 {
+		return c.StartWait
+	}
+	return 3 * time.Second
 }
 
 // GetMainPIDPath 获取主程序的 PID 文件路径
@@ -71,7 +84,7 @@ func (c *Option) GetMainPIDPath() string {
 // GetCheckInterval 获取检查的时间间隔
 func (c *Option) GetCheckInterval() time.Duration {
 	if c.CheckInterval > 0 {
-		return time.Duration(c.CheckInterval) * time.Second
+		return c.CheckInterval
 	}
 	return 5 * time.Second
 }
@@ -84,18 +97,18 @@ type Grace struct {
 	// 将使用默认的使用标准库的log.Writer作为输出
 	Logger *log.Logger
 
-	groups map[string]*Worker
+	workers map[string]*Worker
 }
 
 // Register 注册一个新的 worker
 func (g *Grace) Register(name string, gg *Worker) error {
 	g.init()
-	_, has := g.groups[name]
+	_, has := g.workers[name]
 	if has {
-		return fmt.Errorf("group=%q already exists", name)
+		return fmt.Errorf("worker=%q already exists", name)
 	}
 	gg.main = g
-	g.groups[name] = gg
+	g.workers[name] = gg
 	return nil
 }
 
@@ -115,8 +128,8 @@ func (g *Grace) init() {
 	if err := g.Option.Parser(); err != nil {
 		panic(err.Error())
 	}
-	if g.groups == nil {
-		g.groups = make(map[string]*Worker)
+	if g.workers == nil {
+		g.workers = make(map[string]*Worker)
 	}
 }
 
@@ -129,7 +142,7 @@ func (g *Grace) logit(msgs ...interface{}) {
 func (g *Grace) Start(ctx context.Context) (err error) {
 	startTime := time.Now()
 	defer func() {
-		g.logit("Start() exit, err=", err, ", cost=", time.Since(startTime))
+		g.logit("grace.Start() exit, err=", err, ", cost=", time.Since(startTime))
 	}()
 	g.init()
 	action := actionStart
@@ -167,6 +180,7 @@ func (g *Grace) Start(ctx context.Context) (err error) {
 	}
 }
 
+// mainProcess 找到主进程
 func (g *Grace) mainProcess() (*os.Process, error) {
 	bf, err := ioutil.ReadFile(g.Option.GetMainPIDPath())
 	if err != nil {
@@ -179,6 +193,7 @@ func (g *Grace) mainProcess() (*os.Process, error) {
 	return os.FindProcess(pid)
 }
 
+// fireSignal 给主进程发送信号
 func (g *Grace) fireSignal(sig os.Signal) error {
 	p, err := g.mainProcess()
 	if err != nil {
@@ -187,7 +202,7 @@ func (g *Grace) fireSignal(sig os.Signal) error {
 	return p.Signal(sig)
 }
 
-// actionReceiveStop 发送 stop 信号
+// actionReceiveStop 给主进程 发送 stop 信号，让主进程和子进程都退出
 func (g *Grace) actionReceiveStop() error {
 	p, err := g.mainProcess()
 	if err != nil {
@@ -208,7 +223,7 @@ func (g *Grace) actionReceiveStop() error {
 	for {
 		select {
 		case <-ctx.Done():
-			return p.Kill()
+			return syscall.Kill(-p.Pid, syscall.SIGKILL)
 		case <-time.After(5 * time.Millisecond):
 			_, err1 := g.mainProcess()
 			if err1 != nil {
@@ -224,10 +239,8 @@ func (g *Grace) writePIDFile() error {
 	if err := keepDir(filepath.Dir(pidPath)); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(pidPath, []byte(pidStr), 0644); err != nil {
-		return err
-	}
-	return nil
+	err := ioutil.WriteFile(pidPath, []byte(pidStr), 0644)
+	return err
 }
 
 func (g *Grace) actionMainStart(ctx context.Context) error {
@@ -235,12 +248,17 @@ func (g *Grace) actionMainStart(ctx context.Context) error {
 		os.Remove(g.Option.GetMainPIDPath())
 	}()
 
+	wd, err := os.Getwd()
+	g.logit("[grace][master] working dir=", wd, err)
+	if err != nil {
+		return err
+	}
+
 	if e := g.writePIDFile(); e != nil {
 		return e
 	}
-
-	if len(g.groups) == 0 {
-		return errors.New("no groups to start")
+	if len(g.workers) == 0 {
+		return errors.New("no workers to start")
 	}
 	go g.watchMainPid()
 
@@ -251,7 +269,9 @@ func (g *Grace) watchMainPid() {
 	pidPath := g.Option.GetMainPIDPath()
 	info, _ := os.Stat(pidPath)
 	last := info.ModTime()
+
 	tk := time.NewTicker(1 * time.Second)
+	defer tk.Stop()
 
 	for range tk.C {
 		info1, err := os.Stat(pidPath)
@@ -276,7 +296,7 @@ func (g *Grace) watchMainPid() {
 
 func (g *Grace) workersDo(fn func(w *Worker) error) error {
 	var wg errgroup.Group
-	for _, w := range g.groups {
+	for _, w := range g.workers {
 		w := w
 		wg.Go(func() error {
 			return fn(w)
@@ -294,7 +314,7 @@ func (g *Grace) mainStart(ctx context.Context) error {
 
 func (g *Grace) keepSubProcess(ctx context.Context) (err error) {
 	return g.workersDo(func(w *Worker) error {
-		return w.mainReload(ctx)
+		return w.reload(ctx)
 	})
 }
 
@@ -304,7 +324,7 @@ func (g *Grace) startWorkerProcess(ctx context.Context) error {
 	})
 }
 
-// IsSubProcess 是否子进程
+// IsSubProcess 是否子进程运行模式
 func IsSubProcess() bool {
-	return os.Getenv(envActionKey) != ""
+	return len(os.Getenv(envActionKey)) > 0
 }
