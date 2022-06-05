@@ -197,9 +197,11 @@ func (g *Grace) mainProcess() (*os.Process, error) {
 func (g *Grace) fireSignal(sig os.Signal) error {
 	p, err := g.mainProcess()
 	if err != nil {
-		return nil
+		return err
 	}
-	return p.Signal(sig)
+	err= p.Signal(sig)
+	g.logit("fireSignal to master, master pid=",p.Pid,", Signal=",sig,", err=",err)
+	return err
 }
 
 // actionReceiveStop 给主进程 发送 stop 信号，让主进程和子进程都退出
@@ -210,7 +212,7 @@ func (g *Grace) actionReceiveStop() error {
 	}
 
 	// 给主进程发送 退出信号
-	if err = p.Signal(syscall.SIGQUIT); err != nil {
+	if err = syscall.Kill(-p.Pid, syscall.SIGQUIT); err != nil {
 		return err
 	}
 
@@ -308,7 +310,7 @@ func (g *Grace) workersDo(fn func(w *Worker) error) error {
 // mainStart 主进程开启开始
 func (g *Grace) mainStart(ctx context.Context) error {
 	return g.workersDo(func(w *Worker) error {
-		return w.mainStart(ctx)
+		return w.start(ctx)
 	})
 }
 

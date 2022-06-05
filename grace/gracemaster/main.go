@@ -45,9 +45,21 @@ func main() {
 
 	err = g.Start(context.Background())
 	logger.Println("grace_master exit:", err)
+	if err!=nil{
+		os.Exit(1)
+	}
 }
 
 func getLogger(logDir string) (*log.Logger, func()) {
+	logger := log.Default()
+	logger.SetPrefix(fmt.Sprintf("pid=%d ppid=%d ", os.Getpid(), os.Getppid()))
+	logger.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmsgprefix)
+	
+	// reload,stop 等子命令，直接将日志输出到 stderr 即可
+	if isSubCmd(){
+		return logger, func() {}
+	}
+	
 	lg := &fsfs.Rotator{
 		Path:    filepath.Join(logDir, "grace", "grace.log"),
 		ExtRule: "1hour",
@@ -56,12 +68,16 @@ func getLogger(logDir string) (*log.Logger, func()) {
 	if err := lg.Init(); err != nil {
 		log.Fatalf("init logger failed, error=%v\n", err)
 	}
-
-	logger := log.Default()
+	
 	logger.SetOutput(lg)
-	logger.SetPrefix(fmt.Sprintf("pid=%d ppid=%d ", os.Getpid(), os.Getppid()))
-	logger.SetFlags(log.LstdFlags | log.Lshortfile | log.Lmsgprefix)
 	return logger, func() {
 		_ = lg.Close()
 	}
+}
+
+func isSubCmd()bool{
+	if len(os.Args) > 1{
+		return os.Args[1]=="reload"|| os.Args[1]=="stop"
+	}
+	return false
 }

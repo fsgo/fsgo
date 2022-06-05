@@ -124,8 +124,8 @@ func (w *Worker) register(c Consumer, res Resource) error {
 	return nil
 }
 
-// mainStart 主进程开启开始
-func (w *Worker) mainStart(ctx context.Context) error {
+// start 有主进程调用，worker 开始运行
+func (w *Worker) start(ctx context.Context) error {
 	start := time.Now()
 	w.logit("worker starting ...")
 	defer func() {
@@ -162,14 +162,15 @@ func (w *Worker) mainStart(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			w.logit("receive ctx.Done: ",ctx.Err())
 			watchCancel()
 			stopped = true
 			_ = w.stop(context.Background())
 			cmdCancel() // 在 stop 之后，让 cmd 尽量完成优雅退出
-
 			return ctx.Err()
+			
 		case sig := <-ch:
-			w.logit(fmt.Sprintf("receive signal(%v)", sig))
+			w.logit("receive signal: ", sig)
 			switch sig {
 			case syscall.SIGINT,
 				syscall.SIGQUIT,
@@ -182,7 +183,9 @@ func (w *Worker) mainStart(ctx context.Context) error {
 			case syscall.SIGUSR2:
 				_ = w.reload(w.cmdCtx)
 			}
+			
 		case e := <-w.event:
+			w.logit("receive event:",e)
 			switch e {
 			case actionKeepSubProcess:
 				if !stopped {
@@ -224,6 +227,15 @@ func (w *Worker) watch(ctx context.Context) {
 		}
 		st.CheckTimes++
 
+		w.mux.Lock()
+		isReloading:=w.isReloading
+		w.mux.Unlock()
+		
+		if isReloading{
+			w.logit("[watch] skipped by isReloading")
+			continue
+		}
+		
 		var err error
 
 		newVersion := w.option.version()
@@ -325,7 +337,7 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 			logFiles["pid"] = cmd.Process.Pid
 		}
 		cost := time.Since(start)
-
+		
 		w.logit("sub process exit, error=", errWait, ", duration=", cost, ", sub_process_info=", logFiles)
 		w.event <- actionKeepSubProcess
 	}()
@@ -340,30 +352,28 @@ func (w *Worker) withLock(fn func() error) error {
 
 func (w *Worker) subProcessExists() bool {
 	pid := w.getLastPID()
-	if !pidExists(pid) {
-		return false
-	}
-	var ok bool
-	w.withLock(func() error {
-		if w.cmd != nil && w.cmd.ProcessState != nil {
-			ok = !w.cmd.ProcessState.Exited()
-		}
-		return nil
-	})
-	return ok
+	return pidExists(pid)
 }
 
 // keepPrecess 检查检查是否存在
 func (w *Worker) keepPrecess(ctx context.Context) (err error) {
 	w.mux.Lock()
 	lastExit := w.lastExit
+	isReloading:=w.isReloading
 	w.mux.Unlock()
+	
+	if isReloading{
+		w.logit("[keepPrecess] skipped by isReloading")
+		return nil
+	}
 
 	pid := w.getLastPID()
 	if w.subProcessExists() {
-		w.logit("work process exists ", pid)
+		w.logit("[keepPrecess] work process exists, pid=", pid)
 		return nil
 	}
+	
+	w.logit("[keepPrecess] work process not exists, will reload it, pid=", pid)
 
 	// 避免子进程有异常时， 不停重启服务导致 CPU 消耗特别高
 	if !lastExit.IsZero() && time.Since(lastExit) < time.Second {
@@ -385,6 +395,7 @@ func (w *Worker) getLastPID() int {
 }
 
 // reload 执行 reload 动作
+// 这个方法都是由 master 进程来调用的
 //
 // 	1. fork 新子进程
 // 	2. stop 旧的子进程
@@ -408,7 +419,7 @@ func (w *Worker) reload(ctx context.Context) (err error) {
 	}()
 	// -----------------------------------------------------------------
 
-	w.logit("reload starting ...")
+	w.logit("start reloading  ...")
 	defer func() {
 		w.logit("reload finish, error=", err)
 	}()

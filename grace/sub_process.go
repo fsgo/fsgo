@@ -32,7 +32,7 @@ func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 	start := time.Now()
 	defer func() {
 		cost := time.Since(start)
-		sp.logit("Start finish, error=", errLast,
+		sp.logit("Exit, error=", errLast,
 			", start_at=", start.Format("2006-01-02 15:04:05"),
 			", duration=", cost,
 		)
