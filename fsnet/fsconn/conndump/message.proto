@@ -3,28 +3,44 @@ package conndump;
 
 option go_package ="../conndump";
 
-message Message {
-   // 消息分组 id，用于区分是否同一个数据流
-   int64 GID = 1;
 
-   // 消息 iD，同一个 GID 内，依次递增
-   int64 ID =2;
+// MessageAction 消息类型
+enum MessageAction {
+   Unknown=0;
+       
+   // 调用 Read 方法的行为
+   Read  = 1; 
+   
+   // 调用 Write 方法的行为
+   Write = 2;
+   
+   // 调用 Close 方法的行为
+   Close = 3;
+}
+
+// Message net.Conn 一次读写(调用一次 Read 或者 Write 方法)的内容
+message Message {
+   // 消息 ID，累计递增
+   int64 ID =1;
+
+   // 消息行为类型
+   MessageAction Action=2;
+   
+   // 所属服务的名称
+   string Service =3;
+       
+   // 消息分组 id，用于区分是否同一个数据流
+   int64 Group = 4;
+
+   // 消息 iD，同一个 Group 内，依次递增
+   int64 GID =5;
    
    // 消息的目的地址
-   string Addr = 3;
+   string Addr = 6;
 
    // 消息的时间
-   int64 Time=4;
-
-   enum Type {
-      Request  = 0;
-      Response = 1;
-      Close = 2;
-   }
-   
-   // 是否 Request 还是 Response
-   Type type=5;
+   int64 Time=7;
 
    // 消息内容
-   bytes  payload= 7; 
+   bytes  Payload= 8; 
 };

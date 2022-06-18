@@ -63,6 +63,7 @@ var _ HasRaw = (*connWithIt)(nil)
 
 type connWithIt struct {
 	raw net.Conn
+
 	// 包好了全局和创建时传入的拦截器
 	allIts interceptors
 
@@ -104,4 +105,52 @@ func (c *connWithIt) SetReadDeadline(t time.Time) error {
 
 func (c *connWithIt) SetWriteDeadline(t time.Time) error {
 	return c.allIts.CallSetWriteDeadline(c.raw, t, c.raw.SetWriteDeadline, 0)
+}
+
+// HasService 用于判断是否有服务名
+type HasService interface {
+	// Service 服务名
+	Service() any
+}
+
+func WithService(service any, c net.Conn) net.Conn {
+	if ws, ok := c.(HasService); ok && ws.Service() == service {
+		return c
+	}
+	return &withService{
+		service: service,
+		Conn:    c,
+	}
+}
+
+var _ HasRaw = (*withService)(nil)
+
+type withService struct {
+	service any
+	net.Conn
+}
+
+func (c *withService) RawConn() net.Conn {
+	return c.Conn
+}
+
+func (c *withService) Service() any {
+	return c.service
+}
+
+// Service 读取连接的 service 属性
+func Service(c net.Conn) any {
+	for {
+		if c == nil {
+			return nil
+		}
+		if ws, ok := c.(HasService); ok {
+			return ws.Service()
+		}
+		if c1, ok := c.(HasRaw); ok {
+			c = c1.RawConn()
+		} else {
+			return nil
+		}
+	}
 }

@@ -14,6 +14,7 @@ import (
 )
 
 var gid = flag.Int64("gid", 0, "filter only which gid")
+var service = flag.String("s", "", "filter only which service")
 
 // Usage:
 // cat all messages:
@@ -37,11 +38,26 @@ func catFile(fp string) {
 	}
 
 	conndump.Scan(f, func(msg *conndump.Message) bool {
-		if *gid > 0 {
+		if filter(msg) {
+			// 满足筛选条件的则只输出消息体，可直接将内容发送给 server 用于重放
 			_, _ = os.Stdout.Write(msg.GetPayload())
 		} else {
 			fmt.Println(msg.String())
 		}
 		return true
 	})
+}
+
+func filter(msg *conndump.Message) bool {
+	if *gid < 0 {
+		return false
+	}
+	if *gid > 0 && *gid != msg.GetGID() {
+		return false
+	}
+
+	if len(*service) > 0 && *service != msg.GetService() {
+		return false
+	}
+	return true
 }

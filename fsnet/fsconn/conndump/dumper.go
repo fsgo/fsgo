@@ -6,6 +6,7 @@ package conndump
 
 import (
 	"encoding/binary"
+	"fmt"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -45,9 +46,9 @@ func (d *Dumper) init() error {
 	d.conns = make(map[fsconn.Info]*connInfo)
 
 	d.it = &fsconn.Interceptor{
-		AfterWrite: d.dumpRequest,
-		AfterRead:  d.dumpResponse,
-		AfterClose: d.dumpFinish,
+		AfterWrite: d.dumpWrite,
+		AfterRead:  d.dumpRead,
+		AfterClose: d.dumpClose,
 	}
 
 	d.outFile = &fsfs.Rotator{
@@ -82,23 +83,23 @@ func (d *Dumper) EnableResponse(enable bool) {
 	d.enableResponse.SetEnable(enable)
 }
 
-// dumpRequest dump conn 里写出的数据(request)
-func (d *Dumper) dumpRequest(conn fsconn.Info, b []byte, size int, err error) {
+// dumpWrite dump conn 里写出的数据(request)
+func (d *Dumper) dumpWrite(conn fsconn.Info, b []byte, size int, err error) {
 	if !d.enableRequest.IsEnable() {
 		return
 	}
-	d.doDump(conn, b, size, Message_Request)
+	d.doDump(conn, b, size, MessageAction_Write)
 }
 
-// dumpResponse dump conn 里收到的数据(response)
-func (d *Dumper) dumpResponse(conn fsconn.Info, b []byte, size int, err error) {
+// dumpRead dump conn 里收到的数据(response)
+func (d *Dumper) dumpRead(conn fsconn.Info, b []byte, size int, err error) {
 	if !d.enableResponse.IsEnable() {
 		return
 	}
-	d.doDump(conn, b, size, Message_Response)
+	d.doDump(conn, b, size, MessageAction_Read)
 }
 
-func (d *Dumper) doDump(conn fsconn.Info, b []byte, size int, tp Message_Type) {
+func (d *Dumper) doDump(conn fsconn.Info, b []byte, size int, tp MessageAction) {
 	ci := d.getConnInfo(conn)
 	msg := ci.newMessage(b, size, tp)
 	d.writeMessage(msg)
@@ -134,20 +135,20 @@ func (d *Dumper) getConnInfo(conn fsconn.Info) *connInfo {
 		return info
 	}
 	info = &connInfo{
-		gid:  d.nextGID(),
-		Conn: conn,
+		groupID: d.nextGID(),
+		Conn:    conn,
 	}
 	d.conns[conn] = info
 	return info
 }
 
-func (d *Dumper) dumpFinish(conn fsconn.Info, _ error) {
-	ci := d.getConnInfo(conn)
-	msg := ci.newMessage(nil, 0, Message_Close)
+func (d *Dumper) dumpClose(info fsconn.Info, _ error) {
+	ci := d.getConnInfo(info)
+	msg := ci.newMessage(nil, 0, MessageAction_Close)
 	d.writeMessage(msg)
 	d.connsMux.Lock()
 	defer d.connsMux.Unlock()
-	delete(d.conns, conn)
+	delete(d.conns, info)
 }
 
 func (d *Dumper) Stop() {
@@ -157,21 +158,38 @@ func (d *Dumper) Stop() {
 }
 
 type connInfo struct {
-	Conn fsconn.Info
-	gid  int64
-	id   int64
+	Conn      fsconn.Info
+	groupID   int64
+	idInGroup int64
 }
 
-func (in *connInfo) newMessage(b []byte, size int, tp Message_Type) *Message {
+var msgID int64
+
+func (in *connInfo) newMessage(b []byte, size int, tp MessageAction) *Message {
 	msg := &Message{
-		ID:   atomic.AddInt64(&in.id, 1),
-		GID:  in.gid,
-		Addr: in.Conn.RemoteAddr().String(),
-		Time: time.Now().UnixNano(),
-		Type: tp,
+		ID:      atomic.AddInt64(&msgID, 1),
+		Service: in.service(),
+		Group:   in.groupID,
+		GID:     atomic.AddInt64(&in.idInGroup, 1),
+		Addr:    in.Conn.RemoteAddr().String(),
+		Time:    time.Now().UnixNano(),
+		Action:  tp,
 	}
 	if size > 0 {
 		msg.Payload = b[:size]
 	}
 	return msg
+}
+
+func (in *connInfo) service() string {
+	if ws, ok := in.Conn.(fsconn.HasService); ok {
+		service := ws.Service()
+		switch v := service.(type) {
+		case string:
+			return v
+		default:
+			return fmt.Sprint(v)
+		}
+	}
+	return ""
 }
