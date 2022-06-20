@@ -135,8 +135,8 @@ func (d *Dumper) getConnInfo(conn fsconn.Info) *connInfo {
 		return info
 	}
 	info = &connInfo{
-		groupID: d.nextGID(),
-		Conn:    conn,
+		connID: d.nextGID(),
+		Conn:   conn,
 	}
 	d.conns[conn] = info
 	return info
@@ -158,9 +158,9 @@ func (d *Dumper) Stop() {
 }
 
 type connInfo struct {
-	Conn      fsconn.Info
-	groupID   int64
-	idInGroup int64
+	Conn     fsconn.Info
+	connID   int64
+	subGroup int64
 }
 
 var msgID int64
@@ -169,8 +169,8 @@ func (in *connInfo) newMessage(b []byte, size int, tp MessageAction) *Message {
 	msg := &Message{
 		ID:      atomic.AddInt64(&msgID, 1),
 		Service: in.service(),
-		Group:   in.groupID,
-		GID:     atomic.AddInt64(&in.idInGroup, 1),
+		ConnID:  in.connID,
+		SubID:   atomic.AddInt64(&in.subGroup, 1),
 		Addr:    in.Conn.RemoteAddr().String(),
 		Time:    time.Now().UnixNano(),
 		Action:  tp,

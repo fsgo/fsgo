@@ -29,11 +29,11 @@ message Message {
    // 所属服务的名称
    string Service =3;
        
-   // 消息分组 id，用于区分是否同一个数据流
-   int64 Group = 4;
+   // 连接(net.Conn) ID，用于区分是否同一个数据流
+   int64 ConnID = 4;
 
-   // 消息 iD，同一个 Group 内，依次递增
-   int64 GID =5;
+   // 消息 iD，同一个 ConnID 内，依次递增
+   int64 SubID =5;
    
    // 消息的目的地址
    string Addr = 6;

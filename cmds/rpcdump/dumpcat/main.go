@@ -13,15 +13,15 @@ import (
 	"github.com/fsgo/fsgo/fsnet/fsconn/conndump"
 )
 
-var gid = flag.Int64("gid", 0, "filter only which gid")
+var cid = flag.Int64("cid", 0, "filter only which conn ID")
 var service = flag.String("s", "", "filter only which service")
 
 // Usage:
 // cat all messages:
 // dumpcat dump.pb.202205222200
 //
-// cat gid=1's messages:
-// dumpcat -gid=1 dump.pb.202205222200
+// cat cid=1's messages:
+// dumpcat -cid=1 dump.pb.202205222200
 func main() {
 	flag.Parse()
 
@@ -49,10 +49,10 @@ func catFile(fp string) {
 }
 
 func filter(msg *conndump.Message) bool {
-	if *gid < 0 {
+	if *cid < 0 {
 		return false
 	}
-	if *gid > 0 && *gid != msg.GetGID() {
+	if *cid > 0 && *cid != msg.GetConnID() {
 		return false
 	}
 
