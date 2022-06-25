@@ -13,8 +13,9 @@ import (
 	"github.com/fsgo/fsgo/fsnet/fsconn/conndump"
 )
 
-var cid = flag.Int64("cid", 0, "filter only which conn ID")
+var cid = flag.Int64("cid", -1, "filter only which conn ID")
 var service = flag.String("s", "", "filter only which service")
+var detail = flag.Bool("d", true, "print detail data")
 
 // Usage:
 // cat all messages:
@@ -39,8 +40,13 @@ func catFile(fp string) {
 
 	conndump.Scan(f, func(msg *conndump.Message) bool {
 		if filter(msg) {
-			// 满足筛选条件的则只输出消息体，可直接将内容发送给 server 用于重放
+			if *detail {
+				fmt.Println(msg.String())
+			}
 			_, _ = os.Stdout.Write(msg.GetPayload())
+			if *detail {
+				fmt.Println()
+			}
 		} else {
 			fmt.Println(msg.String())
 		}

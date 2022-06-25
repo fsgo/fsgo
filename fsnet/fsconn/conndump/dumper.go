@@ -7,6 +7,7 @@ package conndump
 import (
 	"encoding/binary"
 	"fmt"
+	"net"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
@@ -68,6 +69,7 @@ func (d *Dumper) init() error {
 	return nil
 }
 
+// Interceptor 返回 conn Interceptor
 func (d *Dumper) Interceptor() *fsconn.Interceptor {
 	if err := d.init(); err != nil {
 		panic(err)
@@ -75,12 +77,28 @@ func (d *Dumper) Interceptor() *fsconn.Interceptor {
 	return d.it
 }
 
+// DumpRead 设置是否允许 dump Read 的数据
 func (d *Dumper) DumpRead(enable bool) {
 	d.readStatus.SetEnable(enable)
 }
 
+// DumpWrite 设置是否允许 dump Write 的数据
 func (d *Dumper) DumpWrite(enable bool) {
 	d.writeStatus.SetEnable(enable)
+}
+
+// WrapListener 封装一个 Listener，使得使用这个 Listener 的所有流量都支持 dump
+func (d *Dumper) WrapListener(name string, l net.Listener) net.Listener {
+	nl := &fsconn.Listener{
+		Listener: l,
+		AfterAccepts: []func(conn net.Conn) (net.Conn, error){
+			func(conn net.Conn) (net.Conn, error) {
+				c := fsconn.WithService(name, conn)
+				return fsconn.WithInterceptor(c, d.Interceptor()), nil
+			},
+		},
+	}
+	return nl
 }
 
 // dumpWrite dump conn 里写出的数据
@@ -159,6 +177,7 @@ func (d *Dumper) dumpClose(info fsconn.Info, _ error) {
 	delete(d.conns, info)
 }
 
+// Stop 停止
 func (d *Dumper) Stop() {
 	d.DumpRead(false)
 	d.DumpWrite(false)

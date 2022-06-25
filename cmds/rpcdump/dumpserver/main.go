@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/fsgo/fsgo/fsfs"
-	"github.com/fsgo/fsgo/fsnet/fsconn"
 	"github.com/fsgo/fsgo/fsnet/fsconn/conndump"
 )
 
@@ -28,7 +27,7 @@ func main() {
 	if err != nil {
 		log.Fatalln("listen failed:", err)
 	}
-	log.Println("dump server listen at:", l.Addr().String())
+	log.Println("dump server listen at:", l.Addr().String(), "dump data dir:", *out)
 
 	log.Fatalln("server exit:", startDumpServer(l))
 }
@@ -41,9 +40,10 @@ func startDumpServer(l net.Listener) error {
 		},
 	}
 
+	l = dm.WrapListener("ds", l)
+
 	handler := func(conn net.Conn) {
 		log.Println("connect:", conn.RemoteAddr())
-		conn = fsconn.WithInterceptor(conn, dm.Interceptor())
 		defer conn.Close()
 		n, err := io.Copy(ioutil.Discard, conn)
 		log.Println("disconnect:", conn.RemoteAddr(), "read=", n, "err=", err)
