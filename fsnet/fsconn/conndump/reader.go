@@ -32,3 +32,50 @@ func Scan(rd io.Reader, fn func(msg *Message) bool) error {
 		}
 	}
 }
+
+type ChanScanner struct {
+	Filter   func(msg *Message) bool
+	Receiver func(<-chan *Message) bool
+
+	chs map[int64]chan *Message
+}
+
+func (cs *ChanScanner) Scan(rd io.Reader) error {
+	if cs.chs == nil {
+		cs.chs = make(map[int64]chan *Message, 128)
+	}
+	err := Scan(rd, func(msg *Message) bool {
+		if !cs.Filter(msg) {
+			return true
+		}
+		connID := msg.GetConnID()
+		c, has := cs.chs[connID]
+		if has {
+			c <- msg
+			if msg.GetAction() == MessageAction_Close {
+				delete(cs.chs, connID)
+				close(c)
+			}
+			return true
+		}
+
+		// 不正常的数据，没有 Read 和 Write，直接来了一个 Close，则忽略掉
+		if msg.GetAction() == MessageAction_Close {
+			return true
+		}
+		c = make(chan *Message, 128)
+		c <- msg
+		cs.chs[connID] = c
+		return cs.Receiver(c)
+	})
+	return err
+}
+
+func (cs *ChanScanner) Close() {
+	if len(cs.chs) == 0 {
+		return
+	}
+	for _, c := range cs.chs {
+		close(c)
+	}
+}

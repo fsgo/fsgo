@@ -44,6 +44,7 @@ func startDumpServer(l net.Listener) error {
 	handler := func(conn net.Conn) {
 		log.Println("connect:", conn.RemoteAddr())
 		conn = fsconn.WithInterceptor(conn, dm.Interceptor())
+		defer conn.Close()
 		n, err := io.Copy(ioutil.Discard, conn)
 		log.Println("disconnect:", conn.RemoteAddr(), "read=", n, "err=", err)
 	}

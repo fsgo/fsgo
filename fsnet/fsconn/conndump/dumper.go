@@ -27,11 +27,11 @@ type Dumper struct {
 	// RotatorConfig 可选，用于配置 dump 的 Rotator
 	RotatorConfig func(r *fsfs.Rotator)
 
-	it             *fsconn.Interceptor
-	enableRequest  fstypes.EnableStatus
-	enableResponse fstypes.EnableStatus
+	it          *fsconn.Interceptor
+	readStatus  fstypes.EnableStatus
+	writeStatus fstypes.EnableStatus
 
-	gid     int64
+	connID  int64
 	outFile *fsfs.Rotator
 
 	conns    map[fsconn.Info]*connInfo
@@ -75,32 +75,32 @@ func (d *Dumper) Interceptor() *fsconn.Interceptor {
 	return d.it
 }
 
-func (d *Dumper) EnableRequest(enable bool) {
-	d.enableRequest.SetEnable(enable)
+func (d *Dumper) DumpRead(enable bool) {
+	d.readStatus.SetEnable(enable)
 }
 
-func (d *Dumper) EnableResponse(enable bool) {
-	d.enableResponse.SetEnable(enable)
+func (d *Dumper) DumpWrite(enable bool) {
+	d.writeStatus.SetEnable(enable)
 }
 
-// dumpWrite dump conn 里写出的数据(request)
+// dumpWrite dump conn 里写出的数据
 func (d *Dumper) dumpWrite(conn fsconn.Info, b []byte, size int, err error) {
-	if !d.enableRequest.IsEnable() {
+	if err != nil || !d.writeStatus.IsEnable() {
 		return
 	}
-	d.doDump(conn, b, size, MessageAction_Write)
+	d.doDumpReadWrite(conn, b, size, MessageAction_Write)
 }
 
-// dumpRead dump conn 里收到的数据(response)
+// dumpRead dump conn 里收到的数据
 func (d *Dumper) dumpRead(conn fsconn.Info, b []byte, size int, err error) {
-	if !d.enableResponse.IsEnable() {
+	if err != nil || !d.readStatus.IsEnable() {
 		return
 	}
-	d.doDump(conn, b, size, MessageAction_Read)
+	d.doDumpReadWrite(conn, b, size, MessageAction_Read)
 }
 
-func (d *Dumper) doDump(conn fsconn.Info, b []byte, size int, tp MessageAction) {
-	ci := d.getConnInfo(conn)
+func (d *Dumper) doDumpReadWrite(conn fsconn.Info, b []byte, size int, tp MessageAction) {
+	ci := d.getConnInfo(conn, true)
 	msg := ci.newMessage(b, size, tp)
 	d.writeMessage(msg)
 }
@@ -116,26 +116,28 @@ func (d *Dumper) writeMessage(msg proto.Message) {
 	_, _ = d.outFile.Write(b1)
 }
 
-func (d *Dumper) nextGID() int64 {
-	return atomic.AddInt64(&d.gid, 1)
+func (d *Dumper) nextConnID() int64 {
+	return atomic.AddInt64(&d.connID, 1)
 }
 
-func (d *Dumper) getConnInfo(conn fsconn.Info) *connInfo {
+func (d *Dumper) getConnInfo(conn fsconn.Info, create bool) *connInfo {
 	d.connsMux.RLock()
 	info := d.conns[conn]
 	d.connsMux.RUnlock()
-	if info != nil {
+
+	if info != nil || !create {
 		return info
 	}
 
 	d.connsMux.Lock()
 	defer d.connsMux.Unlock()
+
 	info = d.conns[conn]
 	if info != nil {
 		return info
 	}
 	info = &connInfo{
-		connID: d.nextGID(),
+		connID: d.nextConnID(),
 		Conn:   conn,
 	}
 	d.conns[conn] = info
@@ -143,17 +145,23 @@ func (d *Dumper) getConnInfo(conn fsconn.Info) *connInfo {
 }
 
 func (d *Dumper) dumpClose(info fsconn.Info, _ error) {
-	ci := d.getConnInfo(info)
+	ci := d.getConnInfo(info, false)
+	if ci == nil {
+		// 在此之前没有 Read 和 Write，直接 Close 的情况
+		return
+	}
+
 	msg := ci.newMessage(nil, 0, MessageAction_Close)
 	d.writeMessage(msg)
+
 	d.connsMux.Lock()
 	defer d.connsMux.Unlock()
 	delete(d.conns, info)
 }
 
 func (d *Dumper) Stop() {
-	d.EnableRequest(false)
-	d.EnableResponse(false)
+	d.DumpRead(false)
+	d.DumpWrite(false)
 	_ = d.outFile.Close()
 }
 
