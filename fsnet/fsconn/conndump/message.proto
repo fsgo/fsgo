@@ -38,7 +38,7 @@ message Message {
    // 消息的目的地址
    string Addr = 6;
 
-   // 消息的时间
+   // 消息的时间，UnixNano
    int64 Time=7;
 
    // 消息内容
