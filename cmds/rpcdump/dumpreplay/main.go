@@ -19,11 +19,11 @@ import (
 	"github.com/fsgo/fsgo/cmds/rpcdump/internal"
 )
 
-var cid = flag.Int64("cid", 0, "filter only which conn ID")
-var action = flag.String("a", "rwc", "filter action. r: Read,w:Write,c:Close; rc: Read and Close")
-var service = flag.String("s", "", "filter only which service")
-var dist = flag.String("dist", "", "replay data to")
-var conc = flag.Int("conc", 1, "Number of multiple requests to make at a time")
+var connID = flag.Int64("cid", 0, "filter the connID field")
+var action = flag.String("a", "rwc", "filter the action filed. r: Read,w:Write,c:Close; rc: Read and Close")
+var service = flag.String("s", "", "filter the service field")
+var to = flag.String("to", "", "replay data to. can be a net addr, eg 127.0.0.1:8080, default to stdout")
+var conc = flag.Int("conc", 1, "number of multiple requests to make at a time")
 
 // Usage:
 // cat all messages:
@@ -70,10 +70,7 @@ func replayFile(fp string) {
 }
 
 func filter(msg *conndump.Message) bool {
-	if *cid < 0 {
-		return false
-	}
-	if *cid > 0 && *cid != msg.GetConnID() {
+	if *connID > 0 && *connID != msg.GetConnID() {
 		return false
 	}
 
@@ -96,7 +93,7 @@ func replay(msgs <-chan *conndump.Message) {
 func newWriter() *writer {
 	w1 := &writer{
 		Concurrency: *conc,
-		Dist:        *dist,
+		To:        *to,
 		buffers:     map[int64][]*conndump.Message{},
 		distWriter:  map[int64]io.WriteCloser{},
 	}
@@ -107,7 +104,7 @@ func newWriter() *writer {
 }
 
 type writer struct {
-	Dist        string
+	To        string
 	buffers     map[int64][]*conndump.Message
 	distWriter  map[int64]io.WriteCloser
 	Concurrency int
@@ -200,14 +197,14 @@ func (rw *writer) Close() {
 }
 
 func newConn() io.WriteCloser {
-	if len(*dist) == 0 {
+	if len(*to) == 0 {
 		return fsio.NopWriteCloser(os.Stdout)
 	}
 
 	for i := 0; ; i++ {
-		c, err := net.DialTimeout("tcp", *dist, 3*time.Second)
+		c, err := net.DialTimeout("tcp", *to, 3*time.Second)
 		if err != nil {
-			log.Println("connect to ", *dist, "failed:", err)
+			log.Println("connect to ", *to, "failed:", err)
 			if i > 2 {
 				time.Sleep(100 * time.Millisecond)
 			} else if i > 10 {
