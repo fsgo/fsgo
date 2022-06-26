@@ -33,10 +33,12 @@ func main() {
 func startHTTPServer(l net.Listener) error {
 	dm := &conndump.Dumper{
 		DataDir: *out,
-		RotatorConfig: func(r *fsfs.Rotator) {
+		RotatorConfig: func(client bool, r *fsfs.Rotator) {
 			r.MaxFiles = *maxFiles
 		},
 	}
+	dm.DumpAll(true)
+
 	l = dm.WrapListener("http_server", l)
 	hs := &http.Server{
 		Handler: http.HandlerFunc(hello),

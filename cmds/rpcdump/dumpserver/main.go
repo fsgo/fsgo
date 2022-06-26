@@ -35,16 +35,17 @@ func main() {
 func startDumpServer(l net.Listener) error {
 	dm := &conndump.Dumper{
 		DataDir: *out,
-		RotatorConfig: func(r *fsfs.Rotator) {
+		RotatorConfig: func(client bool, r *fsfs.Rotator) {
 			r.MaxFiles = *maxFiles
 		},
 	}
+	dm.DumpAll(true)
 
 	l = dm.WrapListener("ds", l)
 
 	handler := func(conn net.Conn) {
-		log.Println("connect:", conn.RemoteAddr())
 		defer conn.Close()
+		log.Println("connect:", conn.RemoteAddr())
 		n, err := io.Copy(ioutil.Discard, conn)
 		log.Println("disconnect:", conn.RemoteAddr(), "read=", n, "err=", err)
 	}

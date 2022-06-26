@@ -15,9 +15,12 @@ import (
 
 	"github.com/fsgo/fsgo/fsio"
 	"github.com/fsgo/fsgo/fsnet/fsconn/conndump"
+
+	"github.com/fsgo/fsgo/cmds/rpcdump/internal"
 )
 
 var cid = flag.Int64("cid", 0, "filter only which conn ID")
+var action = flag.String("a", "rwc", "filter action. r: Read,w:Write,c:Close; rc: Read and Close")
 var service = flag.String("s", "", "filter only which service")
 var dist = flag.String("dist", "", "replay data to")
 var conc = flag.Int("conc", 1, "Number of multiple requests to make at a time")
@@ -71,6 +74,10 @@ func filter(msg *conndump.Message) bool {
 		return false
 	}
 	if *cid > 0 && *cid != msg.GetConnID() {
+		return false
+	}
+
+	if !internal.IsAction(*action, msg.GetAction()) {
 		return false
 	}
 

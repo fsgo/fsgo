@@ -139,7 +139,7 @@ func (c *withService) Service() any {
 }
 
 // Service 读取连接的 service 属性
-func Service(c net.Conn) any {
+func Service(c Info) any {
 	for {
 		if c == nil {
 			return nil

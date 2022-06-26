@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fsgo/fsenv"
 	"google.golang.org/protobuf/proto"
 
 	"github.com/fsgo/fsgo/fsfs"
@@ -22,69 +23,158 @@ import (
 
 // Dumper 流量 dump
 type Dumper struct {
-	// DataDir 数据存放目录，必填
+	// DataDir 数据存放目录，可选
 	DataDir string
 
 	// RotatorConfig 可选，用于配置 dump 的 Rotator
-	RotatorConfig func(r *fsfs.Rotator)
+	RotatorConfig func(client bool, r *fsfs.Rotator)
 
-	it          *fsconn.Interceptor
-	readStatus  fstypes.EnableStatus
-	writeStatus fstypes.EnableStatus
+	clientIt *fsconn.Interceptor
+	serverIt *fsconn.Interceptor
 
-	connID  int64
-	outFile *fsfs.Rotator
+	clientReadStatus  fstypes.GroupEnableStatus
+	clientWriteStatus fstypes.GroupEnableStatus
+
+	serverReadStatus  fstypes.GroupEnableStatus
+	serverWriteStatus fstypes.GroupEnableStatus
+
+	connID        int64
+	clientOutFile *fsfs.Rotator
+	serverOutFile *fsfs.Rotator
 
 	conns    map[fsconn.Info]*connInfo
 	connsMux sync.RWMutex
+
+	once sync.Once
 }
 
 // Setup 初始化配置
-func (d *Dumper) init() error {
-	if d.it != nil {
-		return nil
-	}
-	d.conns = make(map[fsconn.Info]*connInfo)
+func (d *Dumper) initOnce() error {
+	var err error
+	d.once.Do(func() {
+		d.conns = make(map[fsconn.Info]*connInfo)
 
-	d.it = &fsconn.Interceptor{
-		AfterWrite: d.dumpWrite,
-		AfterRead:  d.dumpRead,
-		AfterClose: d.dumpClose,
-	}
+		d.clientIt = d.newInterceptor(true)
+		d.serverIt = d.newInterceptor(false)
 
-	d.outFile = &fsfs.Rotator{
-		Path:     filepath.Join(d.DataDir, "dump.pb"),
+		if d.serverOutFile, err = d.initOutFile(false); err != nil {
+			return
+		}
+
+		if d.clientOutFile, err = d.initOutFile(true); err != nil {
+			return
+		}
+	})
+	return err
+}
+
+func (d *Dumper) newInterceptor(isClient bool) *fsconn.Interceptor {
+	it := &fsconn.Interceptor{
+		AfterWrite: func(info fsconn.Info, b []byte, wroteSize int, err error) {
+			d.dumpWrite(isClient, info, b, wroteSize, err)
+		},
+		AfterRead: func(info fsconn.Info, b []byte, readSize int, err error) {
+			d.dumpRead(isClient, info, b, readSize, err)
+		},
+		AfterClose: func(info fsconn.Info, err error) {
+			d.dumpClose(isClient, info, err)
+		},
+	}
+	return it
+}
+
+func (d *Dumper) initOutFile(client bool) (*fsfs.Rotator, error) {
+	subDir := "server"
+	if client {
+		subDir = "client"
+	}
+	f := &fsfs.Rotator{
+		Path:     filepath.Join(d.getDataDir(), subDir, "dump.pb"),
 		ExtRule:  "10minute",
 		MaxFiles: 24,
 	}
 
 	if d.RotatorConfig != nil {
-		d.RotatorConfig(d.outFile)
+		d.RotatorConfig(client, f)
 	}
 
-	if err := d.outFile.Init(); err != nil {
-		return err
+	if err := f.Init(); err != nil {
+		return nil, err
 	}
-
-	return nil
+	return f, nil
 }
 
-// Interceptor 返回 conn Interceptor
-func (d *Dumper) Interceptor() *fsconn.Interceptor {
-	if err := d.init(); err != nil {
+func (d *Dumper) getDataDir() string {
+	if len(d.DataDir) != 0 {
+		return d.DataDir
+	}
+	return filepath.Join(fsenv.DataRootDir(), "rpcdump")
+}
+
+// ClientConnInterceptor 返回 client 的 conn Interceptor
+func (d *Dumper) ClientConnInterceptor() *fsconn.Interceptor {
+	if err := d.initOnce(); err != nil {
 		panic(err)
 	}
-	return d.it
+	return d.clientIt
 }
 
-// DumpRead 设置是否允许 dump Read 的数据
-func (d *Dumper) DumpRead(enable bool) {
-	d.readStatus.SetEnable(enable)
+// ServerConnInterceptor 返回 server 的 conn Interceptor
+//
+// 对于 server，建议使用 WrapListener 方法，而不是直接使用这个方法
+func (d *Dumper) ServerConnInterceptor() *fsconn.Interceptor {
+	if err := d.initOnce(); err != nil {
+		panic(err)
+	}
+	return d.serverIt
 }
 
-// DumpWrite 设置是否允许 dump Write 的数据
-func (d *Dumper) DumpWrite(enable bool) {
-	d.writeStatus.SetEnable(enable)
+// DumpClientRead 设置是否允许 dump Read 的数据
+func (d *Dumper) DumpClientRead(name string, enable bool) {
+	d.clientReadStatus.SetEnable(name, enable)
+}
+
+// DumpClientWrite 设置是否允许 dump Write 的数据
+func (d *Dumper) DumpClientWrite(name string, enable bool) {
+	d.clientWriteStatus.SetEnable(name, enable)
+}
+
+// DumpAllClientRead 设置所有的 client 是否允许 dump Read 的数据
+func (d *Dumper) DumpAllClientRead(enable bool) {
+	d.clientReadStatus.SetAllEnable(enable)
+}
+
+// DumpAllClientWrite 设置所有的 client 是否允许 dump Write 的数据
+func (d *Dumper) DumpAllClientWrite(enable bool) {
+	d.clientReadStatus.SetAllEnable(enable)
+}
+
+// DumpServerRead 设置所有 server 是否都允许 dump Read 的数据
+func (d *Dumper) DumpServerRead(name string, enable bool) {
+	d.serverReadStatus.SetEnable(name, enable)
+}
+
+// DumpServerWrite 设置所有 server 是否都允许 dump Write 的数据
+func (d *Dumper) DumpServerWrite(name string, enable bool) {
+	d.serverWriteStatus.SetEnable(name, enable)
+}
+
+// DumpAllServerRead 设置所有 server 是否都允许 dump Read 的数据
+func (d *Dumper) DumpAllServerRead(enable bool) {
+	d.serverReadStatus.SetAllEnable(enable)
+}
+
+// DumpAllServerWrite 设置所有 server 是否都允许 dump Write 的数据
+func (d *Dumper) DumpAllServerWrite(enable bool) {
+	d.serverWriteStatus.SetAllEnable(enable)
+}
+
+// DumpAll 设置所有 server 和 client 是否都允许 dump
+func (d *Dumper) DumpAll(enable bool) {
+	d.DumpAllClientRead(enable)
+	d.DumpAllClientWrite(enable)
+	d.DumpAllServerRead(enable)
+	d.DumpAllServerWrite(enable)
 }
 
 // WrapListener 封装一个 Listener，使得使用这个 Listener 的所有流量都支持 dump
@@ -94,7 +184,7 @@ func (d *Dumper) WrapListener(name string, l net.Listener) net.Listener {
 		AfterAccepts: []func(conn net.Conn) (net.Conn, error){
 			func(conn net.Conn) (net.Conn, error) {
 				c := fsconn.WithService(name, conn)
-				return fsconn.WithInterceptor(c, d.Interceptor()), nil
+				return fsconn.WithInterceptor(c, d.ServerConnInterceptor()), nil
 			},
 		},
 	}
@@ -102,28 +192,48 @@ func (d *Dumper) WrapListener(name string, l net.Listener) net.Listener {
 }
 
 // dumpWrite dump conn 里写出的数据
-func (d *Dumper) dumpWrite(conn fsconn.Info, b []byte, size int, err error) {
-	if err != nil || !d.writeStatus.IsEnable() {
+func (d *Dumper) dumpWrite(isClient bool, conn fsconn.Info, b []byte, size int, err error) {
+	if err != nil {
 		return
 	}
-	d.doDumpReadWrite(conn, b, size, MessageAction_Write)
+	name := service(conn)
+	if isClient {
+		if !d.clientWriteStatus.IsEnable(name) {
+			return
+		}
+	} else {
+		if !d.serverWriteStatus.IsEnable(name) {
+			return
+		}
+	}
+	d.doDumpReadWrite(isClient, conn, b, size, MessageAction_Write)
 }
 
 // dumpRead dump conn 里收到的数据
-func (d *Dumper) dumpRead(conn fsconn.Info, b []byte, size int, err error) {
-	if err != nil || !d.readStatus.IsEnable() {
+func (d *Dumper) dumpRead(isClient bool, conn fsconn.Info, b []byte, size int, err error) {
+	if err != nil {
 		return
 	}
-	d.doDumpReadWrite(conn, b, size, MessageAction_Read)
+	name := service(conn)
+	if isClient {
+		if !d.clientReadStatus.IsEnable(name) {
+			return
+		}
+	} else {
+		if !d.serverReadStatus.IsEnable(name) {
+			return
+		}
+	}
+	d.doDumpReadWrite(isClient, conn, b, size, MessageAction_Read)
 }
 
-func (d *Dumper) doDumpReadWrite(conn fsconn.Info, b []byte, size int, tp MessageAction) {
+func (d *Dumper) doDumpReadWrite(isClient bool, conn fsconn.Info, b []byte, size int, tp MessageAction) {
 	ci := d.getConnInfo(conn, true)
 	msg := ci.newMessage(b, size, tp)
-	d.writeMessage(msg)
+	d.writeMessage(isClient, msg)
 }
 
-func (d *Dumper) writeMessage(msg proto.Message) {
+func (d *Dumper) writeMessage(isClient bool, msg proto.Message) {
 	bf, err := proto.Marshal(msg)
 	if err != nil {
 		return
@@ -131,7 +241,11 @@ func (d *Dumper) writeMessage(msg proto.Message) {
 	b1 := make([]byte, len(bf)+4)
 	binary.LittleEndian.PutUint32(b1, uint32(len(bf)))
 	copy(b1[4:], bf)
-	_, _ = d.outFile.Write(b1)
+	if isClient {
+		_, _ = d.clientOutFile.Write(b1)
+	} else {
+		_, _ = d.serverOutFile.Write(b1)
+	}
 }
 
 func (d *Dumper) nextConnID() int64 {
@@ -162,15 +276,25 @@ func (d *Dumper) getConnInfo(conn fsconn.Info, create bool) *connInfo {
 	return info
 }
 
-func (d *Dumper) dumpClose(info fsconn.Info, _ error) {
+func (d *Dumper) dumpClose(isClient bool, info fsconn.Info, _ error) {
 	ci := d.getConnInfo(info, false)
 	if ci == nil {
 		// 在此之前没有 Read 和 Write，直接 Close 的情况
 		return
 	}
+	name := service(info)
+	if isClient {
+		if !d.clientReadStatus.IsEnable(name) && !d.clientWriteStatus.IsEnable(name) {
+			return
+		}
+	} else {
+		if !d.serverReadStatus.IsEnable(name) && !d.serverWriteStatus.IsEnable(name) {
+			return
+		}
+	}
 
 	msg := ci.newMessage(nil, 0, MessageAction_Close)
-	d.writeMessage(msg)
+	d.writeMessage(isClient, msg)
 
 	d.connsMux.Lock()
 	defer d.connsMux.Unlock()
@@ -179,9 +303,10 @@ func (d *Dumper) dumpClose(info fsconn.Info, _ error) {
 
 // Stop 停止
 func (d *Dumper) Stop() {
-	d.DumpRead(false)
-	d.DumpWrite(false)
-	_ = d.outFile.Close()
+	d.DumpAll(false)
+
+	_ = d.clientOutFile.Close()
+	_ = d.serverOutFile.Close()
 }
 
 type connInfo struct {
@@ -209,14 +334,18 @@ func (in *connInfo) newMessage(b []byte, size int, tp MessageAction) *Message {
 }
 
 func (in *connInfo) service() string {
-	if ws, ok := in.Conn.(fsconn.HasService); ok {
-		service := ws.Service()
-		switch v := service.(type) {
-		case string:
-			return v
-		default:
-			return fmt.Sprint(v)
-		}
+	return service(in.Conn)
+}
+
+func service(conn fsconn.Info) string {
+	name := fsconn.Service(conn)
+	if name == nil {
+		return ""
 	}
-	return ""
+	switch v := name.(type) {
+	case string:
+		return v
+	default:
+		return fmt.Sprint(v)
+	}
 }

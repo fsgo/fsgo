@@ -11,11 +11,18 @@ import (
 	"os"
 
 	"github.com/fsgo/fsgo/fsnet/fsconn/conndump"
+
+	"github.com/fsgo/fsgo/cmds/rpcdump/internal"
 )
 
-var cid = flag.Int64("cid", -1, "filter only which conn ID")
+var connID = flag.Int64("cid", -1, `filter only which conn ID.
+-1 : disable other conditions
+0  : enable other  conditions
+>0 : filter only this connID
+`)
+var action = flag.String("a", "rwc", "filter action. r: Read, w:Write, c:Close; rc: Read and Close")
 var service = flag.String("s", "", "filter only which service")
-var detail = flag.Bool("d", true, "print detail data")
+var detail = flag.Bool("d", true, "print details")
 
 // Usage:
 // cat all messages:
@@ -39,26 +46,31 @@ func catFile(fp string) {
 	}
 
 	conndump.Scan(f, func(msg *conndump.Message) bool {
-		if filter(msg) {
-			if *detail {
-				fmt.Println(msg.String())
-			}
-			_, _ = os.Stdout.Write(msg.GetPayload())
-			if *detail {
-				fmt.Println()
-			}
-		} else {
+		if *connID < 0 {
 			fmt.Println(msg.String())
+			return true
+		}
+
+		if !filter(msg) {
+			return true
+		}
+		if *detail {
+			fmt.Println(msg.String())
+		}
+		_, _ = os.Stdout.Write(msg.GetPayload())
+		if *detail {
+			fmt.Println()
 		}
 		return true
 	})
 }
 
 func filter(msg *conndump.Message) bool {
-	if *cid < 0 {
+	if *connID > 0 && *connID != msg.GetConnID() {
 		return false
 	}
-	if *cid > 0 && *cid != msg.GetConnID() {
+
+	if !internal.IsAction(*action, msg.GetAction()) {
 		return false
 	}
 
