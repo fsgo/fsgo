@@ -89,7 +89,7 @@ func (cs *ChanScanner) receiveMessage(msg *Message) bool {
 	cs.loopID++
 	// 每读取到 1024 条消息，检查一次过期情况
 	if cs.Timeout > 0 && cs.loopID%1024 == 0 {
-		cs.checkTimeout(msg.GetTime())
+		cs.checkTimeout(msg.GetTime().AsTime().UnixNano())
 	}
 	if !cs.doFilter(msg) {
 		return true
@@ -113,7 +113,7 @@ func (cs *ChanScanner) receiveMessage(msg *Message) bool {
 	cs.chs[connID] = c
 
 	if cs.Timeout > 0 {
-		cs.timeouts[connID] = msg.GetTime()
+		cs.timeouts[connID] = msg.GetTime().AsTime().UnixNano()
 	}
 
 	return cs.Receiver(c)

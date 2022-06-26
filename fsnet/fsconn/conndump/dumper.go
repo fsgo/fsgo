@@ -15,6 +15,7 @@ import (
 
 	"github.com/fsgo/fsenv"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/fsgo/fsgo/fsfs"
 	"github.com/fsgo/fsgo/fsnet/fsconn"
@@ -324,7 +325,7 @@ func (in *connInfo) newMessage(b []byte, size int, tp MessageAction) *Message {
 		ConnID:  in.connID,
 		SubID:   atomic.AddInt64(&in.subGroup, 1),
 		Addr:    in.Conn.RemoteAddr().String(),
-		Time:    time.Now().UnixNano(),
+		Time:    timestamppb.New(time.Now()),
 		Action:  tp,
 	}
 	if size > 0 {

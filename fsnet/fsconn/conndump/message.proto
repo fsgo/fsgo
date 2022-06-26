@@ -1,6 +1,8 @@
 syntax = "proto3";
 package conndump;
 
+import "google/protobuf/timestamp.proto";
+
 option go_package ="../conndump";
 
 
@@ -39,7 +41,7 @@ message Message {
    string Addr = 6;
 
    // 消息的时间，UnixNano
-   int64 Time=7;
+   google.protobuf.Timestamp Time=7;
 
    // 消息内容
    bytes  Payload= 8; 
