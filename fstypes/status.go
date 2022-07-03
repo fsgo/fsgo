@@ -83,6 +83,13 @@ func (gs *GroupEnableStatus) SetAllEnable(enable bool) {
 	gs.all.Store(enable)
 }
 
+// Range 遍历所有已设置的值
+func (gs *GroupEnableStatus) Range(fn func(key any, enable bool) bool) {
+	gs.detail.Range(func(key, value any) bool {
+		return fn(key, value.(bool))
+	})
+}
+
 type specKey uint8
 
 const notFoundStatusKey = specKey(0)

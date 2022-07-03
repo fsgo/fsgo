@@ -67,4 +67,22 @@ func TestGroupEnableStatus(t *testing.T) {
 		want = "test:false,*other*:false"
 		require.Equal(t, want, got)
 	})
+
+	t.Run("range", func(t *testing.T) {
+		g := &GroupEnableStatus{
+			Default: true,
+		}
+		g.SetEnable("a", true)
+		g.SetEnable("b", false)
+		got := map[string]bool{}
+		g.Range(func(key any, enable bool) bool {
+			got[key.(string)] = enable
+			return true
+		})
+		want := map[string]bool{
+			"a": true,
+			"b": false,
+		}
+		require.Equal(t, want, got)
+	})
 }
