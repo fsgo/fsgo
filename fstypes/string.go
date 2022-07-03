@@ -14,6 +14,11 @@ import (
 // String 字符串
 type String string
 
+// IntSlice 转换为 []int
+func (s String) IntSlice(sep string) ([]int, error) {
+	return toNumberSlice[int](s, sep, int(0))
+}
+
 // Int8Slice 转换为 []int8
 func (s String) Int8Slice(sep string) ([]int8, error) {
 	return toNumberSlice[int8](s, sep, int8(0))
