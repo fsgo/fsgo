@@ -7,7 +7,6 @@ package internal
 import (
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/fsgo/fsgo/fsnet/fsconn/conndump"
 )
@@ -28,7 +27,6 @@ func FormatMessage(msg *conndump.Message, long bool) string {
 	b.WriteString(msg.GetAddr())
 
 	b.WriteString(" Time:")
-	time.Now().UTC()
 	b.WriteString(msg.GetTime().AsTime().Local().Format("20060102 15:04:05.000"))
 	b.WriteString(" Payload:(")
 	p := msg.GetPayload()

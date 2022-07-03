@@ -6,6 +6,7 @@ package conndump
 
 import (
 	"encoding/binary"
+	"errors"
 	"io"
 	"time"
 
@@ -17,6 +18,9 @@ func Scan(rd io.Reader, fn func(msg *Message) bool) error {
 	head := make([]byte, 4)
 	for {
 		if _, err := io.ReadFull(rd, head); err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
 			return err
 		}
 		length := binary.LittleEndian.Uint32(head)
