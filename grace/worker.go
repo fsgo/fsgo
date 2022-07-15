@@ -162,13 +162,13 @@ func (w *Worker) start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
-			w.logit("receive ctx.Done: ",ctx.Err())
+			w.logit("receive ctx.Done: ", ctx.Err())
 			watchCancel()
 			stopped = true
 			_ = w.stop(context.Background())
 			cmdCancel() // 在 stop 之后，让 cmd 尽量完成优雅退出
 			return ctx.Err()
-			
+
 		case sig := <-ch:
 			w.logit("receive signal: ", sig)
 			switch sig {
@@ -183,9 +183,9 @@ func (w *Worker) start(ctx context.Context) error {
 			case syscall.SIGUSR2:
 				_ = w.reload(w.cmdCtx)
 			}
-			
+
 		case e := <-w.event:
-			w.logit("receive event:",e)
+			w.logit("receive event:", e)
 			switch e {
 			case actionKeepSubProcess:
 				if !stopped {
@@ -220,22 +220,22 @@ func (w *Worker) watch(ctx context.Context) {
 	defer tk.Stop()
 	st := &watchStats{}
 
-	for range tk.C {
+	doCheck := func() bool {
 		if err := ctx.Err(); err != nil {
 			w.logit("[watch] exit by ctx.Err():", err)
-			return
+			return false
 		}
 		st.CheckTimes++
 
 		w.mux.Lock()
-		isReloading:=w.isReloading
+		isReloading := w.isReloading
 		w.mux.Unlock()
-		
-		if isReloading{
+
+		if isReloading {
 			w.logit("[watch] skipped by isReloading")
-			continue
+			return true
 		}
-		
+
 		var err error
 
 		newVersion := w.option.version()
@@ -258,6 +258,12 @@ func (w *Worker) watch(ctx context.Context) {
 			}
 		} else {
 			w.logit("[watch] not change, pid=", pid, ", version=", newVersion)
+		}
+		return true
+	}
+	for range tk.C {
+		if !doCheck() {
+			return
 		}
 		tk.Reset(dur)
 	}
@@ -291,8 +297,9 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 		files[idx] = f
 	}
 
+	// 解析用户自定义的环境变量文件
 	var userEnv []string
-	if envFile := w.option.getEnvFilePath(); envFile != "" {
+	if envFile := w.option.getEnvFilePath(); len(envFile) > 0 {
 		var errParser error
 		userEnv, errParser = envfile.ParserFile(ctx, envFile)
 		w.logit(fmt.Sprintf("parserEvnFile(%q)", w.option.EnvFile), ", gotEnv=", userEnv, ", err=", errParser)
@@ -337,7 +344,7 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 			logFiles["pid"] = cmd.Process.Pid
 		}
 		cost := time.Since(start)
-		
+
 		w.logit("sub process exit, error=", errWait, ", duration=", cost, ", sub_process_info=", logFiles)
 		w.event <- actionKeepSubProcess
 	}()
@@ -359,10 +366,10 @@ func (w *Worker) subProcessExists() bool {
 func (w *Worker) keepPrecess(ctx context.Context) (err error) {
 	w.mux.Lock()
 	lastExit := w.lastExit
-	isReloading:=w.isReloading
+	isReloading := w.isReloading
 	w.mux.Unlock()
-	
-	if isReloading{
+
+	if isReloading {
 		w.logit("[keepPrecess] skipped by isReloading")
 		return nil
 	}
@@ -372,7 +379,7 @@ func (w *Worker) keepPrecess(ctx context.Context) (err error) {
 		w.logit("[keepPrecess] work process exists, pid=", pid)
 		return nil
 	}
-	
+
 	w.logit("[keepPrecess] work process not exists, will reload it, pid=", pid)
 
 	// 避免子进程有异常时， 不停重启服务导致 CPU 消耗特别高

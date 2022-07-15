@@ -28,6 +28,7 @@ const (
 
 	actionSubStart = "sub_process_start"
 
+	// 一个特殊的 event，当子进程退出了，需要创建新进程的时候，发送此信号
 	actionKeepSubProcess = "keep_sub_process"
 )
 
@@ -199,8 +200,8 @@ func (g *Grace) fireSignal(sig os.Signal) error {
 	if err != nil {
 		return err
 	}
-	err= p.Signal(sig)
-	g.logit("fireSignal to master, master pid=",p.Pid,", Signal=",sig,", err=",err)
+	err = p.Signal(sig)
+	g.logit("fireSignal to master, master pid=", p.Pid, ", Signal=", sig, ", err=", err)
 	return err
 }
 
