@@ -81,7 +81,7 @@ func (as *AnyServer) Serve(l net.Listener) error {
 
 		if err != nil {
 			var ne temporary
-			if errors.As(err, ne) && ne.Temporary() {
+			if errors.As(err, &ne) && ne.Temporary() {
 				continue
 			}
 
