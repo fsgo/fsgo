@@ -49,6 +49,10 @@ const (
 
 var ErrShutdown = errors.New("server shutdown")
 
+type temporary interface {
+	Temporary() bool
+}
+
 func (as *AnyServer) Serve(l net.Listener) error {
 	atomic.StoreInt64(&as.status, statusRunning)
 	ctx, cancel := context.WithCancel(context.Background())
@@ -76,7 +80,7 @@ func (as *AnyServer) Serve(l net.Listener) error {
 		}
 
 		if err != nil {
-			var ne *net.OpError
+			var ne temporary
 			if errors.As(err, ne) && ne.Temporary() {
 				continue
 			}
@@ -100,6 +104,7 @@ func (as *AnyServer) Serve(l net.Listener) error {
 }
 
 func (as *AnyServer) handleConn(ctx context.Context, conn net.Conn) {
+	ctx = ContextWithConn(ctx, conn)
 	as.Handler(ctx, conn)
 }
 
