@@ -39,6 +39,10 @@ type AnyServer struct {
 	status      int64
 	closeCancel context.CancelFunc
 	serverExit  chan bool
+	
+	connections map[net.Conn]struct{}
+	listener net.Listener
+	mux sync.RWMutex
 }
 
 const (
@@ -58,6 +62,8 @@ func (as *AnyServer) Serve(l net.Listener) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	as.closeCancel = cancel
 	as.serverExit = make(chan bool, 1)
+	as.listener=l
+	as.connections=make(map[net.Conn]struct{})
 
 	var errResult error
 	var wg sync.WaitGroup
@@ -104,8 +110,26 @@ func (as *AnyServer) Serve(l net.Listener) error {
 }
 
 func (as *AnyServer) handleConn(ctx context.Context, conn net.Conn) {
+	as.mux.Lock()
+	as.connections[conn]= struct{}{}
+	as.mux.Unlock()
+	
+	defer func() {
+		as.mux.Lock()
+		delete(as.connections,conn)
+		as.mux.Unlock()
+	}()
 	ctx = ContextWithConn(ctx, conn)
 	as.Handler(ctx, conn)
+}
+
+func (as *AnyServer)closeAllConn(){
+	as.mux.Lock()
+	for c:=range as.connections{
+		_=c.Close()
+		delete(as.connections,c)
+	}
+	as.mux.Unlock()
 }
 
 func (as *AnyServer) Shutdown(ctx context.Context) error {
@@ -118,6 +142,8 @@ func (as *AnyServer) Shutdown(ctx context.Context) error {
 	atomic.StoreInt64(&as.status, statusClosed)
 	select {
 	case <-ctx.Done():
+		_=as.listener.Close()
+		as.closeAllConn()
 	case <-as.serverExit:
 	}
 	as.closeCancel()
