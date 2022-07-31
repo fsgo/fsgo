@@ -13,10 +13,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fsgo/fsgo/cmds/rpcdump/internal"
 	"github.com/fsgo/fsgo/fsio"
 	"github.com/fsgo/fsgo/fsnet/fsconn/conndump"
-
-	"github.com/fsgo/fsgo/cmds/rpcdump/internal"
 )
 
 var connID = flag.Int64("cid", 0, "filter the connID field")
@@ -93,7 +92,7 @@ func replay(msgs <-chan *conndump.Message) {
 func newWriter() *writer {
 	w1 := &writer{
 		Concurrency: *conc,
-		To:        *to,
+		To:          *to,
 		buffers:     map[int64][]*conndump.Message{},
 		distWriter:  map[int64]io.WriteCloser{},
 	}
@@ -104,7 +103,7 @@ func newWriter() *writer {
 }
 
 type writer struct {
-	To        string
+	To          string
 	buffers     map[int64][]*conndump.Message
 	distWriter  map[int64]io.WriteCloser
 	Concurrency int

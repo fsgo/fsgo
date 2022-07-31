@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/fsgo/fsgo/fstime"
 )
 
 // Keeper 保持文件存在
@@ -27,7 +29,7 @@ type Keeper struct {
 
 	file    *os.File
 	info    os.FileInfo
-	timer   *time.Timer
+	timer   *fstime.Interval
 	mux     sync.RWMutex
 	running bool
 
@@ -51,12 +53,9 @@ func (kf *Keeper) Start() error {
 		return fmt.Errorf("already started")
 	}
 	kf.running = true
-	kf.timer = time.NewTimer(kf.CheckInterval)
-	go func() {
-		for range kf.timer.C {
-			kf.loop()
-		}
-	}()
+	kf.timer = &fstime.Interval{}
+	kf.timer.Add(kf.loop)
+	kf.timer.Start(kf.CheckInterval)
 	return nil
 }
 

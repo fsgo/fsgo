@@ -10,9 +10,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/fsgo/fsgo/fsnet/fsconn/conndump"
-
 	"github.com/fsgo/fsgo/cmds/rpcdump/internal"
+	"github.com/fsgo/fsgo/fsnet/fsconn/conndump"
 )
 
 var connID = flag.Int64("cid", -1, `filter only which conn ID.

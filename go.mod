@@ -6,6 +6,7 @@ require (
 	github.com/fsgo/fscache v0.0.0-20210819153355-395397445282
 	github.com/fsgo/fsconf v0.2.4
 	github.com/fsgo/fsenv v0.3.0
+	github.com/golang/snappy v0.0.4
 	github.com/miekg/dns v1.1.43
 	github.com/stretchr/testify v1.7.1
 	golang.org/x/net v0.0.0-20220526153639-5463443f8c37
@@ -15,7 +16,7 @@ require (
 
 require (
 	github.com/BurntSushi/toml v1.1.0 // indirect
-	github.com/davecgh/go-spew v1.1.0 // indirect
+	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.4 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect

@@ -34,15 +34,15 @@ type AnyServer struct {
 
 	OnConn func(ctx context.Context, conn net.Conn, err error) (context.Context, net.Conn, error)
 
-	Handler func(ctx context.Context, conn net.Conn)
+	Handler Handler
 
 	status      int64
 	closeCancel context.CancelFunc
 	serverExit  chan bool
-	
+
 	connections map[net.Conn]struct{}
-	listener net.Listener
-	mux sync.RWMutex
+	listener    net.Listener
+	mux         sync.RWMutex
 }
 
 const (
@@ -58,19 +58,22 @@ type temporary interface {
 }
 
 func (as *AnyServer) Serve(l net.Listener) error {
+	if as.Handler == nil {
+		return errors.New("handler is nil")
+	}
 	atomic.StoreInt64(&as.status, statusRunning)
 	ctx, cancel := context.WithCancel(context.Background())
 	as.closeCancel = cancel
 	as.serverExit = make(chan bool, 1)
-	as.listener=l
-	as.connections=make(map[net.Conn]struct{})
+	as.listener = l
+	as.connections = make(map[net.Conn]struct{})
 
 	var errResult error
 	var wg sync.WaitGroup
-	for {
+
+	loopAccept := func() error {
 		if atomic.LoadInt64(&as.status) == statusClosed {
-			errResult = ErrShutdown
-			break
+			return ErrShutdown
 		}
 
 		if as.BeforeAccept != nil {
@@ -88,21 +91,28 @@ func (as *AnyServer) Serve(l net.Listener) error {
 		if err != nil {
 			var ne temporary
 			if errors.As(err, &ne) && ne.Temporary() {
-				continue
+				return nil
 			}
 
 			if strings.Contains(err.Error(), "i/o timeout") {
-				continue
+				return nil
 			}
-			errResult = err
-			break
+			return err
 		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			as.handleConn(ctxConn, conn)
 		}()
+		return nil
 	}
+
+	for {
+		if errResult = loopAccept(); errResult != nil {
+			break
+		}
+	}
+
 	wg.Wait()
 	as.serverExit <- true
 	atomic.StoreInt64(&as.status, statusClosed)
@@ -111,23 +121,23 @@ func (as *AnyServer) Serve(l net.Listener) error {
 
 func (as *AnyServer) handleConn(ctx context.Context, conn net.Conn) {
 	as.mux.Lock()
-	as.connections[conn]= struct{}{}
+	as.connections[conn] = struct{}{}
 	as.mux.Unlock()
-	
+
 	defer func() {
 		as.mux.Lock()
-		delete(as.connections,conn)
+		delete(as.connections, conn)
 		as.mux.Unlock()
 	}()
 	ctx = ContextWithConn(ctx, conn)
-	as.Handler(ctx, conn)
+	as.Handler.Handle(ctx, conn)
 }
 
-func (as *AnyServer)closeAllConn(){
+func (as *AnyServer) closeAllConn() {
 	as.mux.Lock()
-	for c:=range as.connections{
-		_=c.Close()
-		delete(as.connections,c)
+	for c := range as.connections {
+		_ = c.Close()
+		delete(as.connections, c)
 	}
 	as.mux.Unlock()
 }
@@ -142,7 +152,7 @@ func (as *AnyServer) Shutdown(ctx context.Context) error {
 	atomic.StoreInt64(&as.status, statusClosed)
 	select {
 	case <-ctx.Done():
-		_=as.listener.Close()
+		_ = as.listener.Close()
 		as.closeAllConn()
 	case <-as.serverExit:
 	}

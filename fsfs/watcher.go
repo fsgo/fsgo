@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"github.com/fsgo/fsgo/fstime"
 )
 
 const (
@@ -37,7 +39,7 @@ type Watcher struct {
 	Delay    time.Duration
 	rules    []*watchRule
 
-	tk      *time.Ticker
+	timer   *fstime.Interval
 	mux     sync.RWMutex
 	started bool
 }
@@ -75,12 +77,9 @@ func (w *Watcher) Start() error {
 	if w.started {
 		return errors.New("already started")
 	}
-	w.tk = time.NewTicker(w.getInterval())
-	go func() {
-		for range w.tk.C {
-			w.scan()
-		}
-	}()
+	w.timer = &fstime.Interval{}
+	w.timer.Add(w.scan)
+	w.timer.Start(w.getInterval())
 	w.started = true
 	return nil
 }
@@ -103,7 +102,7 @@ func (w *Watcher) Stop() {
 	if !w.started {
 		return
 	}
-	w.tk.Stop()
+	w.timer.Stop()
 	w.started = false
 }
 

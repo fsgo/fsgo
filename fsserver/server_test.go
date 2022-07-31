@@ -25,7 +25,7 @@ func TestAnyServer(t *testing.T) {
 	defer l.Close()
 
 	ser := &fsserver.AnyServer{
-		Handler: echoHandler,
+		Handler: fsserver.HandleFunc(echoHandler),
 	}
 	var wg sync.WaitGroup
 	wg.Add(1)

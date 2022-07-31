@@ -5,6 +5,7 @@
 package fsfs
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -144,7 +145,7 @@ func (f *Rotator) setupClean() {
 
 func (f *Rotator) setFilePathFn() error {
 	if f.Path == "" {
-		return fmt.Errorf("f.Path is empty")
+		return errors.New("f.Path is empty")
 	}
 
 	if f.ExtRule != "" {
