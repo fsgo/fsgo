@@ -32,8 +32,32 @@ type Cached struct {
 }
 
 // LookupIP Lookup IP
-func (r *Cached) LookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
-	return interceptors(r.Interceptors).CallLookupIP(ctx, network, host, r.lookupIP, 0)
+func (r *Cached) LookupIP(ctx context.Context, network, host string) (ips []net.IP, err error) {
+	its := interceptors(r.Interceptors)
+	lookIdx := -1
+	afterIdx := -1
+	for i := 0; i < len(its); i++ {
+		if its[i].BeforeLookupIP != nil {
+			ctx, network, host = its[i].BeforeLookupIP(ctx, network, host)
+		}
+		if lookIdx == -1 && its[i].LookupIP != nil {
+			lookIdx = i
+		}
+		if afterIdx == -1 && its[i].AfterLookupIP != nil {
+			afterIdx = i
+		}
+	}
+	if lookIdx == -1 {
+		ips, err = r.lookupIP(ctx, network, host)
+	} else {
+		ips, err = its.CallLookupIP(ctx, network, host, r.lookupIP, lookIdx)
+	}
+	if afterIdx != -1 {
+		for ; afterIdx < len(its); afterIdx++ {
+			ips, err = its[afterIdx].AfterLookupIP(ctx, network, host, ips, err)
+		}
+	}
+	return ips, err
 }
 
 func (r *Cached) lookupIP(ctx context.Context, network, host string) ([]net.IP, error) {
@@ -51,8 +75,33 @@ func (r *Cached) lookupIP(ctx context.Context, network, host string) ([]net.IP, 
 }
 
 // LookupIPAddr Lookup IPAddr
-func (r *Cached) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
-	return interceptors(r.Interceptors).CallLookupIPAddr(ctx, host, r.lookupIPAddr, 0)
+func (r *Cached) LookupIPAddr(ctx context.Context, host string) (ips []net.IPAddr, err error) {
+	its := interceptors(r.Interceptors)
+	lookIdx := -1
+	afterIdx := -1
+	for i := 0; i < len(its); i++ {
+		if its[i].BeforeLookupIPAddr != nil {
+			ctx, host = its[i].BeforeLookupIPAddr(ctx, host)
+		}
+		if lookIdx == -1 && its[i].LookupIPAddr != nil {
+			lookIdx = i
+		}
+		if afterIdx == -1 && its[i].AfterLookupIPAddr != nil {
+			afterIdx = i
+		}
+	}
+	if lookIdx == -1 {
+		ips, err = r.lookupIPAddr(ctx, host)
+	} else {
+		ips, err = its.CallLookupIPAddr(ctx, host, r.lookupIPAddr, lookIdx)
+	}
+	if afterIdx != -1 {
+		for ; afterIdx < len(its); afterIdx++ {
+			ips, err = its[afterIdx].AfterLookupIPAddr(ctx, host, ips, err)
+		}
+	}
+
+	return ips, err
 }
 
 func (r *Cached) lookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {

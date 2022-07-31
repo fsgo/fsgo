@@ -76,35 +76,157 @@ func (c *connWithIt) RawConn() net.Conn {
 }
 
 func (c *connWithIt) Read(b []byte) (n int, err error) {
-	return c.allIts.CallRead(c.raw, b, c.raw.Read, 0)
+	idx := -1
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].Read != nil {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		n, err = c.raw.Read(b)
+	} else {
+		n, err = c.allIts.CallRead(c.raw, b, c.raw.Read, idx)
+	}
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].AfterRead != nil {
+			c.allIts[i].AfterRead(c.raw, b, n, err)
+		}
+	}
+	return n, err
 }
 
 func (c *connWithIt) Write(b []byte) (n int, err error) {
-	return c.allIts.CallWrite(c.raw, b, c.raw.Write, 0)
+	idx := -1
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].Write != nil {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		n, err = c.raw.Write(b)
+	} else {
+		n, err = c.allIts.CallWrite(c.raw, b, c.raw.Write, idx)
+	}
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].AfterWrite != nil {
+			c.allIts[i].AfterWrite(c.raw, b, n, err)
+		}
+	}
+	return n, err
 }
 
-func (c *connWithIt) Close() error {
-	return c.allIts.CallClose(c.raw, c.raw.Close, 0)
+func (c *connWithIt) Close() (err error) {
+	idx := -1
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].Close != nil {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		err = c.raw.Close()
+	} else {
+		err = c.allIts.CallClose(c.raw, c.raw.Close, idx)
+	}
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].AfterClose != nil {
+			c.allIts[i].AfterClose(c.raw, err)
+		}
+	}
+	return err
 }
 
 func (c *connWithIt) LocalAddr() net.Addr {
-	return c.allIts.CallLocalAddr(c.raw, c.raw.LocalAddr, 0)
+	idx := -1
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].LocalAddr != nil {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return c.raw.LocalAddr()
+	}
+	return c.allIts.CallLocalAddr(c.raw, c.raw.LocalAddr, idx)
 }
 
 func (c *connWithIt) RemoteAddr() net.Addr {
-	return c.allIts.CallRemoteAddr(c.raw, c.raw.RemoteAddr, 0)
+	idx := -1
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].RemoteAddr != nil {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		return c.raw.RemoteAddr()
+	}
+	return c.allIts.CallRemoteAddr(c.raw, c.raw.RemoteAddr, idx)
 }
 
-func (c *connWithIt) SetDeadline(t time.Time) error {
-	return c.allIts.CallSetDeadline(c.raw, t, c.raw.SetDeadline, 0)
+func (c *connWithIt) SetDeadline(t time.Time) (err error) {
+	idx := -1
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].SetDeadline != nil {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		err = c.raw.SetDeadline(t)
+	} else {
+		err = c.allIts.CallSetDeadline(c.raw, t, c.raw.SetDeadline, idx)
+	}
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].AfterSetDeadline != nil {
+			c.allIts[i].AfterSetDeadline(c.raw, t, err)
+		}
+	}
+	return err
 }
 
-func (c *connWithIt) SetReadDeadline(t time.Time) error {
-	return c.allIts.CallSetReadDeadline(c.raw, t, c.raw.SetReadDeadline, 0)
+func (c *connWithIt) SetReadDeadline(t time.Time) (err error) {
+	idx := -1
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].SetReadDeadline != nil {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		err = c.raw.SetReadDeadline(t)
+	} else {
+		err = c.allIts.CallSetReadDeadline(c.raw, t, c.raw.SetReadDeadline, idx)
+	}
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].AfterSetReadDeadline != nil {
+			c.allIts[i].AfterSetReadDeadline(c.raw, t, err)
+		}
+	}
+	return err
 }
 
-func (c *connWithIt) SetWriteDeadline(t time.Time) error {
-	return c.allIts.CallSetWriteDeadline(c.raw, t, c.raw.SetWriteDeadline, 0)
+func (c *connWithIt) SetWriteDeadline(t time.Time) (err error) {
+	idx := -1
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].SetWriteDeadline != nil {
+			idx = i
+			break
+		}
+	}
+	if idx == -1 {
+		err = c.raw.SetWriteDeadline(t)
+	} else {
+		err = c.allIts.CallSetWriteDeadline(c.raw, t, c.raw.SetWriteDeadline, idx)
+	}
+	for i := 0; i < len(c.allIts); i++ {
+		if c.allIts[i].AfterSetWriteDeadline != nil {
+			c.allIts[i].AfterSetWriteDeadline(c.raw, t, err)
+		}
+	}
+	return err
 }
 
 // HasService 用于判断是否有服务名

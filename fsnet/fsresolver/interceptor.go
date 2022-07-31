@@ -15,13 +15,13 @@ import (
 type Interceptor struct {
 	LookupIP func(ctx context.Context, network, host string, invoker LookupIPFunc) ([]net.IP, error)
 
-	BeforeLookupIP func(ctx context.Context, network, host string) (ctxNew context.Context, networkNew, hostNew string)
-	AfterLookupIP  func(ctx context.Context, network, host string, ips []net.IP, err error)
+	BeforeLookupIP func(ctx context.Context, network, host string) (c context.Context, n, h string)
+	AfterLookupIP  func(ctx context.Context, network, host string, ips []net.IP, err error) ([]net.IP, error)
 
 	LookupIPAddr func(ctx context.Context, host string, invoker LookupIPAddrFunc) ([]net.IPAddr, error)
 
 	BeforeLookupIPAddr func(ctx context.Context, host string) (ctxNew context.Context, hostNew string)
-	AfterLookupIPAddr  func(ctx context.Context, host string, addrs []net.IPAddr, err error)
+	AfterLookupIPAddr  func(ctx context.Context, host string, addrs []net.IPAddr, err error) ([]net.IPAddr, error)
 }
 
 type resolverItCtx struct {
@@ -63,23 +63,6 @@ type interceptors []*Interceptor
 
 func (rhs interceptors) CallLookupIP(ctx context.Context, network, host string, invoker LookupIPFunc,
 	idx int) (ips []net.IP, err error) {
-	if idx == 0 {
-		for i := 0; i < len(rhs); i++ {
-			if rhs[i].BeforeLookupIP == nil {
-				continue
-			}
-			ctx, network, host = rhs[i].BeforeLookupIP(ctx, network, host)
-		}
-
-		defer func() {
-			for i := 0; i < len(rhs); i++ {
-				if rhs[i].AfterLookupIP == nil {
-					continue
-				}
-				rhs[i].AfterLookupIP(ctx, network, host, ips, err)
-			}
-		}()
-	}
 	for ; idx < len(rhs); idx++ {
 		if rhs[idx].LookupIP != nil {
 			break
@@ -96,23 +79,6 @@ func (rhs interceptors) CallLookupIP(ctx context.Context, network, host string, 
 
 func (rhs interceptors) CallLookupIPAddr(ctx context.Context, host string, invoker LookupIPAddrFunc,
 	idx int) (addrs []net.IPAddr, err error) {
-	if idx == 0 {
-		for i := 0; i < len(rhs); i++ {
-			if rhs[i].BeforeLookupIPAddr == nil {
-				continue
-			}
-			ctx, host = rhs[i].BeforeLookupIPAddr(ctx, host)
-		}
-
-		defer func() {
-			for i := 0; i < len(rhs); i++ {
-				if rhs[i].AfterLookupIPAddr == nil {
-					continue
-				}
-				rhs[i].AfterLookupIPAddr(ctx, host, addrs, err)
-			}
-		}()
-	}
 	for ; idx < len(rhs); idx++ {
 		if rhs[idx].LookupIPAddr != nil {
 			break

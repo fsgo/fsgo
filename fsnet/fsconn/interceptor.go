@@ -46,16 +46,6 @@ type Interceptor struct {
 type interceptors []*Interceptor
 
 func (chs interceptors) CallRead(info Info, b []byte, invoker func(b []byte) (int, error), idx int) (n int, err error) {
-	if idx == 0 {
-		defer func() {
-			for i := 0; i < len(chs); i++ {
-				if chs[i].AfterRead == nil {
-					continue
-				}
-				chs[i].AfterRead(info, b, n, err)
-			}
-		}()
-	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].Read != nil {
 			break
@@ -71,16 +61,6 @@ func (chs interceptors) CallRead(info Info, b []byte, invoker func(b []byte) (in
 }
 
 func (chs interceptors) CallWrite(info Info, b []byte, invoker func(b []byte) (int, error), idx int) (n int, err error) {
-	if idx == 0 {
-		defer func() {
-			for i := 0; i < len(chs); i++ {
-				if chs[i].AfterWrite == nil {
-					continue
-				}
-				chs[i].AfterWrite(info, b, n, err)
-			}
-		}()
-	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].Write != nil {
 			break
@@ -95,16 +75,6 @@ func (chs interceptors) CallWrite(info Info, b []byte, invoker func(b []byte) (i
 }
 
 func (chs interceptors) CallClose(info Info, invoker func() error, idx int) (err error) {
-	if idx == 0 {
-		defer func() {
-			for i := 0; i < len(chs); i++ {
-				if chs[i].AfterClose == nil {
-					continue
-				}
-				chs[i].AfterClose(info, err)
-			}
-		}()
-	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].Close != nil {
 			break
@@ -147,16 +117,6 @@ func (chs interceptors) CallRemoteAddr(info Info, invoker func() net.Addr, idx i
 }
 
 func (chs interceptors) CallSetDeadline(info Info, dl time.Time, invoker func(time.Time) error, idx int) (err error) {
-	if idx == 0 {
-		defer func() {
-			for i := 0; i < len(chs); i++ {
-				if chs[i].AfterSetDeadline == nil {
-					continue
-				}
-				chs[i].AfterSetDeadline(info, dl, err)
-			}
-		}()
-	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].SetDeadline != nil {
 			break
@@ -171,16 +131,6 @@ func (chs interceptors) CallSetDeadline(info Info, dl time.Time, invoker func(ti
 }
 
 func (chs interceptors) CallSetReadDeadline(info Info, dl time.Time, invoker func(time.Time) error, idx int) (err error) {
-	if idx == 0 {
-		defer func() {
-			for i := 0; i < len(chs); i++ {
-				if chs[i].AfterSetReadDeadline == nil {
-					continue
-				}
-				chs[i].AfterSetReadDeadline(info, dl, err)
-			}
-		}()
-	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].SetReadDeadline != nil {
 			break
@@ -195,16 +145,6 @@ func (chs interceptors) CallSetReadDeadline(info Info, dl time.Time, invoker fun
 }
 
 func (chs interceptors) CallSetWriteDeadline(info Info, dl time.Time, invoker func(time.Time) error, idx int) (err error) {
-	if idx == 0 {
-		defer func() {
-			for i := 0; i < len(chs); i++ {
-				if chs[i].AfterSetWriteDeadline == nil {
-					continue
-				}
-				chs[i].AfterSetWriteDeadline(info, dl, err)
-			}
-		}()
-	}
 	for ; idx < len(chs); idx++ {
 		if chs[idx].SetWriteDeadline != nil {
 			break

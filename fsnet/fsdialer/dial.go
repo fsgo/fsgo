@@ -59,18 +59,45 @@ func (d *Simple) RegisterInterceptor(its ...*Interceptor) {
 }
 
 // DialContext dial with Context
-func (d *Simple) DialContext(ctx context.Context, network string, address string) (net.Conn, error) {
+func (d *Simple) DialContext(ctx context.Context, network string, address string) (conn net.Conn, err error) {
 	if d.Timeout > 0 {
 		var cancel context.CancelFunc
 		ctx, cancel = context.WithTimeout(ctx, d.Timeout)
 		defer cancel()
 	}
 	its := d.getInterceptors(ctx)
-	c, err := its.CallDialContext(ctx, network, address, d.stdDial, 0)
+
+	dialIdx := -1
+	afterIdx := -1
+	for i := 0; i < len(its); i++ {
+		if its[i].BeforeDialContext != nil {
+			ctx, network, address = its[i].BeforeDialContext(ctx, network, address)
+		}
+		if dialIdx == -1 && its[i].DialContext != nil {
+			dialIdx = i
+		}
+		if afterIdx == -1 && its[i].AfterDialContext != nil {
+			afterIdx = i
+		}
+	}
+	if dialIdx == -1 {
+		conn, err = d.stdDial(ctx, network, address)
+	} else {
+		conn, err = its.CallDialContext(ctx, network, address, d.stdDial, dialIdx)
+	}
+
+	if afterIdx != -1 {
+		for i := afterIdx; i < len(its); i++ {
+			if its[i].AfterDialContext != nil {
+				conn, err = its[i].AfterDialContext(ctx, network, address, conn, err)
+			}
+		}
+	}
+
 	if err != nil {
 		return nil, err
 	}
-	return fsconn.NewWithContext(ctx, c), nil
+	return fsconn.NewWithContext(ctx, conn), nil
 }
 
 func splitHostPort(hostPort string) (host string, port string, err error) {

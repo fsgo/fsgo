@@ -44,7 +44,7 @@ func (l *Listener) Accept() (net.Conn, error) {
 	})
 
 	if l.AcceptTimeout > 0 && l.catSetAcceptTimeout {
-		l.raw.(canSetDeadline).SetDeadline(time.Now().Add(l.AcceptTimeout))
+		_ = l.raw.(canSetDeadline).SetDeadline(time.Now().Add(l.AcceptTimeout))
 	}
 
 	conn, err := l.Listener.Accept()

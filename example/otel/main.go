@@ -13,8 +13,9 @@ import (
 	"net/http"
 
 	"github.com/fsgo/fsgo/extra/fsotel"
-	"github.com/fsgo/fsgo/fsnet"
+	"github.com/fsgo/fsgo/fsnet/fsdialer"
 	"github.com/fsgo/fsgo/fsnet/fshttp"
+	"github.com/fsgo/fsgo/fsnet/fsresolver"
 	"github.com/uptrace/opentelemetry-go-extra/otelplay"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel"
@@ -29,8 +30,8 @@ func main() {
 	shutdown := otelplay.ConfigureOpentelemetry(context.Background())
 	defer shutdown()
 
-	fsnet.MustRegisterDialerInterceptor(fsotel.DialerTracer)
-	fsnet.MustRegisterResolverInterceptor(fsotel.ResolverTracer)
+	fsdialer.MustRegisterInterceptor(fsotel.DialerTracer)
+	fsresolver.MustRegisterInterceptor(fsotel.ResolverTracer)
 
 	ser := &http.Server{
 		Addr:    *addr,

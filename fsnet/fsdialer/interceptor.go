@@ -13,34 +13,17 @@ import (
 
 // Interceptor  dialer interceptor
 type Interceptor struct {
-	DialContext func(ctx context.Context, network string, address string, invoker DialContextFunc) (conn net.Conn, err error)
+	DialContext func(ctx context.Context, network string, address string, invoker DialContextFunc) (net.Conn, error)
 
-	BeforeDialContext func(ctx context.Context, network string, address string) (ctxNew context.Context, networkNew string, addressNew string)
+	BeforeDialContext func(ctx context.Context, net string, addr string) (c context.Context, n string, a string)
 
-	AfterDialContext func(ctx context.Context, network string, address string, conn net.Conn, err error)
+	AfterDialContext func(ctx context.Context, net string, addr string, conn net.Conn, err error) (net.Conn, error)
 }
 
 type interceptors []*Interceptor
 
 // CallDialContext 执行 its
 func (dhs interceptors) CallDialContext(ctx context.Context, network, address string, invoker DialContextFunc, idx int) (conn net.Conn, err error) {
-	if idx == 0 {
-		for i := 0; i < len(dhs); i++ {
-			if dhs[i].BeforeDialContext == nil {
-				continue
-			}
-			ctx, network, address = dhs[i].BeforeDialContext(ctx, network, address)
-		}
-
-		defer func() {
-			for i := 0; i < len(dhs); i++ {
-				if dhs[i].AfterDialContext == nil {
-					continue
-				}
-				dhs[i].AfterDialContext(ctx, network, address, conn, err)
-			}
-		}()
-	}
 	for ; idx < len(dhs); idx++ {
 		if dhs[idx].DialContext != nil {
 			break
@@ -119,8 +102,7 @@ func MustRegisterInterceptor(its ...*Interceptor) {
 // 当想给 Default 注册 全局的 Interceptor 的时候，可以使用该方法
 func TransConnInterceptor(its ...*fsconn.Interceptor) *Interceptor {
 	return &Interceptor{
-		DialContext: func(ctx context.Context, network string, address string, invoker DialContextFunc) (conn net.Conn, err error) {
-			conn, err = invoker(ctx, network, address)
+		AfterDialContext: func(ctx context.Context, net string, addr string, conn net.Conn, err error) (net.Conn, error) {
 			if err != nil || len(its) == 0 {
 				return conn, err
 			}
