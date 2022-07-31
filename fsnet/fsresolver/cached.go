@@ -54,7 +54,9 @@ func (r *Cached) LookupIP(ctx context.Context, network, host string) (ips []net.
 	}
 	if afterIdx != -1 {
 		for ; afterIdx < len(its); afterIdx++ {
-			ips, err = its[afterIdx].AfterLookupIP(ctx, network, host, ips, err)
+			if its[afterIdx].AfterLookupIP != nil {
+				ips, err = its[afterIdx].AfterLookupIP(ctx, network, host, ips, err)
+			}
 		}
 	}
 	return ips, err
@@ -97,7 +99,9 @@ func (r *Cached) LookupIPAddr(ctx context.Context, host string) (ips []net.IPAdd
 	}
 	if afterIdx != -1 {
 		for ; afterIdx < len(its); afterIdx++ {
-			ips, err = its[afterIdx].AfterLookupIPAddr(ctx, host, ips, err)
+			if its[afterIdx].AfterLookupIPAddr != nil {
+				ips, err = its[afterIdx].AfterLookupIPAddr(ctx, host, ips, err)
+			}
 		}
 	}
 
