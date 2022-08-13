@@ -24,9 +24,7 @@ func TestHookStderr(t *testing.T) {
 		},
 	}
 	require.Nil(t, kp.Start())
-	defer func() {
-		require.Nil(t, kp.Stop())
-	}()
+	defer kp.Stop()
 
 	require.Nil(t, HookStderr(kp.File()))
 
@@ -54,9 +52,7 @@ func TestHookStdout(t *testing.T) {
 		},
 	}
 	require.Nil(t, kp.Start())
-	defer func() {
-		require.Nil(t, kp.Stop())
-	}()
+	defer kp.Stop()
 
 	require.Nil(t, HookStdout(kp.File()))
 
