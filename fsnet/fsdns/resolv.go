@@ -23,7 +23,8 @@ func ResolvNameserver() []string {
 }
 
 // NewResolvConf create new ResolvConf instance
-// 	already start watch the confPath
+//
+//	already start watch the confPath
 func NewResolvConf(confPath string) *ResolvConf {
 	rf := &ResolvConf{}
 	rf.Parser = rf.parse

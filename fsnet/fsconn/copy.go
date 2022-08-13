@@ -178,7 +178,7 @@ func (sc *StreamConn) connect() error {
 	return err
 }
 
-func (sc *StreamConn) log(args ...interface{}) {
+func (sc *StreamConn) log(args ...any) {
 	if sc.Logger == nil {
 		return
 	}

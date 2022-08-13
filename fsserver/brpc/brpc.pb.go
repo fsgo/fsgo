@@ -407,7 +407,7 @@ func file_brpc_proto_rawDescGZIP() []byte {
 }
 
 var file_brpc_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
-var file_brpc_proto_goTypes = []interface{}{
+var file_brpc_proto_goTypes = []any{
 	(*Meta)(nil),           // 0: brpc.Meta
 	(*RequestMeta)(nil),    // 1: brpc.RequestMeta
 	(*ResponseMeta)(nil),   // 2: brpc.ResponseMeta
@@ -433,7 +433,7 @@ func file_brpc_proto_init() {
 	}
 	file_streaming_proto_init()
 	if !protoimpl.UnsafeEnabled {
-		file_brpc_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_brpc_proto_msgTypes[0].Exporter = func(v any, i int) any {
 			switch v := v.(*Meta); i {
 			case 0:
 				return &v.state
@@ -445,7 +445,7 @@ func file_brpc_proto_init() {
 				return nil
 			}
 		}
-		file_brpc_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_brpc_proto_msgTypes[1].Exporter = func(v any, i int) any {
 			switch v := v.(*RequestMeta); i {
 			case 0:
 				return &v.state
@@ -457,7 +457,7 @@ func file_brpc_proto_init() {
 				return nil
 			}
 		}
-		file_brpc_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_brpc_proto_msgTypes[2].Exporter = func(v any, i int) any {
 			switch v := v.(*ResponseMeta); i {
 			case 0:
 				return &v.state
@@ -469,7 +469,7 @@ func file_brpc_proto_init() {
 				return nil
 			}
 		}
-		file_brpc_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
+		file_brpc_proto_msgTypes[3].Exporter = func(v any, i int) any {
 			switch v := v.(*ChunkInfo); i {
 			case 0:
 				return &v.state

@@ -13,7 +13,8 @@ import (
 )
 
 // ServersFromEnv parser nameserver list from os.env 'FSNET_NAMESERVER'
-// 	eg: export FSNET_NAMESERVER=1.1.1.1,8.8.8.8:53
+//
+//	eg: export FSNET_NAMESERVER=1.1.1.1,8.8.8.8:53
 func ServersFromEnv() []net.Addr {
 	ev := os.Getenv("FSNET_NAMESERVER")
 	if len(ev) == 0 {

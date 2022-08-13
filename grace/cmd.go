@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-//
 // https://man7.org/linux/man-pages/man2/kill.2.html
 // If sig is 0, then no signal is sent, but existence and permission
 // checks are still performed; this can be used to check for the

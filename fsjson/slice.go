@@ -19,11 +19,12 @@ var _ json.Unmarshaler = (*StringSlice)(nil)
 
 // StringSlice 扩展支持 JSON 的 []string 类型
 // 其实际值可以是多种格式，比如:
-// 	value: "a"
-// 	value: "a,b"
-// 	value: ["a","b",123]
-// 	value: null
-// 	value: 123
+//
+//	value: "a"
+//	value: "a,b"
+//	value: ["a","b",123]
+//	value: null
+//	value: 123
 type StringSlice []string
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler

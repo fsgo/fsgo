@@ -273,11 +273,11 @@ func (w *Worker) subProcessStart(ctx context.Context) error {
 	return w.sub.Start(ctx)
 }
 
-func (w *Worker) logit(msgs ...interface{}) {
+func (w *Worker) logit(msgs ...any) {
 	w.logitDepth(3, msgs...)
 }
 
-func (w *Worker) logitDepth(depth int, msgs ...interface{}) {
+func (w *Worker) logitDepth(depth int, msgs ...any) {
 	msg := fmt.Sprintf("[grace][worker][%s] %s", w.option.Cmd, fmt.Sprint(msgs...))
 	_ = w.main.Logger.Output(depth, msg)
 }
@@ -340,7 +340,7 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 
 	go func() {
 		start := time.Now()
-		logFields := make(map[string]interface{})
+		logFields := make(map[string]any)
 		errWait := cmd.Wait()
 		if cmd.Process != nil {
 			logFields["pid"] = cmd.Process.Pid
@@ -406,8 +406,8 @@ func (w *Worker) getLastPID() int {
 // reload 执行 reload 动作
 // 这个方法都是由 master 进程来调用的
 //
-// 	1. fork 新子进程
-// 	2. stop 旧的子进程
+//  1. fork 新子进程
+//  2. stop 旧的子进程
 func (w *Worker) reload(ctx context.Context) (err error) {
 	// -----------------------------------------------------------------
 	// 添加状态判断，避免多种条件在同时触发 reload
@@ -523,8 +523,9 @@ func (w *Worker) stop(ctx context.Context) error {
 }
 
 // Resource 将配置的 Listen 的第 index 个 元素解析为可传递使用的 Resource
-// 	如 配置的 "tcp@127.0.0.1:8080" 会解析为 listenDSN
-// 	若解析失败，panic
+//
+//	如 配置的 "tcp@127.0.0.1:8080" 会解析为 listenDSN
+//	若解析失败，panic
 func (w *Worker) Resource(index int) Resource {
 	if index < 0 || index >= len(w.option.Listen) {
 		panic(fmt.Sprintf("invalid index %d, should in [0,%d]", index, len(w.option.Listen)-1))
@@ -537,7 +538,8 @@ func (w *Worker) Resource(index int) Resource {
 }
 
 // NextResource 自动解析配置的 Listen 的下一个元素为 Resource
-// 	若解析失败，panic
+//
+//	若解析失败，panic
 func (w *Worker) NextResource() Resource {
 	res := w.Resource(w.nextListenDSNIndex)
 	w.nextListenDSNIndex++

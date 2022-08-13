@@ -38,7 +38,8 @@ type Keeper struct {
 }
 
 // Start 开始,非阻塞运行
-// 	与之对应的有 Stop 方法
+//
+//	与之对应的有 Stop 方法
 func (kf *Keeper) Start() error {
 	if err := kf.init(); err != nil {
 		return err

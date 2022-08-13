@@ -20,7 +20,7 @@ func (h *TaskHelper) ConfDir() string {
 }
 
 // ReadConf 从 task 自己的目录里解析配置
-func (h *TaskHelper) ReadConf(name string, value interface{}) error {
+func (h *TaskHelper) ReadConf(name string, value any) error {
 	fpath := filepath.Join(h.ConfDir(), name)
 	bf, err := os.ReadFile(fpath)
 	if err != nil {

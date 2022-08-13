@@ -39,10 +39,11 @@ func Scan(rd io.Reader, fn func(msg *Message) bool) error {
 }
 
 // ChanScanner 将有多个连接(ConnID)的数据流按照同一个连接分组筛选输出
-// 	比如数据流里的数据是:
-// 	conn1.ReadData、conn1.ReadData、conn2.ReadData、conn1.ReadData、conn1.CLose、conn2.CLose
+//
+//	比如数据流里的数据是:
+//	conn1.ReadData、conn1.ReadData、conn2.ReadData、conn1.ReadData、conn1.CLose、conn2.CLose
 //	最终输出为：
-// 	数据流 1：conn1.ReadData、conn1.ReadData、conn1.ReadData、conn1.CLose
+//	数据流 1：conn1.ReadData、conn1.ReadData、conn1.ReadData、conn1.CLose
 //	数据流 2：conn2.ReadData、conn2.CLose
 type ChanScanner struct {
 	// Filter 可选，消息过滤器，若返回 false，则这条消息忽略掉
@@ -132,7 +133,8 @@ func (cs *ChanScanner) checkTimeout(now int64) {
 }
 
 // Close 关闭
-// 	若有不完整的未关闭的流，此时也会同意关闭掉
+//
+//	若有不完整的未关闭的流，此时也会同意关闭掉
 func (cs *ChanScanner) Close() {
 	if len(cs.chs) == 0 {
 		return

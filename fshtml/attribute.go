@@ -274,7 +274,8 @@ func SetSize(w AttrsMapper, size int) {
 }
 
 // SetLang 设置元素的 lang 属性
-// 	如 en-US、zh-CN
+//
+//	如 en-US、zh-CN
 func SetLang(w AttrsMapper, lang string) {
 	SetAttr(w, "lang", lang)
 }

@@ -21,7 +21,7 @@ type subProcess struct {
 	worker *Worker
 }
 
-func (sp *subProcess) logit(msgs ...interface{}) {
+func (sp *subProcess) logit(msgs ...any) {
 	msg := fmt.Sprintf("[subProcess] %s", fmt.Sprint(msgs...))
 	sp.worker.logitDepth(3, msg)
 }

@@ -73,8 +73,9 @@ func (gs *GroupEnableStatus) SetEnable(key any, enable bool) {
 }
 
 // SetAllEnable 设置所有的状态,设置后，也会调整默认状态为此值
-// 	如 默认值为 false，若 key="key123" 未设置，调用 IsEnable("key123") 会返回 false,
-// 	当 SetAllEnable(true) 之后，再次调用 IsEnable("key123") 会返回 true
+//
+//	如 默认值为 false，若 key="key123" 未设置，调用 IsEnable("key123") 会返回 false,
+//	当 SetAllEnable(true) 之后，再次调用 IsEnable("key123") 会返回 true
 func (gs *GroupEnableStatus) SetAllEnable(enable bool) {
 	gs.detail.Range(func(key, _ any) bool {
 		gs.detail.Store(key, enable)

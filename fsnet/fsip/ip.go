@@ -30,21 +30,24 @@ func FilterList(ips []net.IP, filter func(ip net.IP) bool) []net.IP {
 }
 
 // IsLoopback is Loopback ip
-// 	ipv4: 127.*
+//
+//	ipv4: 127.*
 func IsLoopback(ip net.IP) bool {
 	return ip.IsLoopback()
 }
 
 // IsPrivate is private ip
-// 	ipv4: 10/8、172.16/12 、192.168/16 prefix
-// 	ipv6: FC00::/7 prefix
+//
+//	ipv4: 10/8、172.16/12 、192.168/16 prefix
+//	ipv6: FC00::/7 prefix
 func IsPrivate(ip net.IP) bool {
 	return ip.IsPrivate()
 }
 
 // IsLinkLocalUnicast 本地单播地址
-// 	ipv4: 169.*、254.*
-// 	ipv6: fe80::/7 prefix
+//
+//	ipv4: 169.*、254.*
+//	ipv6: fe80::/7 prefix
 func IsLinkLocalUnicast(ip net.IP) bool {
 	return ip.IsLinkLocalUnicast()
 }

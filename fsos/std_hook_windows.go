@@ -13,8 +13,9 @@ import (
 //
 // not work for log.x and os.Stderr.
 // you should:
-// 	os.Stderr=yourFile
-// 	log.SetOutput(yourFile)
+//
+//	os.Stderr=yourFile
+//	log.SetOutput(yourFile)
 func HookStderr(f HasFd) error {
 	return hookStd(syscall.STD_ERROR_HANDLE, f.Fd())
 }

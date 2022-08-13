@@ -315,7 +315,7 @@ func file_streaming_proto_rawDescGZIP() []byte {
 
 var file_streaming_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_streaming_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
-var file_streaming_proto_goTypes = []interface{}{
+var file_streaming_proto_goTypes = []any{
 	(FrameType)(0),          // 0: brpc.FrameType
 	(*StreamSettings)(nil),  // 1: brpc.StreamSettings
 	(*StreamFrameMeta)(nil), // 2: brpc.StreamFrameMeta
@@ -337,7 +337,7 @@ func file_streaming_proto_init() {
 		return
 	}
 	if !protoimpl.UnsafeEnabled {
-		file_streaming_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
+		file_streaming_proto_msgTypes[0].Exporter = func(v any, i int) any {
 			switch v := v.(*StreamSettings); i {
 			case 0:
 				return &v.state
@@ -349,7 +349,7 @@ func file_streaming_proto_init() {
 				return nil
 			}
 		}
-		file_streaming_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
+		file_streaming_proto_msgTypes[1].Exporter = func(v any, i int) any {
 			switch v := v.(*StreamFrameMeta); i {
 			case 0:
 				return &v.state
@@ -361,7 +361,7 @@ func file_streaming_proto_init() {
 				return nil
 			}
 		}
-		file_streaming_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
+		file_streaming_proto_msgTypes[2].Exporter = func(v any, i int) any {
 			switch v := v.(*Feedback); i {
 			case 0:
 				return &v.state

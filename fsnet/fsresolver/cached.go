@@ -66,7 +66,7 @@ func (r *Cached) lookupIP(ctx context.Context, network, host string) ([]net.IP, 
 	if ip, _ := internal.ParseIPZone(host); ip != nil {
 		return []net.IP{ip}, nil
 	}
-	result, err := r.withCache(ctx, "LookupIP", network+host, func() (interface{}, error) {
+	result, err := r.withCache(ctx, "LookupIP", network+host, func() (any, error) {
 		ret, err := r.getStdResolver().LookupIP(ctx, network, host)
 		return ret, err
 	})
@@ -117,7 +117,7 @@ func (r *Cached) lookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, e
 			},
 		}, nil
 	}
-	result, err := r.withCache(ctx, "LookupIPAddr", host, func() (interface{}, error) {
+	result, err := r.withCache(ctx, "LookupIPAddr", host, func() (any, error) {
 		ret, err := r.getStdResolver().LookupIPAddr(ctx, host)
 		return ret, err
 	})
@@ -134,8 +134,8 @@ func (r *Cached) getStdResolver() Resolver {
 	return net.DefaultResolver
 }
 
-func (r *Cached) withCache(ctx context.Context, key string, cacheKey interface{},
-	fn func() (interface{}, error)) (interface{}, error) {
+func (r *Cached) withCache(ctx context.Context, key string, cacheKey any,
+	fn func() (any, error)) (any, error) {
 	if r.Expiration <= 0 {
 		data, err := fn()
 		return data, err
@@ -143,7 +143,7 @@ func (r *Cached) withCache(ctx context.Context, key string, cacheKey interface{}
 	cache := r.getCache(key)
 	cacheData := cache.Get(ctx, cacheKey)
 	if cacheData.Err() == nil {
-		var data interface{}
+		var data any
 		if has, err := cacheData.Value(&data); has && err == nil {
 			return data, nil
 		}

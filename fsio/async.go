@@ -51,7 +51,7 @@ func (aw *AsyncWriter) Write(p []byte) (n int, err error) {
 func (aw *AsyncWriter) init() {
 	atomic.StoreInt32(&aw.status, asyncWriterRunning)
 	aw.pool = &sync.Pool{
-		New: func() interface{} {
+		New: func() any {
 			return &bytes.Buffer{}
 		},
 	}

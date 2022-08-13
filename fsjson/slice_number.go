@@ -10,12 +10,13 @@ var _ json.Unmarshaler = (*IntSlice)(nil)
 
 // IntSlice 扩展支持 JSON 的 []int 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456"
-// 	value: [123,"456",1]
-// 	value: null
-// 	value: 123
-// 	不支持 float 类型，如 "1.2"、1.3 都会失败
+//
+//	value: ""
+//	value: "123,456"
+//	value: [123,"456",1]
+//	value: null
+//	value: 123
+//	不支持 float 类型，如 "1.2"、1.3 都会失败
 type IntSlice []int
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -41,12 +42,13 @@ var _ json.Unmarshaler = (*Int8Slice)(nil)
 
 // Int8Slice 扩展支持 JSON 的 []int8 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456"
-// 	value: [123,"456",1]
-// 	value: null
-// 	value: 123
-// 	不支持 float 类型，如 "1.2"、1.3 都会失败
+//
+//	value: ""
+//	value: "123,456"
+//	value: [123,"456",1]
+//	value: null
+//	value: 123
+//	不支持 float 类型，如 "1.2"、1.3 都会失败
 type Int8Slice []int8
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -72,12 +74,13 @@ var _ json.Unmarshaler = (*Int16Slice)(nil)
 
 // Int16Slice 扩展支持 JSON 的 []int16 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456"
-// 	value: [123,"456",1]
-// 	value: null
-// 	value: 123
-// 	不支持 float 类型，如 "1.2"、1.3 都会失败
+//
+//	value: ""
+//	value: "123,456"
+//	value: [123,"456",1]
+//	value: null
+//	value: 123
+//	不支持 float 类型，如 "1.2"、1.3 都会失败
 type Int16Slice []int16
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -103,12 +106,13 @@ var _ json.Unmarshaler = (*Int32Slice)(nil)
 
 // Int32Slice 扩展支持 JSON 的 []int32 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456"
-// 	value: [123,"456",1]
-// 	value: null
-// 	value: 123
-// 	不支持 float 类型，如 "1.2"、1.3 都会失败
+//
+//	value: ""
+//	value: "123,456"
+//	value: [123,"456",1]
+//	value: null
+//	value: 123
+//	不支持 float 类型，如 "1.2"、1.3 都会失败
 type Int32Slice []int32
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -134,12 +138,13 @@ var _ json.Unmarshaler = (*Int64Slice)(nil)
 
 // Int64Slice 扩展支持 JSON 的 []int64 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456"
-// 	value: [123,"456",1]
-// 	value: null
-// 	value: 123
-// 	不支持 float 类型，如 "1.2"、1.3 都会失败
+//
+//	value: ""
+//	value: "123,456"
+//	value: [123,"456",1]
+//	value: null
+//	value: 123
+//	不支持 float 类型，如 "1.2"、1.3 都会失败
 type Int64Slice []int64
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -165,12 +170,13 @@ var _ json.Unmarshaler = (*UintSlice)(nil)
 
 // UintSlice 扩展支持 JSON 的 []uint 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456,-1"
-// 	value: [123,"456",1,-1]
-// 	value: null
-// 	value: 123
-// 	不支持 float 类型，如 "1.2"、1.3 都会失败
+//
+//	value: ""
+//	value: "123,456,-1"
+//	value: [123,"456",1,-1]
+//	value: null
+//	value: 123
+//	不支持 float 类型，如 "1.2"、1.3 都会失败
 type UintSlice []uint
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -196,12 +202,13 @@ var _ json.Unmarshaler = (*Uint8Slice)(nil)
 
 // Uint8Slice 扩展支持 JSON 的 []uint8 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456,-1"
-// 	value: [123,"456",1,-1]
-// 	value: null
-// 	value: 123
-// 	不支持 float 类型，如 "1.2"、1.3 都会失败
+//
+//	value: ""
+//	value: "123,456,-1"
+//	value: [123,"456",1,-1]
+//	value: null
+//	value: 123
+//	不支持 float 类型，如 "1.2"、1.3 都会失败
 type Uint8Slice []uint8
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -227,12 +234,13 @@ var _ json.Unmarshaler = (*Uint16Slice)(nil)
 
 // Uint16Slice 扩展支持 JSON 的 []uint16 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456,-1"
-// 	value: [123,"456",1,-1]
-// 	value: null
-// 	value: 123
-// 	不支持 float 类型，如 "1.2"、1.3 都会失败
+//
+//	value: ""
+//	value: "123,456,-1"
+//	value: [123,"456",1,-1]
+//	value: null
+//	value: 123
+//	不支持 float 类型，如 "1.2"、1.3 都会失败
 type Uint16Slice []uint16
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -258,12 +266,13 @@ var _ json.Unmarshaler = (*Uint32Slice)(nil)
 
 // Uint32Slice 扩展支持 JSON 的 []uint32 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456,-1"
-// 	value: [123,"456",1,-1]
-// 	value: null
-// 	value: 123
-// 	不支持 float 类型，如 "1.2"、1.3 都会失败
+//
+//	value: ""
+//	value: "123,456,-1"
+//	value: [123,"456",1,-1]
+//	value: null
+//	value: 123
+//	不支持 float 类型，如 "1.2"、1.3 都会失败
 type Uint32Slice []uint32
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -289,12 +298,13 @@ var _ json.Unmarshaler = (*Uint64Slice)(nil)
 
 // Uint64Slice 扩展支持 JSON 的 []uint64 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456,-1"
-// 	value: [123,"456",1,-1]
-// 	value: null
-// 	value: 123
-// 	不支持 float 类型，如 "1.2"、1.3 都会失败
+//
+//	value: ""
+//	value: "123,456,-1"
+//	value: [123,"456",1,-1]
+//	value: null
+//	value: 123
+//	不支持 float 类型，如 "1.2"、1.3 都会失败
 type Uint64Slice []uint64
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -320,12 +330,13 @@ var _ json.Unmarshaler = (*Float32Slice)(nil)
 
 // Float32Slice 扩展支持 JSON 的 []float32 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456,-1,1.2"
-// 	value: [123,"456",1,"2.1",2.3]
-// 	value: null
-// 	value: 123
-// 	value: 123.1
+//
+//	value: ""
+//	value: "123,456,-1,1.2"
+//	value: [123,"456",1,"2.1",2.3]
+//	value: null
+//	value: 123
+//	value: 123.1
 type Float32Slice []float32
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler
@@ -351,12 +362,13 @@ var _ json.Unmarshaler = (*Float64Slice)(nil)
 
 // Float64Slice 扩展支持 JSON 的 []float64 类型
 // 其实际值可以是多种格式，比如:
-// 	value: ""
-// 	value: "123,456,-1,1.2"
-// 	value: [123,"456",1,"2.1",2.3]
-// 	value: null
-// 	value: 123
-// 	value: 123.1
+//
+//	value: ""
+//	value: "123,456,-1,1.2"
+//	value: [123,"456",1,"2.1",2.3]
+//	value: null
+//	value: 123
+//	value: 123.1
 type Float64Slice []float64
 
 // UnmarshalJSON 实现了自定义的 json.Unmarshaler

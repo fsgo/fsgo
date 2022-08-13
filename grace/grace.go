@@ -134,7 +134,7 @@ func (g *Grace) init() {
 	}
 }
 
-func (g *Grace) logit(msgs ...interface{}) {
+func (g *Grace) logit(msgs ...any) {
 	msg := fmt.Sprintf("[grace][main] %s", fmt.Sprint(msgs...))
 	_ = g.Logger.Output(2, msg)
 }

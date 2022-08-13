@@ -59,8 +59,9 @@ func KeepDirExists(dir string) error {
 }
 
 // CleanFiles 按照文件前缀清理文件
-// 	pattern: eg /home/work/logs/access_log.log.*
-// 	remaining: 文件保留个数，eq ：24
+//
+//	pattern: eg /home/work/logs/access_log.log.*
+//	remaining: 文件保留个数，eq ：24
 func CleanFiles(pattern string, remaining int) error {
 	files, err := filepath.Glob(pattern)
 	if err != nil {

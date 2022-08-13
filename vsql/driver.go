@@ -64,8 +64,8 @@ func (a *driverStmt) Query(args []driver.Value) (driver.Rows, error) {
 
 var _ driver.Stmt = (*driverStmt)(nil)
 
-func trans(args []driver.Value) []interface{} {
-	tmp := make([]interface{}, len(args))
+func trans(args []driver.Value) []any {
+	tmp := make([]any, len(args))
 	for i, v := range args {
 		tmp[i] = v
 	}
@@ -123,7 +123,7 @@ func (d *driverConn) BeginTx(ctx context.Context, opts driver.TxOptions) (driver
 }
 
 func (d *driverConn) QueryContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Rows, error) {
-	vs := make([]interface{}, len(args))
+	vs := make([]any, len(args))
 	for i, v := range args {
 		vs[i] = v
 	}
@@ -137,7 +137,7 @@ func (d *driverConn) QueryContext(ctx context.Context, query string, args []driv
 }
 
 func (d *driverConn) ExecContext(ctx context.Context, query string, args []driver.NamedValue) (driver.Result, error) {
-	vs := make([]interface{}, len(args))
+	vs := make([]any, len(args))
 	for i, v := range args {
 		vs[i] = v
 	}

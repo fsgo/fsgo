@@ -28,12 +28,13 @@ func LookupIPFromHosts(ctx context.Context, network, host string) ([]net.IP, err
 }
 
 // NewHostsFile create new HostsFile instance
-// 	if start fail,then panic
-// 	already start watch the hostPath
-// 	when hostPath is empty, use the default path:
-// 	on unix like system,the default path is /etc/hosts.
-// 	the default hostsPath can set by Environment Variables 'FSGO_HOSTS',
-// 	eg: export FSGO_HOSTS=./my_hosts
+//
+//	if start fail,then panic
+//	already start watch the hostPath
+//	when hostPath is empty, use the default path:
+//	on unix like system,the default path is /etc/hosts.
+//	the default hostsPath can set by Environment Variables 'FSGO_HOSTS',
+//	eg: export FSGO_HOSTS=./my_hosts
 func NewHostsFile(hostsPath string) *HostsFile {
 	hf := &HostsFile{}
 	hf.FileName = hf.getPath(hostsPath)

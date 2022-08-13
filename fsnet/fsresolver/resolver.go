@@ -54,8 +54,9 @@ type LookupIPFunc func(ctx context.Context, network, host string) ([]net.IP, err
 type LookupIPAddrFunc func(ctx context.Context, host string) ([]net.IPAddr, error)
 
 // Default default Resolver, result has 3 min cache
-// 	Environment Variables 'FSGO_RESOLVER_EXP' can set the default cache lifetime
-// 	eg: export FSGO_RESOLVER_EXP="10m" set cache lifetime as 10 minute
+//
+//	Environment Variables 'FSGO_RESOLVER_EXP' can set the default cache lifetime
+//	eg: export FSGO_RESOLVER_EXP="10m" set cache lifetime as 10 minute
 var Default Resolver = &Cached{
 	Expiration: defaultResolverExpiration(),
 }

@@ -26,9 +26,9 @@ const (
 
 // Resolver 转换为 Resolver 所需要的类型
 //
-// 	tcp->ip，tcp4->ip4, tcp6->ip6
-// 	udp->ip，udp4->ip4, udp6->ip6
-// 	其他类型原样返回
+//	tcp->ip，tcp4->ip4, tcp6->ip6
+//	udp->ip，udp4->ip4, udp6->ip6
+//	其他类型原样返回
 func (nt Network) Resolver() Network {
 	switch nt {
 	case NetworkTCP, NetworkUDP:

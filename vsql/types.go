@@ -19,16 +19,16 @@ type DB interface {
 	Close() error
 	Conn(ctx context.Context) (Conn, error)
 	Driver() driver.Driver
-	Exec(query string, args ...interface{}) (sql.Result, error)
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	Exec(query string, args ...any) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	Ping() error
 	PingContext(ctx context.Context) error
 	Prepare(query string) (Stmt, error)
 	PrepareContext(ctx context.Context, query string) (Stmt, error)
-	Query(query string, args ...interface{}) (Rows, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (Rows, error)
-	QueryRow(query string, args ...interface{}) Row
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) Row
+	Query(query string, args ...any) (Rows, error)
+	QueryContext(ctx context.Context, query string, args ...any) (Rows, error)
+	QueryRow(query string, args ...any) Row
+	QueryRowContext(ctx context.Context, query string, args ...any) Row
 	SetConnMaxIdleTime(d time.Duration)
 	SetConnMaxLifetime(d time.Duration)
 	SetMaxIdleConns(n int)
@@ -39,8 +39,8 @@ type DB interface {
 type DBOnlyCtx interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
 	PrepareContext(ctx context.Context, query string) (Stmt, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (Rows, error)
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (Rows, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	PingContext(ctx context.Context) error
 	Close() error
 }
@@ -48,8 +48,8 @@ type DBOnlyCtx interface {
 type DBRawOnlyCtx interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (*sql.Tx, error)
 	PrepareContext(ctx context.Context, query string) (*sql.Stmt, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (*sql.Rows, error)
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	PingContext(ctx context.Context) error
 	Close() error
 }
@@ -59,14 +59,14 @@ var _ DBRawOnlyCtx = (*sql.DB)(nil)
 // Tx interface off sql.Tx
 type Tx interface {
 	Commit() error
-	Exec(query string, args ...interface{}) (sql.Result, error)
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	Exec(query string, args ...any) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	Prepare(query string) (Stmt, error)
 	PrepareContext(ctx context.Context, query string) (Stmt, error)
-	Query(query string, args ...interface{}) (Rows, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (Rows, error)
-	QueryRow(query string, args ...interface{}) Row
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) Row
+	Query(query string, args ...any) (Rows, error)
+	QueryContext(ctx context.Context, query string, args ...any) (Rows, error)
+	QueryRow(query string, args ...any) Row
+	QueryRowContext(ctx context.Context, query string, args ...any) Row
 	Rollback() error
 	Stmt(stmt Stmt) Stmt
 	StmtContext(ctx context.Context, stmt Stmt) Stmt
@@ -75,24 +75,24 @@ type Tx interface {
 // Stmt interface off sql.Stmt
 type Stmt interface {
 	Close() error
-	Exec(args ...interface{}) (sql.Result, error)
-	ExecContext(ctx context.Context, args ...interface{}) (sql.Result, error)
-	Query(args ...interface{}) (Rows, error)
-	QueryContext(ctx context.Context, args ...interface{}) (Rows, error)
-	QueryRow(args ...interface{}) Row
-	QueryRowContext(ctx context.Context, args ...interface{}) Row
+	Exec(args ...any) (sql.Result, error)
+	ExecContext(ctx context.Context, args ...any) (sql.Result, error)
+	Query(args ...any) (Rows, error)
+	QueryContext(ctx context.Context, args ...any) (Rows, error)
+	QueryRow(args ...any) Row
+	QueryRowContext(ctx context.Context, args ...any) Row
 }
 
 // Conn interface off sql.Conn
 type Conn interface {
 	BeginTx(ctx context.Context, opts *sql.TxOptions) (Tx, error)
 	Close() error
-	ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error)
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
 	PingContext(ctx context.Context) error
 	PrepareContext(ctx context.Context, query string) (Stmt, error)
-	QueryContext(ctx context.Context, query string, args ...interface{}) (Rows, error)
-	QueryRowContext(ctx context.Context, query string, args ...interface{}) Row
-	Raw(f func(driverConn interface{}) error) (err error)
+	QueryContext(ctx context.Context, query string, args ...any) (Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) Row
+	Raw(f func(driverConn any) error) (err error)
 }
 
 // Rows interface off sql.Rows
@@ -103,13 +103,13 @@ type Rows interface {
 	Err() error
 	Next() bool
 	NextResultSet() bool
-	Scan(dest ...interface{}) error
+	Scan(dest ...any) error
 }
 
 // Row interface off sql.Row
 type Row interface {
 	Err() error
-	Scan(dest ...interface{}) error
+	Scan(dest ...any) error
 }
 
 var _ Row = (*sql.Row)(nil)
@@ -171,11 +171,11 @@ func (d *fDB) Driver() driver.Driver {
 	return d.raw.Driver()
 }
 
-func (d *fDB) Exec(query string, args ...interface{}) (sql.Result, error) {
+func (d *fDB) Exec(query string, args ...any) (sql.Result, error) {
 	return d.raw.Exec(query, args...)
 }
 
-func (d *fDB) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (d *fDB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return d.raw.ExecContext(ctx, query, args...)
 }
 
@@ -203,7 +203,7 @@ func (d *fDB) PrepareContext(ctx context.Context, query string) (Stmt, error) {
 	return NewStmt(st), nil
 }
 
-func (d *fDB) Query(query string, args ...interface{}) (Rows, error) {
+func (d *fDB) Query(query string, args ...any) (Rows, error) {
 	rows, err := d.raw.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -211,7 +211,7 @@ func (d *fDB) Query(query string, args ...interface{}) (Rows, error) {
 	return NewRows(rows), nil
 }
 
-func (d *fDB) QueryContext(ctx context.Context, query string, args ...interface{}) (Rows, error) {
+func (d *fDB) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
 	rows, err := d.raw.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -219,11 +219,11 @@ func (d *fDB) QueryContext(ctx context.Context, query string, args ...interface{
 	return NewRows(rows), nil
 }
 
-func (d *fDB) QueryRow(query string, args ...interface{}) Row {
+func (d *fDB) QueryRow(query string, args ...any) Row {
 	return d.raw.QueryRow(query, args...)
 }
 
-func (d *fDB) QueryRowContext(ctx context.Context, query string, args ...interface{}) Row {
+func (d *fDB) QueryRowContext(ctx context.Context, query string, args ...any) Row {
 	return d.raw.QueryRowContext(ctx, query, args...)
 }
 
@@ -267,11 +267,11 @@ func (f *fTx) Commit() error {
 	return f.raw.Commit()
 }
 
-func (f *fTx) Exec(query string, args ...interface{}) (sql.Result, error) {
+func (f *fTx) Exec(query string, args ...any) (sql.Result, error) {
 	return f.raw.Exec(query, args...)
 }
 
-func (f *fTx) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (f *fTx) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return f.raw.ExecContext(ctx, query, args...)
 }
 
@@ -291,7 +291,7 @@ func (f *fTx) PrepareContext(ctx context.Context, query string) (Stmt, error) {
 	return NewStmt(st), nil
 }
 
-func (f *fTx) Query(query string, args ...interface{}) (Rows, error) {
+func (f *fTx) Query(query string, args ...any) (Rows, error) {
 	rows, err := f.raw.Query(query, args...)
 	if err != nil {
 		return nil, err
@@ -299,7 +299,7 @@ func (f *fTx) Query(query string, args ...interface{}) (Rows, error) {
 	return NewRows(rows), nil
 }
 
-func (f *fTx) QueryContext(ctx context.Context, query string, args ...interface{}) (Rows, error) {
+func (f *fTx) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
 	rows, err := f.raw.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -307,11 +307,11 @@ func (f *fTx) QueryContext(ctx context.Context, query string, args ...interface{
 	return NewRows(rows), nil
 }
 
-func (f *fTx) QueryRow(query string, args ...interface{}) Row {
+func (f *fTx) QueryRow(query string, args ...any) Row {
 	return f.raw.QueryRow(query, args...)
 }
 
-func (f *fTx) QueryRowContext(ctx context.Context, query string, args ...interface{}) Row {
+func (f *fTx) QueryRowContext(ctx context.Context, query string, args ...any) Row {
 	return f.raw.QueryRowContext(ctx, query, args...)
 }
 
@@ -349,15 +349,15 @@ func (f *fStmt) Close() error {
 	return f.raw.Close()
 }
 
-func (f *fStmt) Exec(args ...interface{}) (sql.Result, error) {
+func (f *fStmt) Exec(args ...any) (sql.Result, error) {
 	return f.raw.Exec(args...)
 }
 
-func (f *fStmt) ExecContext(ctx context.Context, args ...interface{}) (sql.Result, error) {
+func (f *fStmt) ExecContext(ctx context.Context, args ...any) (sql.Result, error) {
 	return f.raw.ExecContext(ctx, args...)
 }
 
-func (f *fStmt) Query(args ...interface{}) (Rows, error) {
+func (f *fStmt) Query(args ...any) (Rows, error) {
 	rows, err := f.raw.Query(args...)
 	if err != nil {
 		return nil, err
@@ -365,7 +365,7 @@ func (f *fStmt) Query(args ...interface{}) (Rows, error) {
 	return NewRows(rows), nil
 }
 
-func (f *fStmt) QueryContext(ctx context.Context, args ...interface{}) (Rows, error) {
+func (f *fStmt) QueryContext(ctx context.Context, args ...any) (Rows, error) {
 	rows, err := f.raw.QueryContext(ctx, args...)
 	if err != nil {
 		return nil, err
@@ -373,11 +373,11 @@ func (f *fStmt) QueryContext(ctx context.Context, args ...interface{}) (Rows, er
 	return NewRows(rows), nil
 }
 
-func (f *fStmt) QueryRow(args ...interface{}) Row {
+func (f *fStmt) QueryRow(args ...any) Row {
 	return f.raw.QueryRow(args...)
 }
 
-func (f *fStmt) QueryRowContext(ctx context.Context, args ...interface{}) Row {
+func (f *fStmt) QueryRowContext(ctx context.Context, args ...any) Row {
 	return f.raw.QueryRowContext(ctx, args...)
 }
 
@@ -429,7 +429,7 @@ func (f *fRows) NextResultSet() bool {
 	return f.raw.NextResultSet()
 }
 
-func (f *fRows) Scan(dest ...interface{}) error {
+func (f *fRows) Scan(dest ...any) error {
 	return f.raw.Scan(dest...)
 }
 
@@ -457,7 +457,7 @@ func (f *fConn) Close() error {
 	return f.raw.Close()
 }
 
-func (f *fConn) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (f *fConn) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return f.raw.ExecContext(ctx, query, args...)
 }
 
@@ -473,7 +473,7 @@ func (f *fConn) PrepareContext(ctx context.Context, query string) (Stmt, error) 
 	return NewStmt(st), nil
 }
 
-func (f *fConn) QueryContext(ctx context.Context, query string, args ...interface{}) (Rows, error) {
+func (f *fConn) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
 	rows, err := f.raw.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -481,11 +481,11 @@ func (f *fConn) QueryContext(ctx context.Context, query string, args ...interfac
 	return NewRows(rows), nil
 }
 
-func (f *fConn) QueryRowContext(ctx context.Context, query string, args ...interface{}) Row {
+func (f *fConn) QueryRowContext(ctx context.Context, query string, args ...any) Row {
 	return f.raw.QueryRowContext(ctx, query, args...)
 }
 
-func (f *fConn) Raw(fn func(driverConn interface{}) error) (err error) {
+func (f *fConn) Raw(fn func(driverConn any) error) (err error) {
 	return f.raw.Raw(fn)
 }
 
@@ -521,7 +521,7 @@ func (f *fDBOnlyCtx) PrepareContext(ctx context.Context, query string) (Stmt, er
 	return NewStmt(st), nil
 }
 
-func (f *fDBOnlyCtx) QueryContext(ctx context.Context, query string, args ...interface{}) (Rows, error) {
+func (f *fDBOnlyCtx) QueryContext(ctx context.Context, query string, args ...any) (Rows, error) {
 	rows, err := f.raw.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
@@ -529,7 +529,7 @@ func (f *fDBOnlyCtx) QueryContext(ctx context.Context, query string, args ...int
 	return NewRows(rows), nil
 }
 
-func (f *fDBOnlyCtx) ExecContext(ctx context.Context, query string, args ...interface{}) (sql.Result, error) {
+func (f *fDBOnlyCtx) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
 	return f.raw.ExecContext(ctx, query, args...)
 }
 

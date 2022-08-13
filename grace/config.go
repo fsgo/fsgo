@@ -35,11 +35,11 @@ func NewSimpleConfig() *Config {
 // Config 配置文件的结构体
 type Config struct {
 	// StatusDir 必填，状态数据文件目录，如 主进程的 pid 文件都存放在这里
-	StatusDir string
+	StatusDir string `validate:"required"`
 
 	// LogDir 必填，日志文件目录
 	// 每个子进程一个子目录
-	LogDir string
+	LogDir string `validate:"required"`
 
 	// StopTimeout 可选，优雅关闭的最长时间，若不填写使用默认值 "10s"
 	StopTimeout string
@@ -48,7 +48,7 @@ type Config struct {
 	Keep bool
 
 	// Workers 可选，工作进程配置
-	Workers map[string]*WorkerConfig
+	Workers map[string]*WorkerConfig `validate:"required,min=1"`
 
 	// CheckInterval 可选，检查版本的间隔时间，默认为 "5s"
 	CheckInterval string
@@ -57,8 +57,10 @@ type Config struct {
 	StartWait string
 }
 
-// Parser 解析配置
-func (c *Config) Parser() error {
+var _ fsconf.AutoChecker = (*Config)(nil)
+
+// AutoCheck 解析配置
+func (c *Config) AutoCheck() error {
 	if len(c.Workers) == 0 {
 		return errors.New("empty Workers")
 	}
@@ -132,9 +134,6 @@ func LoadConfig(name string) (*Config, error) {
 	if err := fsconf.Parse(name, &c); err != nil {
 		return nil, err
 	}
-	if err := c.Parser(); err != nil {
-		return nil, err
-	}
 	return c, nil
 }
 
@@ -159,10 +158,10 @@ type WorkerConfig struct {
 	HomeDir string
 
 	// LogDir 必填，当前子进程的日志目录
-	LogDir string
+	LogDir string `validate:"required"`
 
 	// Cmd 必填，工作进程的 cmd
-	Cmd string
+	Cmd string `validate:"required"`
 
 	// CmdArgs 可选，工作进程 cmd 的其他参数
 	CmdArgs []string
