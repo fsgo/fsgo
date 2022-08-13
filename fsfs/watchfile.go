@@ -6,7 +6,6 @@ package fsfs
 
 import (
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"sync"
 	"time"
@@ -31,7 +30,7 @@ func (wf *WatchFile) Start() error {
 	defer wf.mux.Unlock()
 
 	if wf.started {
-		return fmt.Errorf("already started")
+		return errors.New("already started")
 	}
 	if err := wf.Load(); err != nil {
 		return err

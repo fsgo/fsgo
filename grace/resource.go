@@ -6,6 +6,7 @@ package grace
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -38,7 +39,7 @@ func TrySetListener(res Resource, l net.Listener) error {
 		rl.SetListener(l)
 		return nil
 	}
-	return fmt.Errorf("cannot Set Listener")
+	return errors.New("cannot Set Listener")
 }
 
 var _ Resource = (*listenDSN)(nil)
@@ -105,7 +106,7 @@ func (d *listenDSN) File(ctx context.Context) (*os.File, error) {
 	if d.file != nil {
 		return d.file, nil
 	}
-	return nil, fmt.Errorf("file not exists")
+	return nil, errors.New("file not exists")
 }
 
 func (d *listenDSN) String() string {
@@ -119,7 +120,7 @@ func (d *listenDSN) Listener(ctx context.Context) (net.Listener, error) {
 	if d.listener != nil {
 		return d.listener, nil
 	}
-	return nil, fmt.Errorf("listener not exists")
+	return nil, errors.New("listener not exists")
 }
 
 type canSetListener interface {

@@ -8,7 +8,7 @@ import (
 	"context"
 	"database/sql"
 	"database/sql/driver"
-	"fmt"
+	"errors"
 )
 
 const DriverName = "vsql"
@@ -28,7 +28,7 @@ type fDriver struct{}
 func (a *fDriver) Open(name string) (driver.Conn, error) {
 	db, has := dbs[name]
 	if !has {
-		return nil, fmt.Errorf("should RegisterDB first")
+		return nil, errors.New("should RegisterDB first")
 	}
 	dri := &driverConn{
 		raw: db,

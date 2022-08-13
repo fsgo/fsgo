@@ -6,7 +6,7 @@ package fsdialer
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net"
 	"testing"
 
@@ -17,7 +17,7 @@ import (
 
 func TestDialer_DialContext(t *testing.T) {
 	t.Run("default no its", func(t *testing.T) {
-		wantErr := fmt.Errorf("err must")
+		wantErr := errors.New("err must")
 		d := &Simple{
 			Invoker: &testDialer{
 				retConn: nil,
@@ -29,7 +29,7 @@ func TestDialer_DialContext(t *testing.T) {
 	})
 
 	t.Run("with many its", func(t *testing.T) {
-		wantErr := fmt.Errorf("err must")
+		wantErr := errors.New("err must")
 		var num int32
 		checkNum := func(want int32) {
 			assert.Equal(t, want, num)
@@ -91,7 +91,7 @@ func (t *testDialer) DialContext(ctx context.Context, network string, address st
 
 func Test_dialerHooks_HookDialContext(t *testing.T) {
 	td := &testDialer{
-		retErr: fmt.Errorf("mustErr"),
+		retErr: errors.New("mustErr"),
 	}
 	t.Run("zero dhs", func(t *testing.T) {
 		var dhs interceptors

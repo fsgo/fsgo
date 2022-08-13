@@ -6,7 +6,7 @@ package fsresolver
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"net"
 	"reflect"
 	"sync"
@@ -29,14 +29,14 @@ func (t *testResolver) LookupIP(ctx context.Context, network, host string) ([]ne
 	if v, ok := t.lookupIPData.Load(host); ok {
 		return v.([]net.IP), nil
 	}
-	return nil, fmt.Errorf("ip not found")
+	return nil, errors.New("ip not found")
 }
 
 func (t *testResolver) LookupIPAddr(ctx context.Context, host string) ([]net.IPAddr, error) {
 	if v, ok := t.lookupIPAddrData.Load(host); ok {
 		return v.([]net.IPAddr), nil
 	}
-	return nil, fmt.Errorf("ipaddr not found")
+	return nil, errors.New("ipaddr not found")
 }
 
 func TestResolverCached(t *testing.T) {

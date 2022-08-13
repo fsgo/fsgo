@@ -201,7 +201,8 @@ func (f *Rotator) Close() error {
 		return nil
 	}
 	_ = fsio.TryFlush(f.writer)
-	return f.kp.Stop()
+	f.kp.Stop()
+	return nil
 }
 
 var rotateExtRules = map[string]func() string{

@@ -17,7 +17,7 @@ import (
 	"github.com/fsgo/fsgo/fsnet/internal"
 )
 
-var errEmptyResult = fmt.Errorf("dns empty result")
+var errEmptyResult = errors.New("dns empty result")
 
 var dnsExchange = func(ctx context.Context, host string, t uint16, ns net.Addr) (*dns.Msg, error) {
 	c := new(dns.Client)

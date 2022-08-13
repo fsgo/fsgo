@@ -9,6 +9,7 @@ import (
 	"crypto/md5"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -59,13 +60,13 @@ type Config struct {
 // Parser 解析配置
 func (c *Config) Parser() error {
 	if len(c.Workers) == 0 {
-		return fmt.Errorf("empty Workers")
+		return errors.New("empty Workers")
 	}
 	if c.StatusDir == "" {
-		return fmt.Errorf("empty StatusDir")
+		return errors.New("empty StatusDir")
 	}
 	if c.LogDir == "" {
-		return fmt.Errorf("empty LogDir")
+		return errors.New("empty LogDir")
 	}
 
 	for name, w := range c.Workers {

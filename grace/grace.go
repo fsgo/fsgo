@@ -57,7 +57,7 @@ type Option struct {
 // Parser 参数解析、检查
 func (c *Option) Parser() error {
 	if c.StatusDir == "" {
-		return fmt.Errorf("empty StatusDir")
+		return errors.New("empty StatusDir")
 	}
 	return nil
 }

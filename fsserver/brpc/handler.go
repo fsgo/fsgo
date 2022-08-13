@@ -7,7 +7,7 @@ package brpc
 import (
 	"bufio"
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"net"
 )
@@ -68,5 +68,5 @@ func invokeHandler(ctx context.Context, msg *Message, rw ReadWriter, h Handler) 
 		return hv.HandleStream(ctx, msg, rw)
 		// todo
 	}
-	return fmt.Errorf("not support")
+	return errors.New("not support")
 }

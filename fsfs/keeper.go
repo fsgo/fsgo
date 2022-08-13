@@ -5,7 +5,7 @@
 package fsfs
 
 import (
-	"fmt"
+	"errors"
 	"log"
 	"os"
 	"path/filepath"
@@ -50,7 +50,7 @@ func (kf *Keeper) Start() error {
 	kf.mux.Lock()
 	defer kf.mux.Unlock()
 	if kf.running {
-		return fmt.Errorf("already started")
+		return errors.New("already started")
 	}
 	kf.running = true
 	kf.timer = &fstime.Interval{}
@@ -67,21 +67,20 @@ func (kf *Keeper) loop() {
 }
 
 // Stop 停止运行
-func (kf *Keeper) Stop() error {
+func (kf *Keeper) Stop() {
 	kf.mux.Lock()
 	defer kf.mux.Unlock()
 	if !kf.running {
-		return fmt.Errorf("not running")
+		return
 	}
-	kf.running = true
+	kf.running = false
 	kf.timer.Stop()
 	_ = kf.file.Close()
-	return nil
 }
 
 func (kf *Keeper) init() error {
 	if kf.FilePath == nil {
-		return fmt.Errorf("fn FilePath is nil")
+		return errors.New("fn FilePath is nil")
 	}
 	if kf.CheckInterval <= 0 {
 		kf.CheckInterval = 100 * time.Millisecond
@@ -114,7 +113,7 @@ func (kf *Keeper) checkFile() error {
 	fp := kf.FilePath()
 
 	if fp == "" {
-		return fmt.Errorf("empty file path")
+		return errors.New("empty file path")
 	}
 
 	if has, err := kf.exists(fp); has {

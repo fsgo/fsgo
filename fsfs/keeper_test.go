@@ -28,30 +28,28 @@ func TestKeepFile(t *testing.T) {
 		atomic.AddInt32(&changeNum, 1)
 	})
 
-	require.Nil(t, kp.Start())
+	require.NoError(t, kp.Start())
 
 	t.Run("after start", func(t *testing.T) {
 		require.Equal(t, int32(1), atomic.LoadInt32(&changeNum))
 		require.NotNil(t, kp.File())
 	})
 
-	defer func() {
-		require.Nil(t, kp.Stop())
-	}()
+	defer kp.Stop()
 
 	checkExists := func() {
 		info, err := os.Stat(fp)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, info)
 	}
 
 	t.Run("same file not change", func(t *testing.T) {
 		stat1, err := kp.File().Stat()
-		require.Nil(t, err)
+		require.NoError(t, err)
 		time.Sleep(ci * 2)
 
 		stat2, err := kp.File().Stat()
-		require.Nil(t, err)
+		require.NoError(t, err)
 
 		require.True(t, os.SameFile(stat1, stat2))
 	})
@@ -65,12 +63,12 @@ func TestKeepFile(t *testing.T) {
 	})
 
 	t.Run("stopped", func(t *testing.T) {
-		require.Nil(t, kp.Stop())
-		require.Nil(t, os.Remove(fp))
+		kp.Stop()
+		require.NoError(t, os.Remove(fp))
 
 		time.Sleep(ci * 2)
 		// check not exists
 		_, err := os.Stat(fp)
-		require.NotNil(t, err)
+		require.Error(t, err)
 	})
 }

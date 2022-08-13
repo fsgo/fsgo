@@ -6,12 +6,13 @@ package tasks
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 )
 
-var ErrTaskNotFound = fmt.Errorf("task not found")
+var ErrTaskNotFound = errors.New("task not found")
 
 type Mapper struct {
 	tasks map[string]Task
@@ -52,14 +53,14 @@ func (m *Mapper) Execute(ctx context.Context) error {
 	fs.BoolVar(&help, "help", false, "help")
 	if len(os.Args) < 3 {
 		fs.PrintDefaults()
-		return fmt.Errorf("os.Args too short")
+		return errors.New("os.Args too short")
 	}
 	if err := fs.Parse(os.Args[1:3]); err != nil {
 		return err
 	}
 	if name == "" {
 		fs.PrintDefaults()
-		return fmt.Errorf("-name is empty")
+		return errors.New("-name is empty")
 	}
 	return m.Run(ctx, name)
 }

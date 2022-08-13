@@ -7,6 +7,7 @@ package envfile
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -16,7 +17,7 @@ import (
 	"time"
 )
 
-var errNotEnvKV = fmt.Errorf("not env k-v pair")
+var errNotEnvKV = errors.New("not env k-v pair")
 
 const txtEnvMax = 1024 * 1024
 
