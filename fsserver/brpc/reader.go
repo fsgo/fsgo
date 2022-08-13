@@ -6,7 +6,6 @@ package brpc
 
 import (
 	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -33,19 +32,9 @@ func (r *Reader) GetMaxBodySize() uint32 {
 }
 
 func (r *Reader) ReadHeader(rd io.Reader) (Header, error) {
-	bf := headerBP.Get().(*bytes.Buffer)
-	bf.Reset()
-	defer headerBP.Put(bf)
-	if _, err := io.CopyN(bf, rd, headerSize); err != nil {
-		return Header{}, err
-	}
-	h := bf.Bytes()
-	if !bytes.Equal(h[:4], protocol) {
-		return Header{}, fmt.Errorf("%w, expect header %q, got %q", ErrInvalidProtocol, protocol, h)
-	}
-	hd := Header{
-		BodySize: binary.BigEndian.Uint32(h[4:8]),
-		MetaSize: binary.BigEndian.Uint32(h[8:12]),
+	hd, err := ReadHeader(rd)
+	if err != nil {
+		return hd, err
 	}
 	if n := r.GetMaxBodySize(); hd.BodySize > n {
 		return hd, fmt.Errorf("%w, got is %d, max allow is %d", ErrBodyTooLarge, hd.BodySize, n)

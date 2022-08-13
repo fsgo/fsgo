@@ -7,6 +7,7 @@ package grace
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -62,10 +63,9 @@ type Worker struct {
 	main   *Grace
 	option *WorkerConfig
 
-	cmd *exec.Cmd
 	pid int // cmd 对应的 pid
 
-	// 创建当前 cmd 是对应的 cancel 反复
+	// 创建当前 cmd 是对应的 cancel
 	cmdClose context.CancelFunc
 
 	resources []*resourceAndConsumer
@@ -311,6 +311,7 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 	envs := append(os.Environ(), userEnv...)
 	envs = append(envs, envActionKey+"="+actionSubStart)
 
+	ctx, cancel := context.WithCancel(ctx)
 	cmdName, args := w.option.getWorkerCmd()
 	cmd := exec.CommandContext(ctx, cmdName, args...)
 	cmd.Dir = w.option.HomeDir
@@ -327,25 +328,26 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 	err := cmd.Start()
 	w.logit("cmd.Start, err=", err)
 	if err != nil {
+		cancel()
 		return err
 	}
 
 	_ = w.withLock(func() error {
-		w.cmd = cmd
 		w.pid = cmd.Process.Pid
+		w.cmdClose = cancel
 		return nil
 	})
 
 	go func() {
 		start := time.Now()
-		logFiles := make(map[string]interface{})
+		logFields := make(map[string]interface{})
 		errWait := cmd.Wait()
 		if cmd.Process != nil {
-			logFiles["pid"] = cmd.Process.Pid
+			logFields["pid"] = cmd.Process.Pid
 		}
 		cost := time.Since(start)
 
-		w.logit("sub process exit, error=", errWait, ", duration=", cost, ", sub_process_info=", logFiles)
+		w.logit("sub process exit, error=", errWait, ", duration=", cost, ", sub_process_info=", logFields)
 		w.event <- actionKeepSubProcess
 	}()
 	return nil
@@ -416,7 +418,7 @@ func (w *Worker) reload(ctx context.Context) (err error) {
 	}
 	w.mux.Unlock()
 	if isReloading {
-		return fmt.Errorf("already in reloading, cannot reload it")
+		return errors.New("already in reloading, cannot reload it")
 	}
 
 	defer func() {
@@ -435,26 +437,59 @@ func (w *Worker) reload(ctx context.Context) (err error) {
 		return err1
 	}
 
-	lastSubCancel := w.cmdClose
+	lastCmdCancel := w.cmdClose
 
 	lastPID := w.getLastPID()
 
-	ctxN, cancel := context.WithCancel(ctx)
-	w.cmdClose = cancel
-
 	// 启动新进程
-	if errFork := w.forkAndStart(ctxN); errFork != nil {
+	if errFork := w.forkAndStart(ctx); errFork != nil {
 		return errFork
 	}
+	newPID := w.getLastPID()
 
-	time.Sleep(w.getStartWait())
+	checkNewPID := func() error {
+		if w.subProcessExists() {
+			return nil
+		}
+		w.withLock(func() error {
+			w.pid = lastPID
+			w.cmdClose = lastCmdCancel
+			return nil
+		})
+		errCheck := fmt.Errorf("new process pid=%d not exists, restore pid=%d", newPID, lastPID)
+		w.logit(errCheck.Error())
+		return errCheck
+	}
+
+	// 启动后的检查时间，只有超过此时间，检查新进程没有问题，才能继续
+	tm := time.NewTimer(w.getStartWait())
+	defer tm.Stop()
+
+	// 每间隔 0.5 秒检查一次新的进程是否存在，若不存在则退出 reload
+	tk := time.NewTicker(500 * time.Millisecond)
+	defer tk.Stop()
+
+	for {
+		select {
+		case <-tm.C:
+			break
+		case <-tk.C:
+			if errCheck := checkNewPID(); errCheck != nil {
+				return errCheck
+			}
+		}
+	}
+
+	if errCheck := checkNewPID(); errCheck != nil {
+		return errCheck
+	}
 
 	// 优雅关闭老的子进程
 	err = w.stopCmd(ctx, lastPID)
 	w.logit("stop pid=", lastPID, ", err=", err)
 
-	if lastSubCancel != nil {
-		lastSubCancel()
+	if lastCmdCancel != nil {
+		lastCmdCancel()
 	}
 	return nil
 }

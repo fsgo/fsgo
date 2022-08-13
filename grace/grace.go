@@ -74,7 +74,7 @@ func (c *Option) GetStartWait() time.Duration {
 	if c.StartWait > 0 {
 		return c.StartWait
 	}
-	return 3 * time.Second
+	return 5 * time.Second
 }
 
 // GetMainPIDPath 获取主程序的 PID 文件路径

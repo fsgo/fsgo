@@ -31,7 +31,8 @@ type Rotator struct {
 	// 优先使用 ExtRule
 	ExtFunc func() string
 
-	// MaxFiles 最多保留文件数，默认为 24
+	// MaxFiles 最多保留文件数，超过的文件将被清理掉，默认值为 24
+	// 若值为 -1，则保留所有文件
 	MaxFiles int
 
 	// MaxDelay 最大延迟时间,可选，默认为 100ms.
@@ -107,15 +108,17 @@ func (f *Rotator) setup() error {
 	return nil
 }
 
-func (f *Rotator) setupKeepFile() {
-	maxDelay := f.MaxDelay
-	if maxDelay < time.Microsecond {
-		maxDelay = 100 * time.Millisecond
+func (f *Rotator) getMaxDelay() time.Duration {
+	if f.MaxDelay < time.Microsecond {
+		return 100 * time.Millisecond
 	}
+	return f.MaxDelay
+}
 
+func (f *Rotator) setupKeepFile() {
 	f.kp = &Keeper{
 		FilePath:      f.filePathFn,
-		CheckInterval: maxDelay,
+		CheckInterval: f.getMaxDelay(),
 	}
 
 	f.kp.AfterChange(f.onFileChange)
@@ -148,7 +151,7 @@ func (f *Rotator) setFilePathFn() error {
 		return errors.New("f.Path is empty")
 	}
 
-	if f.ExtRule != "" {
+	if len(f.ExtRule) > 0 {
 		if fn, has := rotateExtRules[f.ExtRule]; has {
 			f.filePathFn = func() string {
 				return f.Path + fn()
@@ -174,7 +177,7 @@ func (f *Rotator) setFilePathFn() error {
 
 // Write 写入
 func (f *Rotator) Write(p []byte) (n int, err error) {
-	if err := f.initOnce(); err != nil {
+	if err = f.initOnce(); err != nil {
 		return 0, err
 	}
 	return f.writer.Write(p)

@@ -40,7 +40,7 @@ type Config struct {
 	// 每个子进程一个子目录
 	LogDir string
 
-	// StopTimeout 可选，优雅关闭的最长时间，若不填写使用默认值  10s
+	// StopTimeout 可选，优雅关闭的最长时间，若不填写使用默认值 "10s"
 	StopTimeout string
 
 	// Keep 可选，是否保持子进程一直存在
@@ -49,10 +49,10 @@ type Config struct {
 	// Workers 可选，工作进程配置
 	Workers map[string]*WorkerConfig
 
-	// CheckInterval 可选，检查版本的间隔时间，默认为 5s
+	// CheckInterval 可选，检查版本的间隔时间，默认为 "5s"
 	CheckInterval string
 
-	// StartWait 可选，启动新进程后，老进程退出前的等待时间,默认为 3 秒
+	// StartWait 可选，启动新进程后，老进程退出前的等待时间,默认为 "5s"
 	StartWait string
 }
 

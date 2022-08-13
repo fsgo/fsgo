@@ -30,14 +30,6 @@ var (
 	ErrInvalidMeta     = errors.New("invalid meta")
 )
 
-var headerBP = sync.Pool{
-	New: func() any {
-		bf := &bytes.Buffer{}
-		bf.Grow(headerSize)
-		return bf
-	},
-}
-
 const headerSize = 12
 
 type Header struct {
@@ -46,19 +38,35 @@ type Header struct {
 }
 
 func (h Header) Bytes() []byte {
-	bf := make([]byte, headerSize)
-	copy(bf, protocol[:])
+	var bf [headerSize]byte
+	h.toBytes(bf[:])
+	return bf[:]
+}
+
+func (h Header) toBytes(bf []byte) {
+	// copy(bf[0:], protocol[:])
 	binary.BigEndian.PutUint32(bf[4:], h.BodySize)
 	binary.BigEndian.PutUint32(bf[8:], h.MetaSize)
-	return bf
 }
 
 func (h Header) PayloadSize() uint32 {
 	return h.BodySize - h.MetaSize
 }
 
+var headerWritePool = &sync.Pool{
+	New: func() any {
+		b := make([]byte, headerSize)
+		copy(b[0:], protocol[:])
+		return &b
+	},
+}
+
 func (h Header) WroteTo(w io.Writer) (int64, error) {
-	n, err := w.Write(h.Bytes())
+	b := make([]byte, headerSize)
+	copy(b[0:], protocol)
+	binary.BigEndian.PutUint32(b[4:], h.BodySize)
+	binary.BigEndian.PutUint32(b[8:], h.MetaSize)
+	n, err := w.Write(b)
 	return int64(n), err
 }
 
@@ -75,4 +83,29 @@ func IsMetaInvalid(meta *Meta) error {
 		return fmt.Errorf("%w, attachment_size=%d expect >=0", ErrInvalidMeta, n)
 	}
 	return nil
+}
+
+var headerReadPool = &sync.Pool{
+	New: func() any {
+		b := make([]byte, headerSize)
+		return &b
+	},
+}
+
+func ReadHeader(rd io.Reader) (Header, error) {
+	bf := headerReadPool.Get().(*[]byte)
+	h := *bf
+	defer headerReadPool.Put(bf)
+
+	if _, err := io.ReadFull(rd, h); err != nil {
+		return Header{}, err
+	}
+	if !bytes.Equal(h[:4], protocol) {
+		return Header{}, fmt.Errorf("%w, expect header %q, got %q", ErrInvalidProtocol, protocol, h)
+	}
+	hd := Header{
+		BodySize: binary.BigEndian.Uint32(h[4:8]),
+		MetaSize: binary.BigEndian.Uint32(h[8:12]),
+	}
+	return hd, nil
 }
