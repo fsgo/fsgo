@@ -16,6 +16,9 @@ import (
 
 // ConnStatTracer 用于获取网络状态的拦截器
 type ConnStatTracer struct {
+	connInterceptor   *fsconn.Interceptor
+	dialerInterceptor *Interceptor
+
 	readSize int64
 	readCost int64
 
@@ -25,9 +28,6 @@ type ConnStatTracer struct {
 	dialCost      int64
 	dialTimes     int64
 	dialFailTimes int64
-
-	connInterceptor   *fsconn.Interceptor
-	dialerInterceptor *Interceptor
 
 	once sync.Once
 }

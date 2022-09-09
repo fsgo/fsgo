@@ -45,12 +45,13 @@ func TrySetListener(res Resource, l net.Listener) error {
 var _ Resource = (*listenDSN)(nil)
 
 type listenDSN struct {
-	Index int
-	DSN   string
-
-	file     *os.File
 	listener net.Listener
-	opened   bool
+
+	file *os.File
+	DSN  string
+
+	Index  int
+	opened bool
 }
 
 type filer interface {

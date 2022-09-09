@@ -19,14 +19,15 @@ import (
 
 // Copy 实现对网络连接读写数据的复制
 type Copy struct {
-	interceptor *Interceptor
-	once        sync.Once
 
 	// ReadTo 将 Read 到的数据写入此处,比如 os.Stdout
 	ReadTo io.Writer
 
 	// WriterTo 将 Writer 的数据写入此处，比如 os.Stdout
 	WriterTo io.Writer
+
+	interceptor *Interceptor
+	once        sync.Once
 
 	disableRead  int32
 	disableWrite int32
@@ -84,14 +85,19 @@ type StreamConn struct {
 	// Addr 要连接的网络地址，必填
 	Addr net.Addr
 
-	// DialTimeout 拨号超时时间，可选，默认为 3s
-	DialTimeout time.Duration
+	// Logger 可选，打印日志的 writer
+	Logger io.Writer
+
+	conn net.Conn
 
 	// Dial 可选，拨号函数
 	Dial func(ctx context.Context, addr net.Addr) (net.Conn, error)
 
 	// Wrap 可选
 	Wrap func(conn net.Conn) net.Conn
+
+	// DialTimeout 拨号超时时间，可选，默认为 3s
+	DialTimeout time.Duration
 
 	// Retry 可选，重试次数，默认为 0 （不重试）
 	// -1 :无限重试
@@ -100,11 +106,6 @@ type StreamConn struct {
 	// RetryWait 可选，重试等待间隔时间
 	// 默认值为 1s
 	RetryWait time.Duration
-
-	// Logger 可选，打印日志的 writer
-	Logger io.Writer
-
-	conn net.Conn
 
 	mux sync.Mutex
 

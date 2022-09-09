@@ -18,15 +18,18 @@ var _ io.WriteCloser = (*AsyncWriter)(nil)
 type AsyncWriter struct {
 	io.Writer
 
-	Size int
+	writeErr atomic.Value
 
 	buffers chan *bytes.Buffer
-	once    sync.Once
 	pool    *sync.Pool
 
-	status    int32
-	writeErr  atomic.Value
 	closeDone chan bool
+
+	Size int
+
+	once sync.Once
+
+	status int32
 }
 
 const (

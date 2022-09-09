@@ -48,11 +48,11 @@ func (es *EnableStatus) String() string {
 
 // GroupEnableStatus 一组状态，默认未设置会返回 false
 type GroupEnableStatus struct {
-	// Default 未设置时的默认值
-	Default bool
+	all atomic.Value
 
 	detail sync.Map
-	all    atomic.Value
+	// Default 未设置时的默认值
+	Default bool
 }
 
 // IsEnable 获取状态

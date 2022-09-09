@@ -24,26 +24,28 @@ import (
 
 // Dumper 流量 dump
 type Dumper struct {
-	// DataDir 数据存放目录，可选
-	DataDir string
-
-	// RotatorConfig 可选，用于配置 dump 的 Rotator
-	RotatorConfig func(client bool, r *fsfs.Rotator)
+	clientOutFile *fsfs.Rotator
+	serverOutFile *fsfs.Rotator
 
 	clientIt *fsconn.Interceptor
 	serverIt *fsconn.Interceptor
 
-	clientReadStatus  fstypes.GroupEnableStatus
-	clientWriteStatus fstypes.GroupEnableStatus
+	conns map[fsconn.Info]*connInfo
+
+	// RotatorConfig 可选，用于配置 dump 的 Rotator
+	RotatorConfig func(client bool, r *fsfs.Rotator)
+
+	// DataDir 数据存放目录，可选
+	DataDir string
 
 	serverReadStatus  fstypes.GroupEnableStatus
 	serverWriteStatus fstypes.GroupEnableStatus
 
-	connID        int64
-	clientOutFile *fsfs.Rotator
-	serverOutFile *fsfs.Rotator
+	clientWriteStatus fstypes.GroupEnableStatus
 
-	conns    map[fsconn.Info]*connInfo
+	clientReadStatus fstypes.GroupEnableStatus
+
+	connID   int64
 	connsMux sync.RWMutex
 
 	once sync.Once

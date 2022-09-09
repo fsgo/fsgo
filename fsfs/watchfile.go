@@ -13,15 +13,15 @@ import (
 
 // WatchFile watch file
 type WatchFile struct {
-	FileName string
-
 	Parser func(content []byte) error
+
+	onStop   func()
+	FileName string
 
 	afterChanges []func()
 
 	mux     sync.RWMutex
 	started bool
-	onStop  func()
 }
 
 // Start  watch start

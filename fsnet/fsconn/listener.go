@@ -14,12 +14,13 @@ import (
 type Listener struct {
 	net.Listener
 
+	raw net.Listener
+
 	AfterAccepts []func(conn net.Conn) (net.Conn, error)
 
 	AcceptTimeout time.Duration
 
 	once                sync.Once
-	raw                 net.Listener
 	catSetAcceptTimeout bool
 }
 

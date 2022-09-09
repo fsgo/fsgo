@@ -38,10 +38,10 @@ func NewResolvConf(confPath string) *ResolvConf {
 
 // ResolvConf parser for resolv.conf
 type ResolvConf struct {
-	fsfs.WatchFile
 	re     *ResolverConfig
-	mux    sync.RWMutex
 	onStop func()
+	fsfs.WatchFile
+	mux sync.RWMutex
 }
 
 func (rf *ResolvConf) getPath(fileName string) string {

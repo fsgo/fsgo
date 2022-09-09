@@ -35,13 +35,13 @@ func (we *WatcherEvent) String() string {
 
 // Watcher 文件监听
 type Watcher struct {
+	timer *fstime.Interval
+	rules []*watchRule
+
 	Interval time.Duration
 	Delay    time.Duration
-	rules    []*watchRule
-
-	timer   *fstime.Interval
-	mux     sync.RWMutex
-	started bool
+	mux      sync.RWMutex
+	started  bool
 }
 
 // Watch add  file watch with callback
@@ -107,9 +107,9 @@ func (w *Watcher) Stop() {
 }
 
 type watchRule struct {
-	Name     string
 	CallBack func(event *WatcherEvent)
 	last     map[string]time.Time
+	Name     string
 	delay    time.Duration
 }
 

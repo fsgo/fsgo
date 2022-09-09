@@ -20,16 +20,27 @@ var _ io.WriteCloser = (*Rotator)(nil)
 
 // Rotator 文件具备自动切割的功能
 type Rotator struct {
-	// Path 文件名
-	Path string
+	writer fsio.ResetWriter
+
+	// ExtFunc 文件后缀生成的自定义函数,可选
+	// 优先使用 ExtRule
+	ExtFunc func() string
+
+	// NewWriter 对文件的封装
+	NewWriter func(w io.Writer) fsio.ResetWriter
+
+	filePathFn func() string
+
+	kp *Keeper
 
 	// ExtRule 文件后缀生成的规则，可选
 	// 目前支持：1hour、1day、no(默认)
 	ExtRule string
 
-	// ExtFunc 文件后缀生成的自定义函数,可选
-	// 优先使用 ExtRule
-	ExtFunc func() string
+	// Path 文件名
+	Path string
+
+	timer time.Timer
 
 	// MaxFiles 最多保留文件数，超过的文件将被清理掉，默认值为 24
 	// 若值为 -1，则保留所有文件
@@ -40,18 +51,9 @@ type Rotator struct {
 	// 如文件被删除了，则最大间隔 MaxDelay 时长会检查到
 	MaxDelay time.Duration
 
-	// NewWriter 对文件的封装
-	NewWriter func(w io.Writer) fsio.ResetWriter
-
-	filePathFn func() string
-
-	kp        *Keeper
 	mux       sync.RWMutex
 	onceSetup sync.Once
 	onceInit  sync.Once
-
-	writer fsio.ResetWriter
-	timer  time.Timer
 }
 
 // Init 初始化

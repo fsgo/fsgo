@@ -30,19 +30,20 @@ type CanShutdownServer interface {
 var _ CanShutdownServer = (*AnyServer)(nil)
 
 type AnyServer struct {
+	Handler Handler
+
+	listener     net.Listener
 	BeforeAccept func(l net.Listener) error
 
 	OnConn func(ctx context.Context, conn net.Conn, err error) (context.Context, net.Conn, error)
 
-	Handler Handler
-
-	status      int64
 	closeCancel context.CancelFunc
 	serverExit  chan bool
 
 	connections map[net.Conn]struct{}
-	listener    net.Listener
-	mux         sync.RWMutex
+
+	status int64
+	mux    sync.RWMutex
 }
 
 const (

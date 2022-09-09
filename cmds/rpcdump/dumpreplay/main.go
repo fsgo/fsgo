@@ -103,9 +103,9 @@ func newWriter() *writer {
 }
 
 type writer struct {
-	To          string
 	buffers     map[int64][]*conndump.Message
 	distWriter  map[int64]io.WriteCloser
+	To          string
 	Concurrency int
 	mux         sync.RWMutex
 }

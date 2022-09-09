@@ -18,17 +18,18 @@ import (
 
 // Cached Resolver with Cache
 type Cached struct {
-	// Expiration cache Expiration
-	// <=0 means disabled
-	Expiration time.Duration
-
 	Invoker Resolver
+
+	caches map[string]fscache.SCache
 
 	// Interceptors 可选，拦截器，先注册的后执行
 	Interceptors []*Interceptor
 
-	caches map[string]fscache.SCache
-	mux    sync.Mutex
+	// Expiration cache Expiration
+	// <=0 means disabled
+	Expiration time.Duration
+
+	mux sync.Mutex
 }
 
 // LookupIP Lookup IP

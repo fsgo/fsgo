@@ -76,6 +76,6 @@ func (w *mutexWriter) Write(b []byte) (int, error) {
 
 // WriteStatus status for Write
 type WriteStatus struct {
-	Wrote int
 	Err   error
+	Wrote int
 }

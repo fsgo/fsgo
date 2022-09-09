@@ -11,10 +11,10 @@ import (
 
 // Concurrency 并发度限制器
 type Concurrency struct {
+	sem chan struct{}
 	// Max 最大并发度
 	Max int
 
-	sem  chan struct{}
 	once sync.Once
 }
 

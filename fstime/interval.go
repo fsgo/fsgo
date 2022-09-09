@@ -12,15 +12,15 @@ import (
 
 // Interval 定时器
 type Interval struct {
-	// Concurrency 回调任务并发度，当为 0 时，为全并发
-	Concurrency int
 	concurrency chan struct{}
 
-	tk      *time.Ticker
-	closed  chan struct{}
-	stopped int32
-	fns     []func()
-	mux     sync.RWMutex
+	tk     *time.Ticker
+	closed chan struct{}
+	fns    []func()
+	// Concurrency 回调任务并发度，当为 0 时，为全并发
+	Concurrency int
+	mux         sync.RWMutex
+	stopped     int32
 }
 
 // Start 启动任务

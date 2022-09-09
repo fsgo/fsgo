@@ -73,8 +73,8 @@ func CleanFiles(pattern string, remaining int) error {
 	}
 
 	type finfo struct {
-		path string
 		info os.FileInfo
+		path string
 	}
 
 	var infos []*finfo

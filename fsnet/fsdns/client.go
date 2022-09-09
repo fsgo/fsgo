@@ -76,15 +76,14 @@ var _ fsresolver.Resolver = (*Client)(nil)
 
 // Client prue dns client
 type Client struct {
-	// Servers nameserver list,eg 114.114.114.114:53
-	Servers []net.Addr
-
 	HostsFile fsresolver.LookupIPer
-
-	mux sync.RWMutex
 
 	// LookupIPFilter after query dns success, filter the result
 	LookupIPFilter func(ctx context.Context, network, host string, ns net.Addr, result []net.IP) ([]net.IP, error)
+	// Servers nameserver list,eg 114.114.114.114:53
+	Servers []net.Addr
+
+	mux sync.RWMutex
 }
 
 // SetServers set servers

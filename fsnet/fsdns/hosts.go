@@ -47,10 +47,10 @@ func NewHostsFile(hostsPath string) *HostsFile {
 
 // HostsFile hosts file parser
 type HostsFile struct {
+	domains map[string][]net.IP
 	fsfs.WatchFile
 
-	domains map[string][]net.IP
-	mux     sync.RWMutex
+	mux sync.RWMutex
 }
 
 func (hf *HostsFile) getPath(fileName string) string {

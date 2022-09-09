@@ -36,22 +36,22 @@ const envActionKey = "fsgo_grace_action"
 
 // Option  grace 的配置选项
 type Option struct {
-	// StopTimeout 子进程优雅退出的超时时间
-	StopTimeout time.Duration
-
 	StatusDir string
 
 	LogDir string
 
-	// Keep 是否保持子进程存活
-	// 若为 true，当子进程不存在时，将自动拉起
-	Keep bool
+	// StopTimeout 子进程优雅退出的超时时间
+	StopTimeout time.Duration
 
 	// 检查版本的间隔时间，默认为 5 秒
 	CheckInterval time.Duration
 
 	// StartWait 可选，启动新进程后，老进程退出前的等待时间,默认为 3 秒
 	StartWait time.Duration
+
+	// Keep 是否保持子进程存活
+	// 若为 true，当子进程不存在时，将自动拉起
+	Keep bool
 }
 
 // Parser 参数解析、检查

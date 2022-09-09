@@ -34,6 +34,10 @@ func NewSimpleConfig() *Config {
 
 // Config 配置文件的结构体
 type Config struct {
+
+	// Workers 可选，工作进程配置
+	Workers map[string]*WorkerConfig `validate:"required,min=1"`
+
 	// StatusDir 必填，状态数据文件目录，如 主进程的 pid 文件都存放在这里
 	StatusDir string `validate:"required"`
 
@@ -44,17 +48,14 @@ type Config struct {
 	// StopTimeout 可选，优雅关闭的最长时间，若不填写使用默认值 "10s"
 	StopTimeout string
 
-	// Keep 可选，是否保持子进程一直存在
-	Keep bool
-
-	// Workers 可选，工作进程配置
-	Workers map[string]*WorkerConfig `validate:"required,min=1"`
-
 	// CheckInterval 可选，检查版本的间隔时间，默认为 "5s"
 	CheckInterval string
 
 	// StartWait 可选，启动新进程后，老进程退出前的等待时间,默认为 "5s"
 	StartWait string
+
+	// Keep 可选，是否保持子进程一直存在
+	Keep bool
 }
 
 var _ fsconf.AutoChecker = (*Config)(nil)
@@ -139,8 +140,6 @@ func LoadConfig(name string) (*Config, error) {
 
 // WorkerConfig worker 的配置
 type WorkerConfig struct {
-	// Listen 可选，监听的资源，如 "tcp@127.0.0.1:8909",
-	Listen []string
 
 	// EnvFile 可选，提前配置 Cmd 的环境变量的文件
 	// 在执行 Cmd 前，通过此文件获取env 信息
@@ -163,17 +162,19 @@ type WorkerConfig struct {
 	// Cmd 必填，工作进程的 cmd
 	Cmd string `validate:"required"`
 
-	// CmdArgs 可选，工作进程 cmd 的其他参数
-	CmdArgs []string
-
 	// StopTimeout  优雅关闭的最长时间，若不填写，则使用全局 Config 的
 	StopTimeout string
 
-	// Watches 可选，用于监听版本变化情况的文件列表
-	Watches []string
-
 	// StartWait 可选，启动新进程后，老进程退出前的等待时间,若不填写，则使用全局 Config 的
 	StartWait string
+	// Listen 可选，监听的资源，如 "tcp@127.0.0.1:8909",
+	Listen []string
+
+	// CmdArgs 可选，工作进程 cmd 的其他参数
+	CmdArgs []string
+
+	// Watches 可选，用于监听版本变化情况的文件列表
+	Watches []string
 }
 
 // Parser 解析当前配置

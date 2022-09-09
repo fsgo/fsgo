@@ -17,24 +17,25 @@ import (
 
 // Keeper 保持文件存在
 type Keeper struct {
+	info     os.FileInfo
 	FilePath func() string
-
-	// CheckInterval 检查间隔，可选
-	// 默认为 100ms
-	CheckInterval time.Duration
 
 	// OpenFile 创建文件的函数，可选
 	// 默认为 os.OpenFile(fp, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	OpenFile func(fp string) (*os.File, error)
 
-	file    *os.File
-	info    os.FileInfo
-	timer   *fstime.Interval
-	mux     sync.RWMutex
-	running bool
+	file  *os.File
+	timer *fstime.Interval
 
 	beforeChanges []func(f *os.File)
 	afterChanges  []func(f *os.File)
+
+	// CheckInterval 检查间隔，可选
+	// 默认为 100ms
+	CheckInterval time.Duration
+
+	mux     sync.RWMutex
+	running bool
 }
 
 // Start 开始,非阻塞运行

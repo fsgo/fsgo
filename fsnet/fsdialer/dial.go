@@ -38,17 +38,18 @@ var DialContext = func(ctx context.Context, network string, address string) (net
 
 // Simple dialer
 type Simple struct {
-	// Timeout 可选，超时时间
-	Timeout time.Duration
 
 	// Invoker 可选，底层拨号器
 	Invoker Dialer
 
+	// Resolver 可选，dns 解析
+	Resolver fsresolver.Resolver
+
 	// Interceptors 可选，拦截器列表
 	Interceptors []*Interceptor
 
-	// Resolver 可选，dns 解析
-	Resolver fsresolver.Resolver
+	// Timeout 可选，超时时间
+	Timeout time.Duration
 }
 
 var _ CanInterceptor = (*Simple)(nil)

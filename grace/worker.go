@@ -60,33 +60,36 @@ type resourceAndConsumer struct {
 
 // Worker 工作进程的逻辑
 type Worker struct {
-	main   *Grace
-	option *WorkerConfig
-
-	pid int // cmd 对应的 pid
-
-	// 创建当前 cmd 是对应的 cancel
-	cmdClose context.CancelFunc
-
-	resources []*resourceAndConsumer
-	mux       sync.Mutex
-	sub       *subProcess
-
-	event chan string
 
 	// 子进程上次退出时间
 	lastExit time.Time
 
-	stderr io.Writer
+	// 用于控制 cmd 子进程的 ctx
+	cmdCtx context.Context
 	stdout io.Writer
+
+	stderr io.Writer
+
+	// 创建当前 cmd 是对应的 cancel
+	cmdClose context.CancelFunc
+
+	sub *subProcess
+
+	event chan string
+
+	main   *Grace
+	option *WorkerConfig
+
+	resources []*resourceAndConsumer
+
+	pid int // cmd 对应的 pid
 
 	nextListenDSNIndex int
 
+	mux sync.Mutex
+
 	// 是否正在加载进程
 	isReloading bool
-
-	// 用于控制 cmd 子进程的 ctx
-	cmdCtx context.Context
 }
 
 // Register 注册新的消费者
@@ -197,11 +200,11 @@ func (w *Worker) start(ctx context.Context) error {
 }
 
 type watchStats struct {
+	LastSuc    time.Time
+	LastFail   time.Time
 	CheckTimes uint64 // 检查总次数
 	FailTimes  uint64 // 失败总次数
 	SucTimes   uint64 //
-	LastSuc    time.Time
-	LastFail   time.Time
 }
 
 func (rs *watchStats) String() string {
