@@ -62,7 +62,7 @@ func replayFile(fp string) {
 			return true
 		},
 	}
-	cs.Scan(f)
+	_ = cs.Scan(f)
 	cs.Close()
 
 	wg.Wait()

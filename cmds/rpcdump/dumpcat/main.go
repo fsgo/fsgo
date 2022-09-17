@@ -44,7 +44,7 @@ func catFile(fp string) {
 		return
 	}
 
-	conndump.Scan(f, func(msg *conndump.Message) bool {
+	_ = conndump.Scan(f, func(msg *conndump.Message) bool {
 		if *connID < 0 {
 			fmt.Println(internal.FormatMessage(msg, *detail))
 			return true

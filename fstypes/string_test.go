@@ -24,7 +24,7 @@ func TestString_ToInt64Slice(t *testing.T) {
 			name: "case 1",
 			s:    "1",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []int64{1},
 			wantErr: false,
@@ -33,7 +33,7 @@ func TestString_ToInt64Slice(t *testing.T) {
 			name: "case 2",
 			s:    "1 , 2 , 3 ,",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []int64{1, 2, 3},
 			wantErr: false,
@@ -42,7 +42,7 @@ func TestString_ToInt64Slice(t *testing.T) {
 			name: "case 3",
 			s:    "",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: false,
@@ -51,7 +51,7 @@ func TestString_ToInt64Slice(t *testing.T) {
 			name: "case 4",
 			s:    "abc",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: true,
@@ -60,7 +60,7 @@ func TestString_ToInt64Slice(t *testing.T) {
 			name: "case 5",
 			s:    "8589934592",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []int64{8589934592},
 			wantErr: false,
@@ -95,7 +95,7 @@ func TestString_ToIntSlice(t *testing.T) {
 			name: "case 1",
 			s:    "1",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []int{1},
 			wantErr: false,
@@ -104,7 +104,7 @@ func TestString_ToIntSlice(t *testing.T) {
 			name: "case 2",
 			s:    "1 , 2 , 3 ,",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []int{1, 2, 3},
 			wantErr: false,
@@ -113,7 +113,7 @@ func TestString_ToIntSlice(t *testing.T) {
 			name: "case 3",
 			s:    "",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: false,
@@ -122,7 +122,7 @@ func TestString_ToIntSlice(t *testing.T) {
 			name: "case 4",
 			s:    "abc",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: true,
@@ -157,7 +157,7 @@ func TestString_ToInt32Slice(t *testing.T) {
 			name: "case 1",
 			s:    "1",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []int32{1},
 			wantErr: false,
@@ -166,7 +166,7 @@ func TestString_ToInt32Slice(t *testing.T) {
 			name: "case 2",
 			s:    "1 , 2 , 3 ,",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []int32{1, 2, 3},
 			wantErr: false,
@@ -175,7 +175,7 @@ func TestString_ToInt32Slice(t *testing.T) {
 			name: "case 3",
 			s:    "",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: false,
@@ -184,7 +184,7 @@ func TestString_ToInt32Slice(t *testing.T) {
 			name: "case 4",
 			s:    "abc",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: true,
@@ -193,7 +193,7 @@ func TestString_ToInt32Slice(t *testing.T) {
 			name: "case 5",
 			s:    "8589934592",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: true,
@@ -228,7 +228,7 @@ func TestString_ToUint64Slice(t *testing.T) {
 			name: "case 1",
 			s:    "1",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []uint64{1},
 			wantErr: false,
@@ -237,7 +237,7 @@ func TestString_ToUint64Slice(t *testing.T) {
 			name: "case 2",
 			s:    "1 , 2 , 3, ",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []uint64{1, 2, 3},
 			wantErr: false,
@@ -246,7 +246,7 @@ func TestString_ToUint64Slice(t *testing.T) {
 			name: "case 3",
 			s:    "",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: false,
@@ -255,7 +255,7 @@ func TestString_ToUint64Slice(t *testing.T) {
 			name: "case 4",
 			s:    "abc",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: true,
@@ -290,7 +290,7 @@ func TestString_ToUint32Slice(t *testing.T) {
 			name: "case 1",
 			s:    "1",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []uint32{1},
 			wantErr: false,
@@ -299,7 +299,7 @@ func TestString_ToUint32Slice(t *testing.T) {
 			name: "case 2",
 			s:    "1 , 2 , 3 ,",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    []uint32{1, 2, 3},
 			wantErr: false,
@@ -308,7 +308,7 @@ func TestString_ToUint32Slice(t *testing.T) {
 			name: "case 3",
 			s:    "",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: false,
@@ -317,7 +317,7 @@ func TestString_ToUint32Slice(t *testing.T) {
 			name: "case 4",
 			s:    "abc",
 			args: args{
-				",",
+				sep: ",",
 			},
 			want:    nil,
 			wantErr: true,
