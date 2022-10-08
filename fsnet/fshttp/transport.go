@@ -78,7 +78,7 @@ func (t *Transport) dialTLS(ctx context.Context, req *http.Request, network, add
 	}
 
 	hostName := req.Host
-	if hostName == "" {
+	if len(hostName) == 0 {
 		hostName, _, _ = net.SplitHostPort(addr)
 	} else if strings.Contains(hostName, ":") {
 		hostName, _, _ = net.SplitHostPort(hostName)
@@ -90,7 +90,7 @@ func (t *Transport) dialTLS(ctx context.Context, req *http.Request, network, add
 func (t *Transport) connAddTLS(conn net.Conn, hostName string) net.Conn {
 	cfg := cloneTLSConfig(t.TLSClientConfig)
 
-	if cfg.ServerName == "" {
+	if len(cfg.ServerName) == 0 {
 		cfg.ServerName = hostName
 	}
 	return tls.Client(conn, cfg)
@@ -123,7 +123,7 @@ func (t *Transport) getAddress(req *http.Request) (address string, proxyURL *url
 	address = canonicalAddr(proxyURL)
 
 	proxyAuthVal := proxyAuth(proxyURL)
-	if proxyAuthVal != "" && req.URL.Scheme == "http" {
+	if len(proxyAuthVal) != 0 && req.URL.Scheme == "http" {
 		req.Header.Set(authKey, proxyAuthVal)
 	}
 	return address, proxyURL, nil
@@ -228,7 +228,7 @@ func proxyAuth(proxy *url.URL) string {
 func (t *Transport) proxyHTTPSConn(conn net.Conn, req *http.Request, proxy *url.URL) error {
 	proxyAuthVal := proxyAuth(proxy)
 	hdr := make(http.Header)
-	if proxyAuthVal != "" {
+	if len(proxyAuthVal) != 0 {
 		hdr.Set(authKey, proxyAuthVal)
 	}
 	address := canonicalAddr(req.URL)

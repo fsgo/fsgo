@@ -114,7 +114,7 @@ func (kf *Keeper) AfterChange(fn func(f *os.File)) {
 func (kf *Keeper) checkFile() error {
 	fp := kf.FilePath()
 
-	if fp == "" {
+	if len(fp) == 0 {
 		return errors.New("empty file path")
 	}
 

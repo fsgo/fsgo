@@ -6,8 +6,8 @@ package main
 
 import (
 	"go/format"
-	"io/ioutil"
 	"log"
+	"os"
 	"strings"
 )
 
@@ -27,7 +27,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	ioutil.WriteFile("slice_number.go", out, 0644)
+	os.WriteFile("slice_number.go", out, 0644)
 }
 
 var types = []*tplData{

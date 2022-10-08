@@ -65,6 +65,7 @@ type Worker struct {
 
 	// 用于控制 cmd 子进程的 ctx
 	cmdCtx context.Context
+
 	stdout io.Writer
 
 	stderr io.Writer

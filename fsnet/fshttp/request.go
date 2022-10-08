@@ -60,7 +60,7 @@ func canonicalAddr(url *url.URL) string {
 		addr = v
 	}
 	port := url.Port()
-	if port == "" {
+	if len(port) == 0 {
 		port = portMap[url.Scheme]
 	}
 	return net.JoinHostPort(addr, port)

@@ -8,7 +8,6 @@ import (
 	"errors"
 	"flag"
 	"io"
-	"io/ioutil"
 	"log"
 	"net"
 	"time"
@@ -46,7 +45,7 @@ func startDumpServer(l net.Listener) error {
 	handler := func(conn net.Conn) {
 		defer conn.Close()
 		log.Println("connect:", conn.RemoteAddr())
-		n, err := io.Copy(ioutil.Discard, conn)
+		n, err := io.Copy(io.Discard, conn)
 		log.Println("disconnect:", conn.RemoteAddr(), "read=", n, "err=", err)
 	}
 

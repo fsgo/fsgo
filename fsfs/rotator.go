@@ -149,7 +149,7 @@ func (f *Rotator) setupClean() {
 }
 
 func (f *Rotator) setFilePathFn() error {
-	if f.Path == "" {
+	if len(f.Path) == 0 {
 		return errors.New("f.Path is empty")
 	}
 

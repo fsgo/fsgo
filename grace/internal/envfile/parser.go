@@ -9,7 +9,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/exec"
 	"regexp"
@@ -30,7 +29,7 @@ func ParserFile(ctx context.Context, fp string) ([]string, error) {
 
 	//  若是文本文件，尺寸应该是比较小
 	if info.Size() < txtEnvMax {
-		bf, err := ioutil.ReadFile(fp)
+		bf, err := os.ReadFile(fp)
 		if err != nil {
 			return nil, err
 		}

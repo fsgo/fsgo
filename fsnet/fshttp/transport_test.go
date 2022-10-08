@@ -6,7 +6,7 @@ package fshttp
 
 import (
 	"crypto/tls"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,7 +31,7 @@ func TestTransport_RoundTrip(t *testing.T) {
 		resp, err := cli.Get(ts.URL)
 		require.Nil(t, err)
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		require.Nil(t, err)
 		require.Nil(t, resp.Body.Close())
 		require.Equal(t, "hello", string(body))
@@ -51,7 +51,7 @@ func TestTransport_RoundTrip(t *testing.T) {
 		resp, err := cli.Get(ts.URL)
 		require.Nil(t, err)
 
-		body, err := ioutil.ReadAll(resp.Body)
+		body, err := io.ReadAll(resp.Body)
 		require.Nil(t, err)
 		require.Nil(t, resp.Body.Close())
 		require.Equal(t, "hello", string(body))

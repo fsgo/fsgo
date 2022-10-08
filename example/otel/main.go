@@ -8,7 +8,6 @@ import (
 	"context"
 	"flag"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 
@@ -75,7 +74,7 @@ func handler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	defer resp.Body.Close()
-	bf, err := ioutil.ReadAll(io.LimitReader(resp.Body, 1024))
+	bf, err := io.ReadAll(io.LimitReader(resp.Body, 1024))
 	if err != nil {
 		handlerErr(w, err)
 		return

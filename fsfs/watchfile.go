@@ -6,7 +6,7 @@ package fsfs
 
 import (
 	"errors"
-	"io/ioutil"
+	"os"
 	"sync"
 	"time"
 )
@@ -63,7 +63,7 @@ func (wf *WatchFile) Load() error {
 	if wf.Parser == nil {
 		return errors.New("parser func is nil")
 	}
-	bf, err := ioutil.ReadFile(wf.FileName)
+	bf, err := os.ReadFile(wf.FileName)
 	if err != nil {
 		return err
 	}

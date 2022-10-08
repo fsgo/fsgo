@@ -45,7 +45,7 @@ type ResolvConf struct {
 }
 
 func (rf *ResolvConf) getPath(fileName string) string {
-	if fileName == "" {
+	if len(fileName) == 0 {
 		return "/etc/resolv.conf"
 	}
 	return fileName

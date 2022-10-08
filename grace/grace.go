@@ -8,7 +8,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -56,7 +55,7 @@ type Option struct {
 
 // Parser 参数解析、检查
 func (c *Option) Parser() error {
-	if c.StatusDir == "" {
+	if len(c.StatusDir) == 0 {
 		return errors.New("empty StatusDir")
 	}
 	return nil
@@ -151,7 +150,7 @@ func (g *Grace) Start(ctx context.Context) (err error) {
 		action = os.Args[1]
 	}
 
-	if do := os.Getenv(envActionKey); do != "" {
+	if do := os.Getenv(envActionKey); len(do) != 0 {
 		action = do
 	}
 
@@ -183,7 +182,7 @@ func (g *Grace) Start(ctx context.Context) (err error) {
 
 // mainProcess 找到主进程
 func (g *Grace) mainProcess() (*os.Process, error) {
-	bf, err := ioutil.ReadFile(g.Option.GetMainPIDPath())
+	bf, err := os.ReadFile(g.Option.GetMainPIDPath())
 	if err != nil {
 		return nil, err
 	}
@@ -242,7 +241,7 @@ func (g *Grace) writePIDFile() error {
 	if err := keepDir(filepath.Dir(pidPath)); err != nil {
 		return err
 	}
-	err := ioutil.WriteFile(pidPath, []byte(pidStr), 0644)
+	err := os.WriteFile(pidPath, []byte(pidStr), 0644)
 	return err
 }
 

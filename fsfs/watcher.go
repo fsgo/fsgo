@@ -47,7 +47,7 @@ type Watcher struct {
 
 // Watch add  file watch with callback
 func (w *Watcher) Watch(name string, callback func(event *WatcherEvent)) {
-	if name == "" {
+	if len(name) == 0 {
 		panic("name is empty")
 	}
 	if callback == nil {

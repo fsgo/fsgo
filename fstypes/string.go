@@ -74,7 +74,7 @@ func (s String) Split(sep string) []string {
 	result := make([]string, 0, len(vs))
 	for i := 0; i < len(vs); i++ {
 		v := strings.TrimSpace(vs[i])
-		if v == "" {
+		if len(v) == 0 {
 			continue
 		}
 		result = append(result, v)
@@ -83,11 +83,11 @@ func (s String) Split(sep string) []string {
 }
 
 func (s String) split(sep string) []string {
-	if s == "" {
+	if len(s) == 0 {
 		return nil
 	}
 	ts := strings.TrimSpace(string(s))
-	if ts == "" {
+	if len(ts) == 0 {
 		return nil
 	}
 	return strings.Split(string(s), sep)

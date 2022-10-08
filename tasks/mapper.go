@@ -58,7 +58,7 @@ func (m *Mapper) Execute(ctx context.Context) error {
 	if err := fs.Parse(os.Args[1:3]); err != nil {
 		return err
 	}
-	if name == "" {
+	if len(name) == 0 {
 		fs.PrintDefaults()
 		return errors.New("-name is empty")
 	}

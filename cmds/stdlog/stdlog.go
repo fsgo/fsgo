@@ -35,7 +35,7 @@ func main() {
 }
 
 func pipeRun() {
-	if *logName == "" {
+	if len(*logName) == 0 {
 		log.Fatalf("log_name is empty")
 	}
 	toRotateFile(*logName, os.Stdin)

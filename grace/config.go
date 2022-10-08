@@ -64,10 +64,10 @@ func (c *Config) AutoCheck() error {
 	if len(c.Workers) == 0 {
 		return errors.New("empty Workers")
 	}
-	if c.StatusDir == "" {
+	if len(c.StatusDir) == 0 {
 		return errors.New("empty StatusDir")
 	}
-	if c.LogDir == "" {
+	if len(c.LogDir) == 0 {
 		return errors.New("empty LogDir")
 	}
 
@@ -75,7 +75,7 @@ func (c *Config) AutoCheck() error {
 		if e := w.Parser(); e != nil {
 			return e
 		}
-		if w.LogDir == "" {
+		if len(w.LogDir) == 0 {
 			w.LogDir = filepath.Join(c.LogDir, name)
 		}
 	}
@@ -206,7 +206,7 @@ func statVersion(info os.FileInfo) string {
 }
 
 func (c *WorkerConfig) getFilePath(p string) string {
-	if c.HomeDir == "" {
+	if len(c.HomeDir) == 0 {
 		return p
 	}
 	if filepath.IsAbs(p) {
@@ -216,7 +216,7 @@ func (c *WorkerConfig) getFilePath(p string) string {
 }
 
 func (c *WorkerConfig) getEnvFilePath() string {
-	if c.EnvFile == "" {
+	if len(c.EnvFile) == 0 {
 		return ""
 	}
 	return c.getFilePath(c.EnvFile)
@@ -246,7 +246,7 @@ func (c *WorkerConfig) version() string {
 	cmd, _ := c.getWorkerCmd()
 
 	files := make([]string, 0, 3+len(c.Watches))
-	if p := c.getEnvFilePath(); p != "" {
+	if p := c.getEnvFilePath(); len(p) != 0 {
 		files = append(files, p)
 	}
 
