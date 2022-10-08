@@ -20,8 +20,9 @@ type Interval struct {
 
 	// Concurrency 回调任务并发度，当为 0 时，为全并发
 	Concurrency int
-	mux         sync.RWMutex
-	stopped     int32
+
+	mux     sync.RWMutex
+	stopped int32
 }
 
 // Start 启动任务
