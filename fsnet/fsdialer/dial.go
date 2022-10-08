@@ -38,7 +38,6 @@ var DialContext = func(ctx context.Context, network string, address string) (net
 
 // Simple dialer
 type Simple struct {
-
 	// Invoker 可选，底层拨号器
 	Invoker Dialer
 
@@ -143,7 +142,6 @@ func (d *Simple) stdDial(ctx context.Context, network string, address string) (n
 			}
 		}
 		return nil, err
-
 	}
 	return d.dial(ctx, network, address)
 }

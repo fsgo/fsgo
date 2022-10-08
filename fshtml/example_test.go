@@ -18,6 +18,7 @@ func ExampleNewUl() {
 	// Output:
 	// <ul><li>1</li><li>2</li><li>3</li></ul>
 }
+
 func ExampleNewOl() {
 	values := []string{"1", "2", "3"}
 	ul := fshtml.NewOl(values)

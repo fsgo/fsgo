@@ -73,7 +73,6 @@ func (aw *AsyncWriter) init() {
 		}
 		close(aw.closeDone)
 	}()
-
 }
 
 // LastWriteStatus 返回的是异步写的最新一次的状态

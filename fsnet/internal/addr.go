@@ -51,6 +51,7 @@ func parseIPv6Zone(s string) (net.IP, string) {
 	s, zone := splitHostZone(s)
 	return net.ParseIP(s), zone
 }
+
 func splitHostZone(s string) (host, zone string) {
 	// The IPv6 scoped addressing zone identifier starts after the
 	// last percent sign.
@@ -61,6 +62,7 @@ func splitHostZone(s string) (host, zone string) {
 	}
 	return
 }
+
 func last(s string, b byte) int {
 	i := len(s)
 	for i--; i >= 0; i-- {

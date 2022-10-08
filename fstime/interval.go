@@ -17,6 +17,7 @@ type Interval struct {
 	tk     *time.Ticker
 	closed chan struct{}
 	fns    []func()
+
 	// Concurrency 回调任务并发度，当为 0 时，为全并发
 	Concurrency int
 	mux         sync.RWMutex

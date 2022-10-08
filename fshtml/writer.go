@@ -76,6 +76,7 @@ func (w *bufWriter) writeBytes(sep string, bf []byte) {
 		_, w.err = w.bf.Write(bf)
 	}
 }
+
 func (w *bufWriter) writeString(sep string, bf string) {
 	// 当 bf 不为空时，才写入 sep
 	if len(sep) > 0 && len(bf) > 0 {

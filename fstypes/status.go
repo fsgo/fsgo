@@ -51,6 +51,7 @@ type GroupEnableStatus struct {
 	all atomic.Value
 
 	detail sync.Map
+
 	// Default 未设置时的默认值
 	Default bool
 }

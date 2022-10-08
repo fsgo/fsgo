@@ -48,6 +48,7 @@ func handlerSlow(w http.ResponseWriter, _ *http.Request) {
 	time.Sleep(5 * time.Second)
 	w.Write([]byte("hello"))
 }
+
 func handlerPanic(_ http.ResponseWriter, _ *http.Request) {
 	panic("must panic")
 }

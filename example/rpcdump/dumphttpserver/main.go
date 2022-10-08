@@ -45,6 +45,7 @@ func startHTTPServer(l net.Listener) error {
 	}
 	return hs.Serve(l)
 }
+
 func hello(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write([]byte(r.RequestURI))
 }

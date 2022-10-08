@@ -55,7 +55,6 @@ func stopCmd(ctx context.Context, pid int) error {
 			if !pidExists(pid) {
 				return nil
 			}
-
 		}
 	}
 }

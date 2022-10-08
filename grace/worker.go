@@ -60,7 +60,6 @@ type resourceAndConsumer struct {
 
 // Worker 工作进程的逻辑
 type Worker struct {
-
 	// 子进程上次退出时间
 	lastExit time.Time
 

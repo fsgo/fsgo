@@ -79,7 +79,6 @@ func TestNewConn(t *testing.T) {
 
 			assert.Equal(t, 1, closeNum)
 		})
-
 	})
 }
 

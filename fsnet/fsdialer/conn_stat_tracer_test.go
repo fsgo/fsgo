@@ -67,5 +67,4 @@ func TestTraces(t *testing.T) {
 		got := readHK.ReadBytes()
 		assert.Contains(t, string(got), string(want))
 	})
-
 }

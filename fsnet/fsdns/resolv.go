@@ -101,6 +101,7 @@ func (re *ResolverConfig) parserNameserver(info []string) {
 func (re *ResolverConfig) parserSearch(info []string) {
 	re.Search = append(re.Search, info...)
 }
+
 func (re *ResolverConfig) parserOptions(info []string) {
 	re.Options = append(re.Options, info...)
 }

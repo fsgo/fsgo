@@ -18,6 +18,7 @@ import (
 const (
 	// WatcherEventUpdate contains create and update ent
 	WatcherEventUpdate = "update"
+
 	// WatcherEventDelete  delete event
 	WatcherEventDelete = "delete"
 )

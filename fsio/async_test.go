@@ -41,5 +41,4 @@ func TestAsyncWriter(t *testing.T) {
 		want := WriteStatus{}
 		require.Equal(t, want, aw.LastWriteStatus())
 	})
-
 }

@@ -43,7 +43,6 @@ func (r *Router) Handle(ctx context.Context, conn net.Conn) {
 			return
 		}
 	}
-
 }
 
 func (r *Router) Register(service, method string, handler Handler) {

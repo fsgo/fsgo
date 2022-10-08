@@ -40,5 +40,4 @@ func Test_parseNumber(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, float64(123.1), got)
 	})
-
 }

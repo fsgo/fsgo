@@ -19,7 +19,6 @@ import (
 
 // Copy 实现对网络连接读写数据的复制
 type Copy struct {
-
 	// ReadTo 将 Read 到的数据写入此处,比如 os.Stdout
 	ReadTo io.Writer
 
