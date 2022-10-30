@@ -475,14 +475,14 @@ func (w *Worker) reload(ctx context.Context) (err error) {
 	for {
 		select {
 		case <-tm.C:
-			break
+			goto doCheck
 		case <-tk.C:
 			if errCheck := checkNewPID(); errCheck != nil {
 				return errCheck
 			}
 		}
 	}
-
+doCheck:
 	if errCheck := checkNewPID(); errCheck != nil {
 		return errCheck
 	}

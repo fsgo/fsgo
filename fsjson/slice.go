@@ -9,11 +9,8 @@ package fsjson
 import (
 	"bytes"
 	"encoding/json"
-	"errors"
 	"strings"
 )
-
-var errNotSupport = errors.New("fsjson not support")
 
 var _ json.Unmarshaler = (*StringSlice)(nil)
 

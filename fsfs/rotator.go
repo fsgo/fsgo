@@ -40,8 +40,6 @@ type Rotator struct {
 	// Path 文件名
 	Path string
 
-	timer time.Timer
-
 	// MaxFiles 最多保留文件数，超过的文件将被清理掉，默认值为 24
 	// 若值为 -1，则保留所有文件
 	MaxFiles int
@@ -51,7 +49,6 @@ type Rotator struct {
 	// 如文件被删除了，则最大间隔 MaxDelay 时长会检查到
 	MaxDelay time.Duration
 
-	mux       sync.RWMutex
 	onceSetup sync.Once
 	onceInit  sync.Once
 }

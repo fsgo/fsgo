@@ -97,7 +97,7 @@ func (client *Client) SetServers(servers []net.Addr) {
 // GetServers get servers
 func (client *Client) GetServers() []net.Addr {
 	client.mux.RLock()
-	client.mux.RUnlock()
+	defer client.mux.RUnlock()
 	return client.Servers
 }
 

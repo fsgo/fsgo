@@ -53,7 +53,7 @@ func startDumpServer(l net.Listener) error {
 		conn, err := l.Accept()
 		if err != nil {
 			var ne net.Error
-			if errors.As(err, &ne) && ne.Temporary() {
+			if errors.As(err, &ne) {
 				time.Sleep(5 * time.Millisecond)
 				continue
 			}

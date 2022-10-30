@@ -20,12 +20,12 @@ var extRule = flag.String("rotate", "1hour", "file rotate rule, allow: 1hour, 1d
 func init() {
 	flag.Usage = func() {
 		out := flag.CommandLine.Output()
-		fmt.Fprintf(out, "redirect stdin pipe stream to rotate file\n")
-		fmt.Fprintf(out, "site: github.com/fsgo/fsgo/cmds/stdlog\n")
-		fmt.Fprintf(out, "version: 20210828\n")
+		fmt.Fprint(out, "redirect stdin pipe stream to rotate file\n")
+		fmt.Fprint(out, "site: github.com/fsgo/fsgo/cmds/stdlog\n")
+		fmt.Fprint(out, "version: 20210828\n")
 		fmt.Fprintf(out, "Usage of %s:\n", os.Args[0])
 		flag.PrintDefaults()
-		fmt.Fprintf(out, "as default, file name is like 'stdout.log.2021082819'\n")
+		fmt.Fprint(out, "as default, file name is like 'stdout.log.2021082819'\n")
 	}
 }
 
@@ -36,7 +36,7 @@ func main() {
 
 func pipeRun() {
 	if len(*logName) == 0 {
-		log.Fatalf("log_name is empty")
+		log.Fatal("log_name is empty")
 	}
 	toRotateFile(*logName, os.Stdin)
 }

@@ -65,7 +65,7 @@ func (gs *GroupEnableStatus) IsEnable(key any) bool {
 		}
 		return gs.Default
 	}
-	return value == true
+	return value.(bool)
 }
 
 // SetEnable 设置状态
@@ -102,7 +102,7 @@ func (gs *GroupEnableStatus) String() string {
 	gs.detail.Range(func(key, value any) bool {
 		b.WriteString(fmt.Sprint(key))
 		b.WriteString(":")
-		if value == true {
+		if value.(bool) {
 			b.WriteString("true,")
 		} else {
 			b.WriteString("false,")
