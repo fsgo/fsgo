@@ -143,7 +143,7 @@ func (r *Cached) withCache(ctx context.Context, key string, cacheKey any,
 	}
 	cache := r.getCache(key)
 	cacheData := cache.Get(ctx, cacheKey)
-	if cacheData.Err() == nil {
+	if cacheData.Err == nil {
 		var data any
 		if has, err := cacheData.Value(&data); has && err == nil {
 			return data, nil
