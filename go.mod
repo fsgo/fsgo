@@ -4,8 +4,8 @@ go 1.19
 
 require (
 	github.com/fsgo/fscache v0.0.0-20221106082135-4385911b5ab4
-	github.com/fsgo/fsconf v0.2.6
-	github.com/fsgo/fsenv v0.3.0
+	github.com/fsgo/fsconf v0.2.8
+	github.com/fsgo/fsenv v0.3.2
 	github.com/golang/snappy v0.0.4
 	github.com/miekg/dns v1.1.50
 	github.com/stretchr/testify v1.8.1
@@ -15,7 +15,7 @@ require (
 )
 
 require (
-	github.com/BurntSushi/toml v1.2.0 // indirect
+	github.com/BurntSushi/toml v1.2.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
 	github.com/go-playground/universal-translator v0.18.0 // indirect
