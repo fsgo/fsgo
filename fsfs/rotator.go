@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -151,9 +152,9 @@ func (f *Rotator) setFilePathFn() error {
 	}
 
 	if len(f.ExtRule) > 0 {
-		if fn, has := rotateExtRules[f.ExtRule]; has {
+		if rule, has := rotateExtRules[f.ExtRule]; has {
 			f.filePathFn = func() string {
-				return f.Path + fn()
+				return f.Path + rule.Fn(time.Now())
 			}
 			return nil
 		}
@@ -204,53 +205,142 @@ func (f *Rotator) Close() error {
 	return nil
 }
 
-var rotateExtRules = map[string]func() string{
-	"no": func() string {
-		return ""
+// RotateRule 切割规则
+type RotateRule struct {
+	Name  string
+	Fn    func(now time.Time) string
+	Cycle time.Duration
+}
+
+var rotateExtRules = map[string]*RotateRule{
+	"no": {
+		Name: "no",
+		Fn: func(now time.Time) string {
+			return ""
+		},
+		Cycle: 0,
 	},
-	"1year": func() string {
-		return "." + time.Now().Format("2006")
+	"1year": {
+		Name: "1year",
+		Fn: func(now time.Time) string {
+			return "." + now.Format("2006")
+		},
+		Cycle: 365 * 24 * time.Hour,
 	},
-	"1month": func() string {
-		return "." + time.Now().Format("200601")
+	"1month": {
+		Name: "1month",
+		Fn: func(now time.Time) string {
+			return "." + now.Format("200601")
+		},
+		Cycle: 30 * 24 * time.Hour,
 	},
-	"1day": func() string {
-		return "." + time.Now().Format("20060102")
+	"1week": {
+		Name: "1week",
+		Fn: func(now time.Time) string {
+			dt := now.AddDate(0, 0, -1*int(now.Weekday()))
+			return "." + dt.Format("20060102")
+		},
+		Cycle: 7 * 24 * time.Hour,
 	},
-	"1hour": func() string {
-		// eg: .2022040611,.2022040612,.2022040613
-		return "." + time.Now().Format("2006010215")
+	"1day": {
+		Name: "1day",
+		Fn: func(now time.Time) string {
+			return "." + now.Format("20060102")
+		},
+		Cycle: 24 * time.Hour,
 	},
-	"1minute": func() string {
-		// eg: .202204061100,.202204061101,.202204061102
-		return "." + time.Now().Format("200601021504")
+	"1hour": {
+		Name: "1hour",
+		Fn: func(now time.Time) string {
+			// eg: .2022040611,.2022040612,.2022040613
+			return "." + now.Format("2006010215")
+		},
+		Cycle: time.Hour,
 	},
-	"5minute": func() string {
-		// eg: .202204061100,.202204061105,.202204061110
-		return nMinuteExt(5)
+	"1minute": {
+		Name: "1minute",
+		Fn: func(now time.Time) string {
+			// eg: .202204061100,.202204061101,.202204061102
+			return "." + now.Format("200601021504")
+		},
+		Cycle: time.Minute,
 	},
-	"10minute": func() string {
-		// eg: .202204061100,.202204061110,.202204061120
-		return nMinuteExt(10)
+	"5minute": {
+		Name: "5minute",
+		Fn: func(now time.Time) string {
+			// eg: .202204061100,.202204061105,.202204061110
+			return nMinuteExt(now, 5)
+		},
+		Cycle: 5 * time.Minute,
 	},
-	"15minute": func() string {
-		// eg: .202204061100,.202204061115,.202204061130
-		return nMinuteExt(15)
+	"10minute": {
+		Name: "10minute",
+		Fn: func(now time.Time) string {
+			// eg: .202204061100,.202204061110,.202204061120
+			return nMinuteExt(now, 10)
+		},
+		Cycle: 10 * time.Minute,
 	},
-	"20minute": func() string {
-		// eg: .202204061100,.202204061120,.202204061140
-		return nMinuteExt(20)
+	"15minute": {
+		Name: "15minute",
+		Fn: func(now time.Time) string {
+			// eg: .202204061100,.202204061115,.202204061130
+			return nMinuteExt(now, 15)
+		},
+		Cycle: 15 * time.Minute,
 	},
-	"30minute": func() string {
-		// eg: .202204061100,.202204061130
-		return nMinuteExt(30)
+	"20minute": {
+		Name: "20minute",
+		Fn: func(now time.Time) string {
+			// eg: .202204061100,.202204061120,.202204061140
+			return nMinuteExt(now, 20)
+		},
+		Cycle: 20 * time.Minute,
 	},
-	"1second": func() string {
-		return "." + time.Now().Format("20060102150405")
+	"30minute": {
+		Name: "30minute",
+		Fn: func(now time.Time) string {
+			// eg: .202204061100,.202204061130
+			return nMinuteExt(now, 30)
+		},
+		Cycle: 30 * time.Minute,
+	},
+	"1second": {
+		Name: "1second",
+		Fn: func(now time.Time) string {
+			return "." + now.Format("20060102150405")
+		},
+		Cycle: time.Second,
 	},
 }
 
-func nMinuteExt(n int) string {
-	now := time.Now()
+// SetRotateRule 设置新的切割规则，若和原有的重复，会覆盖掉
+func SetRotateRule(rules ...*RotateRule) error {
+	for _, rule := range rules {
+		if len(rule.Name) == 0 || rule.Fn == nil || rule.Cycle <= 0 {
+			return fmt.Errorf("invalid RotateRule: %v", rule)
+		}
+		rotateExtRules[rule.Name] = rule
+	}
+	return nil
+}
+
+func nMinuteExt(now time.Time, n int) string {
 	return "." + now.Format("2006010215") + fmt.Sprintf("%02d", now.Minute()/n*n)
+}
+
+// RotateRuleNames 返回所有切割规则的名称，已按照切割间隔升序排列
+func RotateRuleNames() []string {
+	all := make([]*RotateRule, 0, len(rotateExtRules))
+	for _, rule := range rotateExtRules {
+		all = append(all, rule)
+	}
+	sort.Slice(all, func(i, j int) bool {
+		return all[i].Cycle < all[j].Cycle
+	})
+	list := make([]string, 0, len(rotateExtRules))
+	for _, rule := range all {
+		list = append(list, rule.Name)
+	}
+	return list
 }

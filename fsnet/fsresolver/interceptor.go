@@ -6,9 +6,7 @@ package fsresolver
 
 import (
 	"context"
-	"math/rand"
 	"net"
-	"time"
 )
 
 // Interceptor  Resolver Interceptor
@@ -91,10 +89,6 @@ func (rhs interceptors) CallLookupIPAddr(ctx context.Context, host string, invok
 	return rhs[idx].LookupIPAddr(ctx, host, func(ctx context.Context, host string) ([]net.IPAddr, error) {
 		return rhs.CallLookupIPAddr(ctx, host, invoker, idx+1)
 	})
-}
-
-func init() {
-	rand.Seed(time.Now().UnixNano())
 }
 
 // TryRegisterInterceptor 尝试给 Default 注册 Interceptor

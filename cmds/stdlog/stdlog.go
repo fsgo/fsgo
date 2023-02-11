@@ -10,12 +10,13 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/fsgo/fsgo/fsfs"
 )
 
 var logName = flag.String("name", "stdout.log", "file name")
-var extRule = flag.String("rotate", "1hour", "file rotate rule, allow: 1hour, 1day, no")
+var extRule = flag.String("rotate", "1hour", "file rotate rule, allow: "+strings.Join(fsfs.RotateRuleNames(), ", "))
 
 func init() {
 	flag.Usage = func() {

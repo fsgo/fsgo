@@ -7,12 +7,19 @@ package fscmd
 import (
 	"context"
 	"flag"
+	"io"
 )
 
-type Command struct {
-	FlagSet flag.FlagSet
+type Actuator interface {
+	Name() string
+	Setup(fs *Config)
+	FlagSet(fs *flag.FlagSet)
+	Run(ctx context.Context, args []string) error
+	String() string
 }
 
-func (cmd *Command) Run(ctx context.Context, args []string) error {
-	return nil
+type Config struct {
+	Stdin  io.Reader
+	Stdout io.Writer
+	Stderr io.Writer
 }
