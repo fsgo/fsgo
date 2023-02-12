@@ -7,6 +7,9 @@ package fsresolver
 import (
 	"context"
 	"net"
+	"sync/atomic"
+
+	"github.com/fsgo/fsgo/fssync"
 )
 
 // Interceptor  Resolver Interceptor
@@ -118,5 +121,66 @@ func ToInterceptor(r Resolver) *Interceptor {
 		LookupIPAddr: func(ctx context.Context, host string, invoker LookupIPAddrFunc) ([]net.IPAddr, error) {
 			return r.LookupIPAddr(ctx, host)
 		},
+	}
+}
+
+// CacheInterceptor 总是缓存查询结果
+type CacheInterceptor struct {
+	ipCache           fssync.Map[[]net.IP]
+	cntFBLookupIP     atomic.Int64 // 查询失败，使用 cache 的计数
+	cntFBLookupIPAddr atomic.Int64 // 查询失败，使用 cache 的计数
+	ipAddrCache       fssync.Map[[]net.IPAddr]
+	disabled          atomic.Bool
+}
+
+func (ci *CacheInterceptor) Interceptor() *Interceptor {
+	return &Interceptor{
+		AfterLookupIP:     ci.afterLookupIP,
+		AfterLookupIPAddr: ci.afterLookupIPAddr,
+	}
+}
+
+// SetEnable 设置状态，默认是 enable 的
+func (ci *CacheInterceptor) SetEnable(enable bool) {
+	ci.disabled.Store(enable)
+}
+
+func (ci *CacheInterceptor) afterLookupIP(ctx context.Context, network, host string, ips []net.IP, err error) ([]net.IP, error) {
+	if ci.disabled.Load() {
+		return ips, err
+	}
+	key := network + "#" + host
+	if err == nil {
+		ci.ipCache.Store(key, ips)
+		return ips, nil
+	}
+	cv, ok := ci.ipCache.Load(key)
+	if ok {
+		ci.cntFBLookupIP.Add(1)
+		return cv, nil
+	}
+	return ips, err
+}
+
+func (ci *CacheInterceptor) afterLookupIPAddr(ctx context.Context, host string, addrs []net.IPAddr, err error) ([]net.IPAddr, error) {
+	if ci.disabled.Load() {
+		return addrs, err
+	}
+	if err == nil {
+		ci.ipAddrCache.Store(host, addrs)
+		return addrs, nil
+	}
+	cv, ok := ci.ipAddrCache.Load(host)
+	if ok {
+		ci.cntFBLookupIPAddr.Add(1)
+		return cv, nil
+	}
+	return addrs, err
+}
+
+func (ci *CacheInterceptor) Stats() map[string]int64 {
+	return map[string]int64{
+		"LookupIPFallback":     ci.cntFBLookupIP.Load(),
+		"LookupIPAddrFallback": ci.cntFBLookupIPAddr.Load(),
 	}
 }
