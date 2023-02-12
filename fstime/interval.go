@@ -22,7 +22,7 @@ type Interval struct {
 	Concurrency int
 
 	mux     sync.RWMutex
-	stopped int32
+	stopped atomic.Bool
 }
 
 // Start 启动任务
@@ -85,7 +85,7 @@ func (it *Interval) Stop() {
 	if !it.Running() {
 		return
 	}
-	atomic.StoreInt32(&it.stopped, 1)
+	it.stopped.Store(true)
 	it.tk.Stop()
 	close(it.closed)
 }
@@ -109,7 +109,7 @@ func (it *Interval) Reset(d time.Duration) {
 
 // Running 返回定时器的运行状态
 func (it *Interval) Running() bool {
-	return atomic.LoadInt32(&it.stopped) == 0
+	return !it.stopped.Load()
 }
 
 // Done 运行状态

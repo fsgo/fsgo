@@ -207,8 +207,8 @@ func (f *Rotator) Close() error {
 
 // RotateRule 切割规则
 type RotateRule struct {
-	Name  string
 	Fn    func(now time.Time) string
+	Name  string
 	Cycle time.Duration
 }
 
