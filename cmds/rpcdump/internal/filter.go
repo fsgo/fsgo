@@ -5,6 +5,8 @@
 package internal
 
 import (
+	"strings"
+
 	"github.com/fsgo/fsgo/fsnet/fsconn/conndump"
 )
 
@@ -13,15 +15,14 @@ func IsAction(a string, ac conndump.MessageAction) bool {
 	if len(a) == 0 {
 		return true
 	}
-	for i := 0; i < len(a); i++ {
-		switch a[i] {
-		case 'r':
-			return ac == conndump.MessageAction_Read
-		case 'w':
-			return ac == conndump.MessageAction_Write
-		case 'c':
-			return ac == conndump.MessageAction_Close
-		}
+	switch ac {
+	case conndump.MessageAction_Read:
+		return strings.Contains(a, "r")
+	case conndump.MessageAction_Write:
+		return strings.Contains(a, "w")
+	case conndump.MessageAction_Close:
+		return strings.Contains(a, "c")
+	default:
+		return false
 	}
-	return false
 }

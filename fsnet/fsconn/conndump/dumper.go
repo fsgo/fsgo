@@ -46,7 +46,7 @@ type Dumper struct {
 	clientReadStatus fstypes.GroupEnableStatus
 
 	connID   int64
-	connsMux sync.RWMutex
+	connsMux sync.RWMutex // 只用于管理连接
 
 	once sync.Once
 }
