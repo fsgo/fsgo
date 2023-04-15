@@ -6,61 +6,79 @@ package fssync
 
 import (
 	"sync"
+
+	"github.com/fsgo/fsgo/fssync/internal"
 )
 
-type Map[T any] struct {
-	_       noCopy
+type Map[K comparable, V any] struct {
+	_       internal.NoCopy
 	storage sync.Map
 }
 
-func (m *Map[T]) Load(key any) (value T, ok bool) {
+func (m *Map[K, V]) Load(key K) (value V, ok bool) {
 	v1, ok1 := m.storage.Load(key)
 	if !ok1 {
 		return value, false
 	}
-	v2, ok2 := v1.(T)
+	v2, ok2 := v1.(V)
 	return v2, ok2
 }
 
-func (m *Map[T]) LoadAndDelete(key any) (value T, loaded bool) {
+func (m *Map[K, V]) LoadAndDelete(key K) (value V, loaded bool) {
 	v, ok := m.storage.LoadAndDelete(key)
 	if !ok {
 		return value, false
 	}
-	return v.(T), true
+	return v.(V), true
 }
 
-func (m *Map[T]) LoadOrStore(key any, value T) (actual T, loaded bool) {
+func (m *Map[K, V]) LoadOrStore(key K, value V) (actual V, loaded bool) {
 	v, ok := m.storage.LoadOrStore(key, value)
-	return v.(T), ok
+	return v.(V), ok
 }
 
-func (m *Map[T]) Store(key any, value T) {
+func (m *Map[K, V]) Store(key K, value V) {
 	m.storage.Store(key, value)
 }
 
-func (m *Map[T]) Swap(key any, value T) (previous T, loaded bool) {
+func (m *Map[K, V]) Swap(key K, value V) (previous V, loaded bool) {
 	p, ok := m.storage.Swap(key, value)
 	if !ok {
 		return previous, false
 	}
-	return p.(T), true
+	return p.(V), true
 }
 
-func (m *Map[T]) CompareAndDelete(key any, old T) (deleted bool) {
+func (m *Map[K, V]) CompareAndDelete(key K, old V) (deleted bool) {
 	return m.storage.CompareAndDelete(key, old)
 }
 
-func (m *Map[T]) CompareAndSwap(key any, old T, new T) bool {
+func (m *Map[K, V]) CompareAndSwap(key K, old V, new V) bool {
 	return m.storage.CompareAndSwap(key, old, new)
 }
 
-func (m *Map[T]) Delete(key any) {
+func (m *Map[K, V]) Delete(key K) {
 	m.storage.Delete(key)
 }
 
-func (m *Map[T]) Range(fn func(key any, value T) bool) {
+func (m *Map[K, V]) Range(fn func(key K, value V) bool) {
 	m.storage.Range(func(key, value any) bool {
-		return fn(key, value.(T))
+		return fn(key.(K), value.(V))
+	})
+}
+
+func (m *Map[K, V]) Count() int {
+	var c int
+	m.storage.Range(func(_, _ any) bool {
+		c++
+		return true
+	})
+	return c
+}
+
+func (m *Map[K, V]) Purge() {
+	m.storage.Range(func(key any, _ any) bool {
+		m.storage.Delete(key)
+		return true
 	})
 }

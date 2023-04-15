@@ -1,8 +1,8 @@
-// Copyright(C) 2022 github.com/fsgo  All Rights Reserved.
+// Copyright(C) 2023 github.com/fsgo  All Rights Reserved.
 // Author: hidu <duv123@gmail.com>
-// Date: 2022/9/9
+// Date: 2023/4/15
 
-package fssync
+package fsatomic
 
 import (
 	"testing"
@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAtomicTimeStamp(t *testing.T) {
-	var a AtomicTimeStamp
+func TestTimeStamp(t *testing.T) {
+	var a TimeStamp
 	got1 := a.Load()
 	require.True(t, got1.IsZero(), got1.String())
 	now := time.Now()
@@ -31,8 +31,8 @@ func TestAtomicTimeStamp(t *testing.T) {
 	require.Greater(t, a.Since(time.Now()), time.Duration(0))
 }
 
-func BenchmarkAtomicTimeStamp_Load(b *testing.B) {
-	var a AtomicTimeStamp
+func BenchmarkTimeStamp_Load(b *testing.B) {
+	var a TimeStamp
 	a.Store(time.Now())
 	b.ResetTimer()
 	var tm time.Time

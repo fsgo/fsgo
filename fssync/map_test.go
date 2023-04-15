@@ -11,7 +11,7 @@ import (
 )
 
 func TestMapLoad(t *testing.T) {
-	var m1 Map[string]
+	var m1 Map[string, string]
 	key1 := "hello"
 	v1, ok1 := m1.Load(key1)
 	require.Equal(t, "", v1)
@@ -38,7 +38,7 @@ func TestMapLoad(t *testing.T) {
 	require.True(t, ok2)
 
 	var num1 int
-	m1.Range(func(key any, value string) bool {
+	m1.Range(func(key string, value string) bool {
 		num1++
 		require.Equal(t, key1, key)
 		require.Equal(t, "h1", value)

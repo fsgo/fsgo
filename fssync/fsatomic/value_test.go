@@ -1,8 +1,8 @@
-// Copyright(C) 2022 github.com/fsgo  All Rights Reserved.
+// Copyright(C) 2023 github.com/fsgo  All Rights Reserved.
 // Author: hidu <duv123@gmail.com>
-// Date: 2022/9/9
+// Date: 2023/4/15
 
-package fssync
+package fsatomic
 
 import (
 	"testing"
@@ -11,8 +11,8 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestAtomicValue_Load(t *testing.T) {
-	var val AtomicValue[time.Time]
+func TestValue_Load(t *testing.T) {
+	var val Value[time.Time]
 	require.True(t, val.Load().IsZero())
 	now := time.Now()
 	val.Store(now)
@@ -26,8 +26,8 @@ func TestAtomicValue_Load(t *testing.T) {
 	require.True(t, val.CompareAndSwap(n2, time.Now()))
 }
 
-func BenchmarkAtomicValue_Load(b *testing.B) {
-	var val AtomicValue[time.Time]
+func BenchmarkValue_Load(b *testing.B) {
+	var val Value[time.Time]
 	val.Store(time.Now())
 	b.ResetTimer()
 	var tm time.Time

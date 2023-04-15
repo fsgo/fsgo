@@ -126,8 +126,8 @@ func ToInterceptor(r Resolver) *Interceptor {
 
 // CacheInterceptor 总是缓存查询结果
 type CacheInterceptor struct {
-	ipCache           fssync.Map[[]net.IP]
-	ipAddrCache       fssync.Map[[]net.IPAddr]
+	ipCache           fssync.Map[string, []net.IP]
+	ipAddrCache       fssync.Map[string, []net.IPAddr]
 	cntFBLookupIP     atomic.Int64 // 查询失败，使用 cache 的计数
 	cntFBLookupIPAddr atomic.Int64 // 查询失败，使用 cache 的计数
 	disabled          atomic.Bool
