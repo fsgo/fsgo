@@ -12,8 +12,6 @@ import (
 
 // Interval 定时器
 type Interval struct {
-	concurrency chan struct{}
-
 	tk     *time.Ticker
 	closed chan struct{}
 	fns    []func()
@@ -32,9 +30,6 @@ func (it *Interval) Start(d time.Duration) {
 	}
 	it.tk = time.NewTicker(d)
 	it.closed = make(chan struct{})
-	if it.Concurrency > 0 {
-		it.concurrency = make(chan struct{}, it.Concurrency)
-	}
 	go it.goStart()
 }
 
@@ -69,12 +64,14 @@ func (it *Interval) runFns() {
 		return
 	}
 
+	limiter := make(chan struct{}, it.Concurrency)
+
 	for i := 0; i < len(it.fns); i++ {
-		it.concurrency <- struct{}{}
+		limiter <- struct{}{}
 		fn := it.fns[i]
 		go func() {
 			fn()
-			<-it.concurrency
+			<-limiter
 			wg.Done()
 		}()
 	}

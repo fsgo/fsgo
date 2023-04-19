@@ -22,13 +22,15 @@ type CanShutdown interface {
 	Shutdown(ctx context.Context) error
 }
 
-type CanShutdownServer interface {
+// GracefulServer 支持优雅关闭的 server
+type GracefulServer interface {
 	Server
 	CanShutdown
 }
 
-var _ CanShutdownServer = (*AnyServer)(nil)
+var _ GracefulServer = (*AnyServer)(nil)
 
+// AnyServer 一个通用的 server
 type AnyServer struct {
 	Handler Handler
 

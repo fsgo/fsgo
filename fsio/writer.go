@@ -30,7 +30,7 @@ func TryFlush(w io.Writer) error {
 
 // NewResetWriter wrap writer to ResetWriter
 func NewResetWriter(w io.Writer) ResetWriter {
-	if rw, ok := w.(*resetWriter); ok {
+	if rw, ok := w.(ResetWriter); ok {
 		return rw
 	}
 	return &resetWriter{
