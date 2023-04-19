@@ -159,15 +159,12 @@ func (w *Worker) start(ctx context.Context) error {
 	ch := make(chan os.Signal, 1)
 	signal.Notify(ch, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR2, syscall.SIGQUIT)
 
-	var stopped bool
-
 	// hold on
 	for {
 		select {
 		case <-ctx.Done():
 			w.logit("receive ctx.Done: ", ctx.Err())
 			watchCancel()
-			stopped = true
 			_ = w.stop(context.Background())
 			cmdCancel() // 在 stop 之后，让 cmd 尽量完成优雅退出
 			return ctx.Err()
@@ -178,7 +175,6 @@ func (w *Worker) start(ctx context.Context) error {
 			case syscall.SIGINT,
 				syscall.SIGQUIT,
 				syscall.SIGTERM:
-				stopped = true
 				watchCancel()
 				_ = w.stop(context.Background())
 				cmdCancel() // 在 stop 之后，让 cmd 尽量完成优雅退出
@@ -191,9 +187,7 @@ func (w *Worker) start(ctx context.Context) error {
 			w.logit("receive event:", e)
 			switch e {
 			case actionKeepSubProcess:
-				if !stopped {
-					_ = w.keepPrecess(w.cmdCtx)
-				}
+				_ = w.keepPrecess(w.cmdCtx)
 			}
 		}
 	}
@@ -215,6 +209,11 @@ func (rs *watchStats) String() string {
 func (w *Worker) watch(ctx context.Context) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	defer func() {
+		if re := recover(); re != nil {
+			w.logit("Worker.watch panic:", re)
+		}
+	}()
 
 	oldVersion := w.option.version()
 
@@ -224,6 +223,12 @@ func (w *Worker) watch(ctx context.Context) {
 	st := &watchStats{}
 
 	doCheck := func() bool {
+		defer func() {
+			if re := recover(); re != nil {
+				w.logit("Worker.watch.doCheck panic:", re)
+			}
+		}()
+
 		if err := ctx.Err(); err != nil {
 			w.logit("[watch] exit by ctx.Err():", err)
 			return false
@@ -312,7 +317,7 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 	}
 
 	envs := append(os.Environ(), userEnv...)
-	envs = append(envs, envActionKey+"="+actionSubStart)
+	envs = append(envs, envsForSubProcess()...)
 
 	ctx, cancel := context.WithCancel(ctx)
 	cmdName, args := w.option.getWorkerCmd()
@@ -343,6 +348,14 @@ func (w *Worker) forkAndStart(ctx context.Context) (ret error) {
 
 	go func() {
 		start := time.Now()
+
+		defer func() {
+			if re := recover(); re != nil {
+				w.logit("subprocess Wait panic:", re, ", duration=", time.Since(start), "cmd=", cmd.String())
+				w.event <- actionKeepSubProcess
+			}
+		}()
+
 		logFields := make(map[string]any)
 		errWait := cmd.Wait()
 		if cmd.Process != nil {

@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -39,10 +38,15 @@ func (sp *subProcess) Start(ctx context.Context) (errLast error) {
 	}()
 
 	errChan := make(chan error, len(sp.worker.resources))
-	for _, s := range sp.worker.resources {
-		go func(c Consumer) {
+	for idx, s := range sp.worker.resources {
+		go func(id int, c Consumer) {
+			defer func() {
+				if re := recover(); re != nil {
+					errChan <- fmt.Errorf("resource[%d] Start panic: %v", id, re)
+				}
+			}()
 			errChan <- c.Start(ctx)
-		}(s.Consumer)
+		}(idx, s.Consumer)
 	}
 
 	ch := make(chan os.Signal, 1)
@@ -82,6 +86,11 @@ func (sp *subProcess) Stop(ctx context.Context) (errStop error) {
 
 		go func(idx int, res Consumer) {
 			defer wg.Done()
+			defer func() {
+				if re := recover(); re != nil {
+					errChains <- fmt.Errorf("resource[%d] Stop panic: %v", idx, re)
+				}
+			}()
 
 			if err := res.Stop(ctx); err != nil {
 				errChains <- fmt.Errorf("resource[%d] (%s) Stop error: %w", idx, res.String(), err)
@@ -94,15 +103,14 @@ func (sp *subProcess) Stop(ctx context.Context) (errStop error) {
 
 	close(errChains)
 
-	var bd strings.Builder
+	var errs []error
 	for err := range errChains {
 		if err != nil {
-			bd.WriteString(err.Error())
-			bd.WriteString(";")
+			errs = append(errs, err)
 		}
 	}
-	if bd.Len() == 0 {
+	if len(errs) == 0 {
 		return nil
 	}
-	return errors.New(bd.String())
+	return errors.Join(errs...)
 }

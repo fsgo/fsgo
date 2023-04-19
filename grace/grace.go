@@ -31,8 +31,6 @@ const (
 	actionKeepSubProcess = "keep_sub_process"
 )
 
-const envActionKey = "fsgo_grace_action"
-
 // Option  grace 的配置选项
 type Option struct {
 	StatusDir string
@@ -150,8 +148,8 @@ func (g *Grace) Start(ctx context.Context) (err error) {
 		action = os.Args[1]
 	}
 
-	if do := os.Getenv(envActionKey); len(do) != 0 {
-		action = do
+	if len(envActionValue) != 0 {
+		action = envActionValue
 	}
 
 	switch action {
@@ -247,7 +245,7 @@ func (g *Grace) writePIDFile() error {
 
 func (g *Grace) actionMainStart(ctx context.Context) error {
 	defer func() {
-		os.Remove(g.Option.GetMainPIDPath())
+		_ = os.Remove(g.Option.GetMainPIDPath())
 	}()
 
 	wd, err := os.Getwd()
@@ -268,31 +266,44 @@ func (g *Grace) actionMainStart(ctx context.Context) error {
 }
 
 func (g *Grace) watchMainPid() {
+	defer func() {
+		if re := recover(); re != nil {
+			g.logit(fmt.Sprintf("watchMainPid panic: %v", re))
+		}
+	}()
+
 	pidPath := g.Option.GetMainPIDPath()
-	info, _ := os.Stat(pidPath)
-	last := info.ModTime()
 
-	tk := time.NewTicker(1 * time.Second)
-	defer tk.Stop()
+	var last time.Time
 
-	for range tk.C {
+	doCheck := func() {
 		info1, err := os.Stat(pidPath)
 		if err != nil {
 			g.logit(fmt.Sprintf("read MainPIDPath=%q stat failed, err=%v", pidPath, err))
 			if os.IsNotExist(err) {
 				err2 := g.writePIDFile()
 				g.logit("create MainPIDPath:", err2)
-			} else {
-				panic("read pid status failed, error=" + err.Error())
 			}
-			continue
+			return
+		}
+		current := info1.ModTime()
+		if last.IsZero() {
+			last = current
+			return
 		}
 
-		current := info1.ModTime()
 		if !last.Equal(current) {
 			last = current
 			_ = g.keepSubProcess(context.Background())
 		}
+	}
+
+	doCheck()
+	tk := time.NewTicker(time.Second)
+	defer tk.Stop()
+
+	for range tk.C {
+		doCheck()
 	}
 }
 
@@ -324,9 +335,4 @@ func (g *Grace) startWorkerProcess(ctx context.Context) error {
 	return g.workersDo(func(w *Worker) error {
 		return w.subProcessStart(ctx)
 	})
-}
-
-// IsSubProcess 是否子进程运行模式
-func IsSubProcess() bool {
-	return len(os.Getenv(envActionKey)) > 0
 }
