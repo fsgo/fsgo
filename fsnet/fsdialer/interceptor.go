@@ -9,6 +9,7 @@ import (
 	"net"
 
 	"github.com/fsgo/fsgo/fsnet/fsconn"
+	"github.com/fsgo/fsgo/fstypes"
 )
 
 // Interceptor  dialer interceptor
@@ -56,7 +57,7 @@ func (dc *dialerItCtx) All() []*Interceptor {
 	} else if len(dc.Its) == 0 {
 		return pits
 	}
-	return append(pits, dc.Its...)
+	return fstypes.SliceMerge(pits, dc.Its)
 }
 
 // ContextWithInterceptor set dialer Interceptor to context

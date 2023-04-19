@@ -236,9 +236,11 @@ func (d *Dumper) doDumpReadWrite(isClient bool, conn fsconn.Info, b []byte, size
 	d.writeMessage(isClient, msg)
 }
 
+const dumpMaxSize = 32 * 1024 * 1024
+
 func (d *Dumper) writeMessage(isClient bool, msg proto.Message) {
 	bf, err := proto.Marshal(msg)
-	if err != nil {
+	if err != nil || len(bf) > dumpMaxSize {
 		return
 	}
 	b1 := make([]byte, len(bf)+4)

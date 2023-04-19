@@ -56,22 +56,34 @@ func (w *resetWriter) Reset(raw io.Writer) {
 	w.mux.Unlock()
 }
 
-// MutexWriter wrap a writer with a mutex
-func MutexWriter(w io.Writer) io.Writer {
-	return &mutexWriter{
+// NewMutexWriter wrap a writer with a mutex
+func NewMutexWriter(w io.Writer) *MutexWriter {
+	return &MutexWriter{
 		Writer: w,
 	}
 }
 
-type mutexWriter struct {
-	io.Writer
-	mu sync.Mutex
+type MutexWriter struct {
+	Writer io.Writer
+	mu     sync.RWMutex
 }
 
-func (w *mutexWriter) Write(b []byte) (int, error) {
+func (w *MutexWriter) Write(b []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.Writer.Write(b)
+}
+
+func (w *MutexWriter) WithRLock(fn func(w io.Writer)) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+	fn(w.Writer)
+}
+
+func (w *MutexWriter) WithLock(fn func(w io.Writer)) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	fn(w.Writer)
 }
 
 // WriteStatus status for Write

@@ -6,6 +6,7 @@ package fsio
 
 import (
 	"bytes"
+	"io"
 	"sync"
 	"testing"
 
@@ -15,8 +16,9 @@ import (
 func TestAsyncWriter(t *testing.T) {
 	t.Run("normal", func(t *testing.T) {
 		b := &bytes.Buffer{}
+		mw := NewMutexWriter(b)
 		aw := &AsyncWriter{
-			Writer:     b,
+			Writer:     mw,
 			ChanSize:   100,
 			NeedStatus: true,
 		}
@@ -30,7 +32,10 @@ func TestAsyncWriter(t *testing.T) {
 			Wrote: 1,
 		}
 		require.Equal(t, want, aw.LastWriteStatus())
-		require.Equal(t, 1000, b.Len())
+
+		mw.WithRLock(func(_ io.Writer) {
+			require.Equal(t, 1000, b.Len())
+		})
 	})
 
 	t.Run("no write", func(t *testing.T) {

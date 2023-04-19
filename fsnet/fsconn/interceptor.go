@@ -8,6 +8,8 @@ import (
 	"context"
 	"net"
 	"time"
+
+	"github.com/fsgo/fsgo/fstypes"
 )
 
 type Info interface {
@@ -158,7 +160,9 @@ func (chs interceptors) CallSetWriteDeadline(info Info, dl time.Time, invoker fu
 	})
 }
 
-type ctxKey struct{}
+type ctxKey struct {
+	_ bool
+}
 
 var ctxKeyInterceptor = ctxKey{}
 
@@ -197,7 +201,7 @@ func (dc *connItCtx) All() []*Interceptor {
 	} else if len(dc.Its) == 0 {
 		return pits
 	}
-	return append(pits, dc.Its...)
+	return fstypes.SliceMerge(pits, dc.Its)
 }
 
 var globalConnIts []*Interceptor

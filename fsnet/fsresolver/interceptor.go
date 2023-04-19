@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/fsgo/fsgo/fssync"
+	"github.com/fsgo/fsgo/fstypes"
 )
 
 // Interceptor  Resolver Interceptor
@@ -44,7 +45,7 @@ func (dc *resolverItCtx) All() []*Interceptor {
 	} else if len(dc.Its) == 0 {
 		return pits
 	}
-	return append(pits, dc.Its...)
+	return fstypes.SliceMerge(pits, dc.Its)
 }
 
 // ContextWithInterceptor set Resolver Interceptor to context
