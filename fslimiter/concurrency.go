@@ -13,17 +13,13 @@ import (
 type Concurrency struct {
 	sem chan struct{}
 
-	// Max 最大并发度
+	// Max 最大并发度。若值 <1,则无限制
 	Max int
 
 	once sync.Once
 }
 
-func (c *Concurrency) init() {
-	c.sem = make(chan struct{}, c.Max)
-}
-
-// Wait 获取锁
+// Wait 获取令牌
 //
 // 返回的 func() 类型的值用于释放锁
 func (c *Concurrency) Wait() func() {
@@ -31,7 +27,7 @@ func (c *Concurrency) Wait() func() {
 	return release
 }
 
-// WaitContext 获取锁，若失败会返回 error
+// WaitContext 获取令牌，若失败会返回 error
 //
 // 返回的 第一个func() 类型的值用于释放锁
 func (c *Concurrency) WaitContext(ctx context.Context) (func(), error) {
@@ -47,6 +43,10 @@ func (c *Concurrency) WaitContext(ctx context.Context) (func(), error) {
 	case c.sem <- struct{}{}:
 		return c.release, nil
 	}
+}
+
+func (c *Concurrency) init() {
+	c.sem = make(chan struct{}, c.Max)
 }
 
 func (c *Concurrency) release() {

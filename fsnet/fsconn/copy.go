@@ -28,14 +28,14 @@ type Copy struct {
 	interceptor *Interceptor
 	once        sync.Once
 
-	disableRead  int32
-	disableWrite int32
+	disableRead  atomic.Bool
+	disableWrite atomic.Bool
 }
 
 func (cc *Copy) init() {
 	cc.interceptor = &Interceptor{
 		AfterRead: func(_ Info, b []byte, readSize int, err error) {
-			if atomic.LoadInt32(&cc.disableRead) == 1 {
+			if cc.disableRead.Load() {
 				return
 			}
 			if readSize > 0 && cc.ReadTo != nil {
@@ -43,7 +43,7 @@ func (cc *Copy) init() {
 			}
 		},
 		AfterWrite: func(_ Info, b []byte, wroteSize int, err error) {
-			if atomic.LoadInt32(&cc.disableWrite) == 1 {
+			if cc.disableWrite.Load() {
 				return
 			}
 			if wroteSize > 0 && cc.ReadTo != nil {
@@ -61,20 +61,12 @@ func (cc *Copy) Interceptor() *Interceptor {
 
 // EnableRead 设置是否允许 copy read 流量
 func (cc *Copy) EnableRead(enable bool) {
-	if enable {
-		atomic.StoreInt32(&cc.disableRead, 0)
-	} else {
-		atomic.StoreInt32(&cc.disableRead, 1)
-	}
+	cc.disableRead.Store(!enable)
 }
 
 // EnableWrite 设置是否允许 copy write 流量
 func (cc *Copy) EnableWrite(enable bool) {
-	if enable {
-		atomic.StoreInt32(&cc.disableWrite, 0)
-	} else {
-		atomic.StoreInt32(&cc.disableWrite, 1)
-	}
+	cc.disableWrite.Store(!enable)
 }
 
 var _ io.ReadWriteCloser = (*StreamConn)(nil)

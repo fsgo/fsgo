@@ -8,18 +8,19 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/fsgo/fsgo/fssync"
 )
 
 // Interval 定时器
 type Interval struct {
 	tk     *time.Ticker
 	closed chan struct{}
-	fns    []func()
+	fns    fssync.Slice[func()]
 
 	// Concurrency 回调任务并发度，当为 0 时，为全并发
 	Concurrency int
 
-	mux     sync.RWMutex
 	stopped atomic.Bool
 }
 
@@ -46,16 +47,14 @@ func (it *Interval) goStart() {
 }
 
 func (it *Interval) runFns() {
-	it.mux.RLock()
-	defer it.mux.RUnlock()
-
 	var wg sync.WaitGroup
-	wg.Add(len(it.fns))
+	allFns := it.fns.Load()
+	wg.Add(len(allFns))
 	defer wg.Wait()
 
 	if it.Concurrency < 1 {
-		for i := 0; i < len(it.fns); i++ {
-			fn := it.fns[i]
+		for i := 0; i < len(allFns); i++ {
+			fn := allFns[i]
 			go func() {
 				fn()
 				wg.Done()
@@ -66,9 +65,9 @@ func (it *Interval) runFns() {
 
 	limiter := make(chan struct{}, it.Concurrency)
 
-	for i := 0; i < len(it.fns); i++ {
+	for i := 0; i < len(allFns); i++ {
 		limiter <- struct{}{}
-		fn := it.fns[i]
+		fn := allFns[i]
 		go func() {
 			fn()
 			<-limiter
@@ -91,9 +90,7 @@ func (it *Interval) Stop() {
 //
 // 应确保函数不会 panic
 func (it *Interval) Add(fn func()) {
-	it.mux.Lock()
-	it.fns = append(it.fns, fn)
-	it.mux.Unlock()
+	it.fns.Add(fn)
 }
 
 // Reset 重置时间

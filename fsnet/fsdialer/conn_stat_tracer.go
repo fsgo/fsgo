@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/fsgo/fsgo/fsnet/fsconn"
+	"github.com/fsgo/fsgo/fssync/fsatomic"
 )
 
 // ConnStatTracer 用于获取网络状态的拦截器
@@ -19,15 +20,15 @@ type ConnStatTracer struct {
 	connInterceptor   *fsconn.Interceptor
 	dialerInterceptor *Interceptor
 
-	readSize int64
-	readCost int64
+	readSize atomic.Int64
+	readCost fsatomic.TimeDuration
 
-	writeSize int64
-	writeCost int64
+	writeSize atomic.Int64
+	writeCost fsatomic.TimeDuration
 
-	dialCost      int64
-	dialTimes     int64
-	dialFailTimes int64
+	dialCost      fsatomic.TimeDuration
+	dialTimes     atomic.Int64
+	dialFailTimes atomic.Int64
 
 	once sync.Once
 }
@@ -37,8 +38,8 @@ func (ch *ConnStatTracer) init() {
 		Read: func(_ fsconn.Info, b []byte, invoker func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
-				atomic.AddInt64(&ch.readCost, time.Since(start).Nanoseconds())
-				atomic.AddInt64(&ch.readSize, int64(n))
+				ch.readCost.Add(time.Since(start))
+				ch.readSize.Add(int64(n))
 			}()
 			return invoker(b)
 		},
@@ -46,8 +47,8 @@ func (ch *ConnStatTracer) init() {
 		Write: func(_ fsconn.Info, b []byte, invoker func([]byte) (int, error)) (n int, err error) {
 			start := time.Now()
 			defer func() {
-				atomic.AddInt64(&ch.writeCost, time.Since(start).Nanoseconds())
-				atomic.AddInt64(&ch.writeSize, int64(n))
+				ch.writeCost.Add(time.Since(start))
+				ch.writeSize.Add(int64(n))
 			}()
 			return invoker(b)
 		},
@@ -59,11 +60,11 @@ func (ch *ConnStatTracer) init() {
 
 			conn, err = invoker(ctx, network, address)
 
-			atomic.AddInt64(&ch.dialCost, time.Since(start).Nanoseconds())
-			atomic.AddInt64(&ch.dialTimes, 1)
+			ch.dialCost.Add(time.Since(start))
+			ch.dialTimes.Add(1)
 
 			if err != nil {
-				atomic.AddInt64(&ch.dialFailTimes, 1)
+				ch.dialFailTimes.Add(1)
 				return nil, err
 			}
 			return fsconn.WithInterceptor(conn, ch.connInterceptor), nil
@@ -85,48 +86,48 @@ func (ch *ConnStatTracer) DialerInterceptor() *Interceptor {
 
 // ReadSize 获取累计读到的的字节大小
 func (ch *ConnStatTracer) ReadSize() int64 {
-	return atomic.LoadInt64(&ch.readSize)
+	return ch.readSize.Load()
 }
 
 // ReadCost 获取累积的读耗时
 func (ch *ConnStatTracer) ReadCost() time.Duration {
-	return time.Duration(atomic.LoadInt64(&ch.readCost))
+	return ch.readCost.Load()
 }
 
 // WriteSize 获取累计写出的的字节大小
 func (ch *ConnStatTracer) WriteSize() int64 {
-	return atomic.LoadInt64(&ch.writeSize)
+	return ch.writeSize.Load()
 }
 
 // WriteCost 获取累积的写耗时
 func (ch *ConnStatTracer) WriteCost() time.Duration {
-	return time.Duration(atomic.LoadInt64(&ch.writeCost))
+	return ch.writeCost.Load()
 }
 
 // DialCost 获取累积的 Dial 耗时
 func (ch *ConnStatTracer) DialCost() time.Duration {
-	return time.Duration(atomic.LoadInt64(&ch.dialCost))
+	return ch.dialCost.Load()
 }
 
 // DialTimes 获取累积的 Dial 总次数
 func (ch *ConnStatTracer) DialTimes() int64 {
-	return atomic.LoadInt64(&ch.dialTimes)
+	return ch.dialTimes.Load()
 }
 
 // DialFailTimes 获取累积的 Dial 失败次数
 func (ch *ConnStatTracer) DialFailTimes() int64 {
-	return atomic.LoadInt64(&ch.dialFailTimes)
+	return ch.dialFailTimes.Load()
 }
 
 // Reset 将所有状态数据重置为 0
 func (ch *ConnStatTracer) Reset() {
-	atomic.StoreInt64(&ch.dialCost, 0)
-	atomic.StoreInt64(&ch.dialTimes, 0)
-	atomic.StoreInt64(&ch.dialFailTimes, 0)
+	ch.dialCost.Store(0)
+	ch.dialTimes.Store(0)
+	ch.dialFailTimes.Store(0)
 
-	atomic.StoreInt64(&ch.readSize, 0)
-	atomic.StoreInt64(&ch.readCost, 0)
+	ch.readSize.Store(0)
+	ch.readCost.Store(0)
 
-	atomic.StoreInt64(&ch.writeSize, 0)
-	atomic.StoreInt64(&ch.writeCost, 0)
+	ch.writeSize.Store(0)
+	ch.writeCost.Store(0)
 }

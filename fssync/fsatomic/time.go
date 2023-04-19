@@ -50,3 +50,5 @@ func (at *TimeStamp) After(n time.Time) bool {
 	v := atomic.LoadInt64((*int64)(at))
 	return v > n.UnixNano()
 }
+
+type TimeDuration = NumberInt64[time.Duration]
