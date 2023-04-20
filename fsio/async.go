@@ -5,7 +5,6 @@
 package fsio
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"io"
@@ -19,24 +18,36 @@ var _ io.WriteCloser = (*AsyncWriter)(nil)
 
 // AsyncWriter 异步化的 writer
 type AsyncWriter struct {
+	// Writer 实际 writer，必填
 	Writer io.Writer
 
-	writeStats fsatomic.Value[WriteStatus]
+	writeStats fsatomic.Value[WriteStatus] // 最新一条写入状态
+	buffers    chan []byte                 // 异步数据
+	callClosed chan bool                   // 调用 Close() 方法后的事件
+	loopExit   chan bool                   // 异步写完成后的事件
 
-	buffers chan *bytes.Buffer
-	pool    *sync.Pool
-
-	done     chan bool
+	// ChanSize 异步队列大小，可选
+	// 默认为 1024。当值为 -1 时，chanSize=0，即变为同步
 	ChanSize int
 
-	once sync.Once
+	once    sync.Once   // 用于初始化
+	initMux sync.Mutex  // 初始化时的锁
+	closed  atomic.Bool // 是否已经调用过 Close
 
-	closed     atomic.Bool
+	// NeedStatus 是否需要 write 的状态
 	NeedStatus bool
-	initMux    sync.Mutex
 }
 
 var errClosed = errors.New("already closed")
+
+func (aw *AsyncWriter) getChanSize() int {
+	if aw.ChanSize > 0 {
+		return aw.ChanSize
+	} else if aw.ChanSize == -1 {
+		return 0
+	}
+	return 1024
+}
 
 // Write 异步写
 func (aw *AsyncWriter) Write(p []byte) (n int, err error) {
@@ -44,13 +55,14 @@ func (aw *AsyncWriter) Write(p []byte) (n int, err error) {
 		return 0, errClosed
 	}
 	aw.once.Do(aw.init)
-	bf := aw.pool.Get().(*bytes.Buffer)
-	n, err = bf.Write(p)
+	bf := make([]byte, 0, len(p))
+	bf = append(bf, p...)
 	select {
-	case <-aw.done:
+	case <-aw.callClosed:
+		close(aw.buffers)
 		return 0, errClosed
 	case aw.buffers <- bf:
-		return n, err
+		return len(p), nil
 	}
 }
 
@@ -58,45 +70,57 @@ func (aw *AsyncWriter) init() {
 	aw.initMux.Lock()
 	defer aw.initMux.Unlock()
 
-	aw.done = make(chan bool)
-	aw.pool = &sync.Pool{
-		New: func() any {
-			return &bytes.Buffer{}
-		},
-	}
-	aw.buffers = make(chan *bytes.Buffer, aw.ChanSize)
+	aw.callClosed = make(chan bool)
+	aw.loopExit = make(chan bool)
+	aw.buffers = make(chan []byte, aw.getChanSize())
 	go func() {
 		defer func() {
-			_ = recover()
+			if re := recover(); re != nil {
+				aw.onRecover("AsyncWriter.loop", re)
+			}
 		}()
+		defer close(aw.loopExit)
 		for !aw.closed.Load() {
 			aw.doLoop()
 		}
 	}()
 }
 
+func (aw *AsyncWriter) onRecover(msg string, re any) {
+	err := fmt.Errorf("%s  panic %v", msg, re)
+	s := WriteStatus{
+		Err: err,
+	}
+	aw.writeStats.Store(s)
+}
+
 func (aw *AsyncWriter) doLoop() {
 	defer func() {
 		if re := recover(); re != nil {
-			err := fmt.Errorf("writer  panic %v", re)
-			s := WriteStatus{
-				Err: err,
-			}
-			aw.writeStats.Store(s)
+			aw.onRecover("AsyncWriter.doLoop", re)
 		}
 	}()
 
 	for {
 		select {
-		case <-aw.done:
+		case <-aw.callClosed:
+			close(aw.buffers)
+			for b := range aw.buffers {
+				n, err := aw.Writer.Write(b)
+				if aw.NeedStatus {
+					s := WriteStatus{
+						Wrote: n,
+						Err:   err,
+					}
+					aw.writeStats.Store(s)
+				}
+			}
 			return
-		case b := <-aw.buffers:
-			data := b.Bytes()
-			bf := make([]byte, 0, len(data))
-			bf = append(bf, data...)
-			n, err := aw.Writer.Write(bf)
-			b.Reset()
-			aw.pool.Put(b)
+		case b, ok := <-aw.buffers:
+			if !ok {
+				return
+			}
+			n, err := aw.Writer.Write(b)
 			if aw.NeedStatus {
 				s := WriteStatus{
 					Wrote: n,
@@ -118,8 +142,9 @@ func (aw *AsyncWriter) Close() error {
 	if aw.closed.CompareAndSwap(false, true) {
 		aw.initMux.Lock()
 		defer aw.initMux.Unlock()
-		if aw.done != nil {
-			close(aw.done)
+		if aw.callClosed != nil {
+			close(aw.callClosed)
+			<-aw.loopExit
 		}
 	}
 	return nil
