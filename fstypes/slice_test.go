@@ -40,3 +40,11 @@ func TestSliceMerge(t *testing.T) {
 		require.Equal(t, want, got)
 	})
 }
+
+func BenchmarkSliceMerge(b *testing.B) {
+	v1 := []string{"1", "10"}
+	v2 := []string{"2", "20"}
+	for i := 0; i < b.N; i++ {
+		_ = SliceMerge(v1, v2)
+	}
+}
