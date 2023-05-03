@@ -23,7 +23,6 @@ type AsyncWriter struct {
 
 	writeStats fsatomic.Value[WriteStatus] // 最新一条写入状态
 	buffers    chan []byte                 // 异步数据
-	callClosed chan bool                   // 调用 Close() 方法后的事件
 	loopExit   chan bool                   // 异步写完成后的事件
 
 	// ChanSize 异步队列大小，可选
@@ -54,23 +53,20 @@ func (aw *AsyncWriter) Write(p []byte) (n int, err error) {
 	if aw.closed.Load() {
 		return 0, errClosed
 	}
+	if len(p) == 0 {
+		return 0, nil
+	}
 	aw.once.Do(aw.init)
 	bf := make([]byte, 0, len(p))
 	bf = append(bf, p...)
-	select {
-	case <-aw.callClosed:
-		close(aw.buffers)
-		return 0, errClosed
-	case aw.buffers <- bf:
-		return len(p), nil
-	}
+	aw.buffers <- bf
+	return len(p), nil
 }
 
 func (aw *AsyncWriter) init() {
 	aw.initMux.Lock()
 	defer aw.initMux.Unlock()
 
-	aw.callClosed = make(chan bool)
 	aw.loopExit = make(chan bool)
 	aw.buffers = make(chan []byte, aw.getChanSize())
 	go func() {
@@ -101,33 +97,17 @@ func (aw *AsyncWriter) doLoop() {
 		}
 	}()
 
-	for {
-		select {
-		case <-aw.callClosed:
-			close(aw.buffers)
-			for b := range aw.buffers {
-				n, err := aw.Writer.Write(b)
-				if aw.NeedStatus {
-					s := WriteStatus{
-						Wrote: n,
-						Err:   err,
-					}
-					aw.writeStats.Store(s)
-				}
+	for b := range aw.buffers {
+		if b == nil {
+			break
+		}
+		n, err := aw.Writer.Write(b)
+		if aw.NeedStatus {
+			s := WriteStatus{
+				Wrote: n,
+				Err:   err,
 			}
-			return
-		case b, ok := <-aw.buffers:
-			if !ok {
-				return
-			}
-			n, err := aw.Writer.Write(b)
-			if aw.NeedStatus {
-				s := WriteStatus{
-					Wrote: n,
-					Err:   err,
-				}
-				aw.writeStats.Store(s)
-			}
+			aw.writeStats.Store(s)
 		}
 	}
 }
@@ -142,8 +122,8 @@ func (aw *AsyncWriter) Close() error {
 	if aw.closed.CompareAndSwap(false, true) {
 		aw.initMux.Lock()
 		defer aw.initMux.Unlock()
-		if aw.callClosed != nil {
-			close(aw.callClosed)
+		if aw.buffers != nil {
+			aw.buffers <- nil
 			<-aw.loopExit
 		}
 	}
