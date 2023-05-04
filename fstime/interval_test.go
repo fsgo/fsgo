@@ -52,3 +52,22 @@ func TestInterval(t *testing.T) {
 	require.Equal(t, int32(1), atomic.LoadInt32(&f1))
 	require.Equal(t, int32(2), atomic.LoadInt32(&f2))
 }
+
+func TestInterval2(t *testing.T) {
+	it := fstime.Interval{}
+	var num atomic.Int64
+	it.Add(func() {
+		num.Add(1)
+		panic("hello")
+	})
+	it.Add(func() {
+		num.Add(3)
+		<-it.Done()
+		num.Add(5)
+	})
+	it.Start(time.Millisecond)
+	time.Sleep(time.Millisecond / 2)
+	it.Stop()
+	time.Sleep(time.Millisecond / 2)
+	require.Equal(t, int64(9), num.Load())
+}

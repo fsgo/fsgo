@@ -15,23 +15,25 @@ import (
 	"github.com/fsgo/fsgo/fstime"
 )
 
+type WatcherEventType string
+
 const (
 	// WatcherEventUpdate contains create and update ent
-	WatcherEventUpdate = "update"
+	WatcherEventUpdate WatcherEventType = "update"
 
 	// WatcherEventDelete  delete event
-	WatcherEventDelete = "delete"
+	WatcherEventDelete WatcherEventType = "delete"
 )
 
 // WatcherEvent event for watcher
 type WatcherEvent struct {
 	FileName string
-	Type     string
+	Type     WatcherEventType
 }
 
 // String event desc
 func (we *WatcherEvent) String() string {
-	return we.FileName + " " + we.Type
+	return we.FileName + " " + string(we.Type)
 }
 
 // Watcher 文件监听
@@ -46,7 +48,7 @@ type Watcher struct {
 }
 
 // Watch add  file watch with callback
-func (w *Watcher) Watch(name string, callback func(event *WatcherEvent)) {
+func (w *Watcher) Watch(name string, callback func(event WatcherEvent)) {
 	if len(name) == 0 {
 		panic("name is empty")
 	}
@@ -108,7 +110,7 @@ func (w *Watcher) Stop() {
 }
 
 type watchRule struct {
-	CallBack func(event *WatcherEvent)
+	CallBack func(event WatcherEvent)
 	last     map[string]time.Time
 	Name     string
 	delay    time.Duration
@@ -138,7 +140,7 @@ func (wr *watchRule) scan() {
 		if !has || !info.ModTime().Equal(lastMod) {
 			if wr.checkDelay(info.ModTime()) {
 				nowData[name] = info.ModTime()
-				event := &WatcherEvent{
+				event := WatcherEvent{
 					FileName: name,
 					Type:     WatcherEventUpdate,
 				}
@@ -154,7 +156,7 @@ func (wr *watchRule) scan() {
 	for name := range wr.last {
 		// 针对已删除的场景
 		if _, has := nowData[name]; !has {
-			event := &WatcherEvent{
+			event := WatcherEvent{
 				FileName: name,
 				Type:     WatcherEventDelete,
 			}

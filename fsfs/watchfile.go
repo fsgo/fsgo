@@ -9,16 +9,18 @@ import (
 	"os"
 	"sync"
 	"time"
+
+	"github.com/fsgo/fsgo/fssync"
 )
 
 // WatchFile watch file
 type WatchFile struct {
-	Parser func(content []byte) error
-
-	onStop   func()
 	FileName string
+	Parser   func(content []byte) error
 
-	afterChanges []func()
+	onStop func()
+
+	afterChanges fssync.Slice[func()]
 
 	mux     sync.RWMutex
 	started bool
@@ -40,9 +42,10 @@ func (wf *WatchFile) Start() error {
 		Interval: time.Second,
 		Delay:    time.Second,
 	}
-	watcher.Watch(wf.FileName, func(event *WatcherEvent) {
+	watcher.Watch(wf.FileName, func(event WatcherEvent) {
 		_ = wf.Load()
-		for _, fn := range wf.afterChanges {
+		all := wf.afterChanges.Load()
+		for _, fn := range all {
 			fn()
 		}
 	})
@@ -72,7 +75,7 @@ func (wf *WatchFile) Load() error {
 
 // OnFileChange register file change callback
 func (wf *WatchFile) OnFileChange(fn func()) {
-	wf.afterChanges = append(wf.afterChanges, fn)
+	wf.afterChanges.Add(fn)
 }
 
 // Stop watch stop

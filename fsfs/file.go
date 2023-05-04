@@ -16,16 +16,13 @@ type HasFd interface {
 	Fd() uintptr
 }
 
-// Exists 判断文件是否存在
+// Exists 判断文件/目录是否存在
 func Exists(name string) (bool, error) {
 	_, err := os.Stat(name)
 	if os.IsNotExist(err) {
 		return false, nil
 	}
-	if err != nil {
-		return false, err
-	}
-	return true, nil
+	return err == nil, err
 }
 
 // KeepDirExists 保持文件夹存在，若不存在则创建

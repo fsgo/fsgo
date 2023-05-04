@@ -12,27 +12,29 @@ import (
 	"sync"
 	"time"
 
+	"github.com/fsgo/fsgo/fssync"
 	"github.com/fsgo/fsgo/fstime"
 )
 
 // Keeper 保持文件存在
 type Keeper struct {
-	info     os.FileInfo
+	// FilePath 返回文件地址，必填
 	FilePath func() string
 
 	// OpenFile 创建文件的函数，可选
 	// 默认为 os.OpenFile(fp, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	OpenFile func(fp string) (*os.File, error)
 
-	file  *os.File
-	timer *fstime.Interval
-
-	beforeChanges []func(f *os.File)
-	afterChanges  []func(f *os.File)
-
 	// CheckInterval 检查间隔，可选
 	// 默认为 100ms
 	CheckInterval time.Duration
+
+	file  *os.File
+	info  os.FileInfo
+	timer *fstime.Interval
+
+	beforeChanges fssync.Slice[func(old *os.File)]
+	afterChanges  fssync.Slice[func(newFile *os.File)]
 
 	mux     sync.RWMutex
 	running bool
@@ -98,17 +100,13 @@ func (kf *Keeper) File() *os.File {
 }
 
 // BeforeChange 注册当文件变化前的回调函数
-func (kf *Keeper) BeforeChange(fn func(f *os.File)) {
-	kf.mux.Lock()
-	defer kf.mux.Unlock()
-	kf.beforeChanges = append(kf.beforeChanges, fn)
+func (kf *Keeper) BeforeChange(fn func(old *os.File)) {
+	kf.beforeChanges.Add(fn)
 }
 
 // AfterChange 注册当文件变化后的回调函数
-func (kf *Keeper) AfterChange(fn func(f *os.File)) {
-	kf.mux.Lock()
-	defer kf.mux.Unlock()
-	kf.afterChanges = append(kf.afterChanges, fn)
+func (kf *Keeper) AfterChange(fn func(newFile *os.File)) {
+	kf.afterChanges.Add(fn)
 }
 
 func (kf *Keeper) checkFile() error {
@@ -140,12 +138,11 @@ func (kf *Keeper) checkFile() error {
 
 	kf.mux.RLock()
 	old := kf.file
-	beforeChanges := kf.beforeChanges
-	afterChanges := kf.afterChanges
 	kf.mux.RUnlock()
 
 	if old != nil {
-		for _, fn := range beforeChanges {
+		fns := kf.beforeChanges.Load()
+		for _, fn := range fns {
 			fn(old)
 		}
 	}
@@ -155,7 +152,7 @@ func (kf *Keeper) checkFile() error {
 	kf.info = info
 	kf.mux.Unlock()
 
-	for _, fn := range afterChanges {
+	for _, fn := range kf.afterChanges.Load() {
 		fn(file)
 	}
 

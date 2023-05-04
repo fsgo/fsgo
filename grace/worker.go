@@ -467,7 +467,7 @@ func (w *Worker) reload(ctx context.Context) (err error) {
 		if w.subProcessExists() {
 			return nil
 		}
-		w.withLock(func() error {
+		_ = w.withLock(func() error {
 			w.pid = lastPID
 			w.cmdClose = lastCmdCancel
 			return nil

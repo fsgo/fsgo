@@ -22,21 +22,28 @@ type Interval struct {
 	Concurrency int
 
 	stopped atomic.Bool
+	once    sync.Once
 }
 
-// Start 启动任务
+func (it *Interval) initOnce() {
+	it.once.Do(func() {
+		it.closed = make(chan struct{})
+	})
+}
+
+// Start 启动任务，每间隔固定时长 d，就会触发一次任务
 func (it *Interval) Start(d time.Duration) {
 	if it.tk != nil {
 		panic("Interval already started")
 	}
+	it.initOnce()
 	it.tk = time.NewTicker(d)
-	it.closed = make(chan struct{})
 	go it.goStart()
 }
 
 func (it *Interval) goStart() {
 	it.runFns()
-	for {
+	for it.Running() {
 		select {
 		case <-it.closed:
 			return
@@ -47,8 +54,9 @@ func (it *Interval) goStart() {
 }
 
 func (it *Interval) runFns() {
-	var wg sync.WaitGroup
 	allFns := it.fns.Load()
+
+	var wg sync.WaitGroup
 	wg.Add(len(allFns))
 	defer wg.Wait()
 
@@ -56,8 +64,11 @@ func (it *Interval) runFns() {
 		for i := 0; i < len(allFns); i++ {
 			fn := allFns[i]
 			go func() {
+				defer func() {
+					wg.Done()
+					_ = recover()
+				}()
 				fn()
-				wg.Done()
 			}()
 		}
 		return
@@ -69,31 +80,34 @@ func (it *Interval) runFns() {
 		limiter <- struct{}{}
 		fn := allFns[i]
 		go func() {
+			defer func() {
+				wg.Done()
+				<-limiter
+				_ = recover()
+			}()
 			fn()
-			<-limiter
-			wg.Done()
 		}()
 	}
 }
 
 // Stop 停止运行
 func (it *Interval) Stop() {
-	if !it.Running() {
+	if !it.stopped.CompareAndSwap(false, true) {
 		return
 	}
-	it.stopped.Store(true)
 	it.tk.Stop()
 	close(it.closed)
 }
 
 // Add 注册回调函数
 //
-// 应确保函数不会 panic
+//	 应确保函数不会 panic。若 fn panic，会自动 recover 同时将 panic 信息丢弃。
+//		默认情况下，若 fn 运行时间 > 调度时间间隔，同一个 fn 在同一时间会有多个运行实例
 func (it *Interval) Add(fn func()) {
 	it.fns.Add(fn)
 }
 
-// Reset 重置时间
+// Reset 重置时间,应该先使用 Start 启动任务
 func (it *Interval) Reset(d time.Duration) {
 	if !it.Running() {
 		return
@@ -108,5 +122,6 @@ func (it *Interval) Running() bool {
 
 // Done 运行状态
 func (it *Interval) Done() <-chan struct{} {
+	it.initOnce()
 	return it.closed
 }
