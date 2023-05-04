@@ -118,33 +118,12 @@ type StringSlice []string
 
 // Unique uniq
 func (ss StringSlice) Unique() StringSlice {
-	if len(ss) < 2 {
-		return ss
-	}
-	c := make(map[string]struct{}, len(ss))
-	ret := make(StringSlice, 0, len(ss))
-	for i := 0; i < len(ss); i++ {
-		v := ss[i]
-		if _, ok := c[v]; ok {
-			continue
-		}
-		c[v] = struct{}{}
-		ret = append(ret, v)
-	}
-	return ret
+	return SliceUnique(ss)
 }
 
 // Has 是否包含指定的值
 func (ss StringSlice) Has(value string) bool {
-	if len(ss) == 0 {
-		return false
-	}
-	for i := 0; i < len(ss); i++ {
-		if ss[i] == value {
-			return true
-		}
-	}
-	return false
+	return SliceHas(ss, value)
 }
 
 // Delete 删除对应的值
@@ -152,15 +131,6 @@ func (ss *StringSlice) Delete(values ...string) {
 	if len(values) == 0 || len(*ss) == 0 {
 		return
 	}
-	c := make(map[string]struct{}, len(*ss))
-	for i := 0; i < len(values); i++ {
-		c[values[i]] = struct{}{}
-	}
-	s1 := make([]string, 0, len(*ss))
-	for i := 0; i < len(*ss); i++ {
-		if _, has := c[(*ss)[i]]; !has {
-			s1 = append(s1, (*ss)[i])
-		}
-	}
+	s1 := SliceDelete(*ss, values...)
 	*ss = s1
 }
