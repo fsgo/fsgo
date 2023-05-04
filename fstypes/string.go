@@ -93,6 +93,48 @@ func (s String) split(sep string) []string {
 	return strings.Split(string(s), sep)
 }
 
+// SubStr 截取字符串
+// @see SubStr
+func (s String) SubStr(offset int, length int) String {
+	return String(SubStr(string(s), offset, length))
+}
+
+// SubStr 截取字符串
+//
+//	str     待截取字符串
+//	offset  偏移值。
+//	        当 offset >= 0 时，从 offset 开始截取；
+//	        当 offset < 0 时，从结尾倒数 offset 个字符开始截取
+//	length  截取长度。
+//	        当 length == 0 时,返回空字符串
+//	        当 length > 0 时,最多返回  length 长度的字符串
+//	        当 length < 0 时,截取到倒数 length 个字符，若位置在 offset 之前，则返回空字符串
+func SubStr(str string, offset int, length int) string {
+	l := len(str)
+	if length == 0 || l == 0 {
+		return ""
+	}
+	if offset < 0 {
+		offset = l + offset
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	if length > 0 {
+		end := offset + length
+		if end > l {
+			return str[offset:]
+		}
+		return str[offset:end]
+	}
+	end := l + length
+	if end <= offset {
+		return ""
+	}
+	return str[offset:end]
+}
+
 func toNumberSlice[T number.Number](s String, sep string, zero any) ([]T, error) {
 	vs := s.split(sep)
 	if len(vs) == 0 {

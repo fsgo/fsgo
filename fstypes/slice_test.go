@@ -88,3 +88,24 @@ func TestSliceDelete(t *testing.T) {
 	var a2 []string
 	require.Empty(t, SliceDelete(a2, "c"))
 }
+
+func TestSliceJoin(t *testing.T) {
+	arr1 := []string{"a", "b"}
+	got1 := SliceJoin(arr1, ",")
+	require.Equal(t, "a,b", got1)
+
+	var arr2 []int
+	got2 := SliceJoin(arr2, ",")
+	require.Equal(t, "", got2)
+
+	arr3 := []int{1, 9}
+	got3 := SliceJoin(arr3, ",")
+	require.Equal(t, "1,9", got3)
+}
+
+func TestSliceValuesAllow(t *testing.T) {
+	arr1 := []string{"a", "b"}
+	require.NoError(t, SliceValuesAllow(arr1, arr1))
+	allow1 := []string{"a", "c"}
+	require.Error(t, SliceValuesAllow(arr1, allow1))
+}

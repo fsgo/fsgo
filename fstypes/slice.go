@@ -4,6 +4,11 @@
 
 package fstypes
 
+import (
+	"fmt"
+	"strings"
+)
+
 // SliceMerge merge 多个 slice 为一个，并最终返回一个新的 slice
 func SliceMerge[S ~[]T, T any](items ...S) S {
 	switch len(items) {
@@ -100,4 +105,44 @@ func SliceDelete[S ~[]T, T comparable](arr S, values ...T) S {
 		cp = append(cp, shadow[:index]...)
 		shadow = shadow[index+1:]
 	}
+}
+
+func SliceJoin[T any](arr []T, sep string) string {
+	return SliceJoinFormat(arr, func(val T) string {
+		return fmt.Sprint(val)
+	}, sep)
+}
+
+func SliceJoinFormat[T any](arr []T, format func(val T) string, sep string) string {
+	if len(arr) == 0 {
+		return ""
+	}
+	elems := make([]string, len(arr))
+	for i := 0; i < len(arr); i++ {
+		elems[i] = format(arr[i])
+	}
+	return strings.Join(elems, sep)
+}
+
+func SliceValuesAllow[T comparable](values []T, allow []T) error {
+	if len(values) == 0 || len(allow) == 0 {
+		return nil
+	}
+	allowMap := make(map[T]struct{}, len(allow))
+	for i := 0; i < len(allow); i++ {
+		allowMap[allow[i]] = struct{}{}
+	}
+	var notAllow []T
+	for i := 0; i < len(values); i++ {
+		val := values[i]
+		if _, ok := allowMap[val]; !ok {
+			notAllow = append(notAllow, val)
+		}
+	}
+	if len(notAllow) == 0 {
+		return nil
+	}
+	str := SliceJoin(notAllow, ",")
+	str = SubStr(str, 0, 10)
+	return fmt.Errorf("%d values (%s) are not allowed", len(notAllow), str)
 }

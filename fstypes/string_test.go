@@ -427,3 +427,105 @@ func TestStringSlice_Unique(t *testing.T) {
 		})
 	}
 }
+
+func TestSubStr(t *testing.T) {
+	type args struct {
+		str    string
+		offset int
+		length int
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "case 1",
+			args: args{
+				str:    "hello",
+				offset: 0,
+				length: 0,
+			},
+			want: "",
+		},
+		{
+			name: "case 2",
+			args: args{
+				str:    "hello",
+				offset: 0,
+				length: 1,
+			},
+			want: "h",
+		},
+		{
+			name: "case 3",
+			args: args{
+				str:    "hello",
+				offset: -2,
+				length: 1,
+			},
+			want: "l",
+		},
+		{
+			name: "case 4",
+			args: args{
+				str:    "hello",
+				offset: -2,
+				length: -1,
+			},
+			want: "l",
+		},
+		{
+			name: "case 5",
+			args: args{
+				str:    "hello",
+				offset: -2,
+				length: 1,
+			},
+			want: "l",
+		},
+		{
+			name: "case 6",
+			args: args{
+				str:    "hello",
+				offset: -6,
+				length: 1,
+			},
+			want: "h",
+		},
+		{
+			name: "case 6-1",
+			args: args{
+				str:    "hello",
+				offset: -100,
+				length: 1,
+			},
+			want: "h",
+		},
+		{
+			name: "case 7",
+			args: args{
+				str:    "hello",
+				offset: 0,
+				length: -100,
+			},
+			want: "",
+		},
+		{
+			name: "case 8",
+			args: args{
+				str:    "hello",
+				offset: 2,
+				length: 100,
+			},
+			want: "llo",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := SubStr(tt.args.str, tt.args.offset, tt.args.length); got != tt.want {
+				t.Errorf("SubStr() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

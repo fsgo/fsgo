@@ -1,47 +1,22 @@
-// Copyright(C) 2022 github.com/fsgo  All Rights Reserved.
+// Copyright(C) 2023 github.com/fsgo  All Rights Reserved.
 // Author: hidu <duv123@gmail.com>
-// Date: 2022/12/25
+// Date: 2023/5/4
 
-package fscmd
+package fsflag
 
 import (
 	"errors"
-	"fmt"
 	"strconv"
-	"strings"
 
 	"github.com/fsgo/fsgo/fstypes"
 )
 
-type FlagTypes interface {
+type Types interface {
 	fstypes.Ordered | ~bool
 }
 
-type SliceFlag[T FlagTypes] struct {
-	Sep    string
-	Values []T
-}
-
-func (ss *SliceFlag[T]) GetSep() string {
-	if ss.Sep == "" {
-		return ","
-	}
-	return ss.Sep
-}
-
-func (ss *SliceFlag[T]) String() string {
-	list := make([]string, 0, len(ss.Values))
-	for _, s := range ss.Values {
-		list = append(list, fmt.Sprintf("%v", s))
-	}
-	return strings.Join(list, ss.GetSep())
-}
-
-func (ss *SliceFlag[T]) getParserFunc() func(str string) (any, error) {
-	var zero T
-
-	var tmp1 any = zero
-	switch tmp1.(type) {
+func getParserFunc(zero any) func(str string) (any, error) {
+	switch zero.(type) {
 	case int8:
 		return func(str string) (any, error) {
 			v, err := strconv.ParseInt(str, 10, 8)
@@ -111,23 +86,4 @@ func (ss *SliceFlag[T]) getParserFunc() func(str string) (any, error) {
 			return zero, errors.New("not support type")
 		}
 	}
-}
-
-func (ss *SliceFlag[T]) Set(s2 string) error {
-	ss.Values = nil
-
-	parser := ss.getParserFunc()
-	arr := strings.Split(s2, ss.GetSep())
-	for _, s := range arr {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		v, err := parser(s)
-		if err != nil {
-			return err
-		}
-		ss.Values = append(ss.Values, v.(T))
-	}
-	return nil
 }
