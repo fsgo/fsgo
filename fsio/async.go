@@ -59,8 +59,13 @@ func (aw *AsyncWriter) Write(p []byte) (n int, err error) {
 	aw.once.Do(aw.init)
 	bf := make([]byte, 0, len(p))
 	bf = append(bf, p...)
-	aw.buffers <- bf
-	return len(p), nil
+
+	select {
+	case aw.buffers <- bf:
+		return len(p), nil
+	case <-aw.loopExit:
+		return 0, errClosed
+	}
 }
 
 func (aw *AsyncWriter) init() {
