@@ -25,7 +25,7 @@ type Attrs struct {
 	KVSep string
 
 	attrs map[string]*Attr
-	keys  fstypes.StringSlice
+	keys  []string
 }
 
 // GetSep  多个属性间的连接符，当为空时，返回默认值 " " (一个空格)
@@ -72,7 +72,7 @@ func (a *Attrs) Delete(keys ...string) {
 	for i := 0; i < len(keys); i++ {
 		key := keys[i]
 		delete(a.attrs, key)
-		a.keys.Delete(key)
+		a.keys = fstypes.SliceDelete(a.keys, key)
 	}
 }
 
@@ -170,7 +170,7 @@ type Attr struct {
 	Key string
 
 	// Values 属性值，可以有多个
-	Values fstypes.StringSlice
+	Values []string
 }
 
 // Set 设置属性值
@@ -188,12 +188,13 @@ func (a *Attr) First() string {
 
 // Add 添加新的属性值
 func (a *Attr) Add(value ...string) {
-	a.Values = append(a.Values, value...).Unique()
+	a.Values = append(a.Values, value...)
+	a.Values = fstypes.SliceUnique(a.Values)
 }
 
 // Delete 删除属性值
 func (a *Attr) Delete(value ...string) {
-	a.Values.Delete(value...)
+	a.Values = fstypes.SliceDelete(a.Values, value...)
 }
 
 func findOrCreateAttr(w AttrsMapper, key string, sep string) *Attr {

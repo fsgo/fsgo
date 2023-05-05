@@ -249,6 +249,46 @@ var rotateExtRules = map[string]*RotateRule{
 		},
 		Cycle: 24 * time.Hour,
 	},
+	"12hour": {
+		Name: "12hour",
+		Fn: func(now time.Time) string {
+			// eg: .2022040600,.2022040612
+			return nHourExt(now, 12)
+		},
+		Cycle: 12 * time.Hour,
+	},
+	"6hour": {
+		Name: "6hour",
+		Fn: func(now time.Time) string {
+			// eg: .2022040600,.2022040606,.2022040612
+			return nHourExt(now, 6)
+		},
+		Cycle: 6 * time.Hour,
+	},
+	"4hour": {
+		Name: "4hour",
+		Fn: func(now time.Time) string {
+			// eg: .2022040600,.2022040604,.2022040608
+			return nHourExt(now, 4)
+		},
+		Cycle: 4 * time.Hour,
+	},
+	"3hour": {
+		Name: "3hour",
+		Fn: func(now time.Time) string {
+			// eg: .2022040600,.2022040603,.2022040606
+			return nHourExt(now, 3)
+		},
+		Cycle: 3 * time.Hour,
+	},
+	"2hour": {
+		Name: "2hour",
+		Fn: func(now time.Time) string {
+			// eg: .2022040600,.2022040602,.2022040604
+			return nHourExt(now, 2)
+		},
+		Cycle: 2 * time.Hour,
+	},
 	"1hour": {
 		Name: "1hour",
 		Fn: func(now time.Time) string {
@@ -327,6 +367,10 @@ func SetRotateRule(rules ...*RotateRule) error {
 
 func nMinuteExt(now time.Time, n int) string {
 	return "." + now.Format("2006010215") + fmt.Sprintf("%02d", now.Minute()/n*n)
+}
+
+func nHourExt(now time.Time, n int) string {
+	return "." + now.Format("20060102") + fmt.Sprintf("%02d", now.Hour()/n*n)
 }
 
 // RotateRuleNames 返回所有切割规则的名称，已按照切割间隔升序排列

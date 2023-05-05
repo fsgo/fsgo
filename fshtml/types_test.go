@@ -39,3 +39,11 @@ func TestStringSlice_Codes(t *testing.T) {
 		require.Equal(t, want, string(got))
 	})
 }
+
+func TestStringSlice_HTML(t *testing.T) {
+	ss := fshtml.StringSlice{"hello", "world"}
+	b, err := ss.HTML()
+	require.NoError(t, err)
+	want := "<ul><li>hello</li><li>world</li></ul>"
+	require.Equal(t, want, string(b))
+}

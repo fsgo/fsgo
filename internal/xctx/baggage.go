@@ -10,7 +10,7 @@ import (
 	"github.com/fsgo/fsgo/fstypes"
 )
 
-type baggage[K any, V any] struct {
+type baggage[K comparable, V any] struct {
 	ctx    context.Context
 	values []V
 }
@@ -28,7 +28,7 @@ func (b *baggage[K, V]) All(key K) []V {
 	return fstypes.SliceMerge(vs, b.values)
 }
 
-func WithValues[K any, V any](ctx context.Context, key K, vs ...V) context.Context {
+func WithValues[K comparable, V any](ctx context.Context, key K, vs ...V) context.Context {
 	if len(vs) == 0 {
 		return ctx
 	}
@@ -39,7 +39,7 @@ func WithValues[K any, V any](ctx context.Context, key K, vs ...V) context.Conte
 	return context.WithValue(ctx, key, val)
 }
 
-func Values[K any, V any](ctx context.Context, key K) []V {
+func Values[K comparable, V any](ctx context.Context, key K) []V {
 	if val, ok := ctx.Value(key).(*baggage[K, V]); ok {
 		return val.All(key)
 	}

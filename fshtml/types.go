@@ -8,7 +8,7 @@ import (
 	"html"
 )
 
-// Bytes 将 []byte 转换为 Element 类型
+// Bytes 将 []byte 转换为 Element 类型，原样输出 HTML
 type Bytes []byte
 
 // HTML 实现 Element 接口
@@ -24,7 +24,7 @@ func (b Text) HTML() ([]byte, error) {
 	return []byte(html.EscapeString(string(b))), nil
 }
 
-// String 将 String 转换为 Element 类型，html 内容会原样输出
+// String 将 String 转换为 Element 类型，原样输出 HTML
 type String string
 
 // HTML 实现 Element 接口
@@ -52,6 +52,28 @@ func (ss StringSlice) ToElements(tag string, fn func(b *Any)) Elements {
 		cs[i] = b
 	}
 	return cs
+}
+
+func (ss StringSlice) HTML() ([]byte, error) {
+	return NewUl(ss).HTML()
+}
+
+// Pre 输出 HTML 时添加 pre 标签
+type Pre string
+
+func (p Pre) HTML() ([]byte, error) {
+	return []byte("<pre>" + p + "</pre>"), nil
+}
+
+// PreByte 输出 HTML 时添加 pre 标签
+type PreByte []byte
+
+func (p PreByte) HTML() ([]byte, error) {
+	bf := make([]byte, 0, len(p)+5+6)
+	bf = append(bf, "<pre>"...)
+	bf = append(bf, p...)
+	bf = append(bf, "</pre>"...)
+	return bf, nil
 }
 
 var (
