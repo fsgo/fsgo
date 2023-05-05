@@ -9,7 +9,7 @@ import (
 	"net"
 
 	"github.com/fsgo/fsgo/fsnet/fsconn"
-	"github.com/fsgo/fsgo/fstypes"
+	"github.com/fsgo/fsgo/internal/xctx"
 )
 
 // Interceptor  dialer interceptor
@@ -38,47 +38,15 @@ func (dhs interceptors) CallDialContext(ctx context.Context, network, address st
 	})
 }
 
-type ctxKey struct{}
-
-var ctxKeyInterceptor = ctxKey{}
-
-type dialerItCtx struct {
-	Ctx context.Context
-	Its []*Interceptor
-}
-
-func (dc *dialerItCtx) All() []*Interceptor {
-	var pits []*Interceptor
-	if pic, ok := dc.Ctx.Value(ctxKeyInterceptor).(*dialerItCtx); ok {
-		pits = pic.All()
-	}
-	if len(pits) == 0 {
-		return dc.Its
-	} else if len(dc.Its) == 0 {
-		return pits
-	}
-	return fstypes.SliceMerge(pits, dc.Its)
-}
-
 // ContextWithInterceptor set dialer Interceptor to context
 // these interceptors will exec before Simple.Interceptors
 func ContextWithInterceptor(ctx context.Context, its ...*Interceptor) context.Context {
-	if len(its) == 0 {
-		return ctx
-	}
-	val := &dialerItCtx{
-		Ctx: ctx,
-		Its: its,
-	}
-	return context.WithValue(ctx, ctxKeyInterceptor, val)
+	return xctx.WithValues(ctx, ctxKeyInterceptor, its...)
 }
 
 // InterceptorsFromContext get DialerInterceptors from contexts
 func InterceptorsFromContext(ctx context.Context) []*Interceptor {
-	if val, ok := ctx.Value(ctxKeyInterceptor).(*dialerItCtx); ok {
-		return val.All()
-	}
-	return nil
+	return xctx.Values[ctxKey, *Interceptor](ctx, ctxKeyInterceptor)
 }
 
 // TryRegisterInterceptor 尝试给 Default 注册 Interceptor

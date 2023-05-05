@@ -9,7 +9,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/fsgo/fsgo/fstypes"
+	"github.com/fsgo/fsgo/internal/xctx"
 )
 
 type Info interface {
@@ -160,48 +160,14 @@ func (chs interceptors) CallSetWriteDeadline(info Info, dl time.Time, invoker fu
 	})
 }
 
-type ctxKey struct {
-	_ bool
-}
-
-var ctxKeyInterceptor = ctxKey{}
-
 // ContextWithInterceptor set connWithIt interceptor to context
 func ContextWithInterceptor(ctx context.Context, its ...*Interceptor) context.Context {
-	if len(its) == 0 {
-		return ctx
-	}
-	val := &connItCtx{
-		Ctx: ctx,
-		Its: its,
-	}
-	return context.WithValue(ctx, ctxKeyInterceptor, val)
+	return xctx.WithValues(ctx, ctxKeyInterceptor, its...)
 }
 
 // InterceptorsFromContext get connWithIt ConnInterceptors from context
 func InterceptorsFromContext(ctx context.Context) []*Interceptor {
-	if val, ok := ctx.Value(ctxKeyInterceptor).(*connItCtx); ok {
-		return val.All()
-	}
-	return nil
-}
-
-type connItCtx struct {
-	Ctx context.Context
-	Its []*Interceptor
-}
-
-func (dc *connItCtx) All() []*Interceptor {
-	var pits []*Interceptor
-	if pic, ok := dc.Ctx.Value(ctxKeyInterceptor).(*connItCtx); ok {
-		pits = pic.All()
-	}
-	if len(pits) == 0 {
-		return dc.Its
-	} else if len(dc.Its) == 0 {
-		return pits
-	}
-	return fstypes.SliceMerge(pits, dc.Its)
+	return xctx.Values[ctxKey, *Interceptor](ctx, ctxKeyInterceptor)
 }
 
 var globalConnIts []*Interceptor

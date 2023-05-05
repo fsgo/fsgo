@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 
 	"github.com/fsgo/fsgo/fssync"
-	"github.com/fsgo/fsgo/fstypes"
+	"github.com/fsgo/fsgo/internal/xctx"
 )
 
 // Interceptor  Resolver Interceptor
@@ -26,39 +26,10 @@ type Interceptor struct {
 	AfterLookupIPAddr  func(ctx context.Context, host string, addrs []net.IPAddr, err error) ([]net.IPAddr, error)
 }
 
-type resolverItCtx struct {
-	Ctx context.Context
-	Its []*Interceptor
-}
-
-type ctxKey struct{}
-
-var ctxKeyInterceptor = ctxKey{}
-
-func (dc *resolverItCtx) All() []*Interceptor {
-	var pits []*Interceptor
-	if pic, ok := dc.Ctx.Value(ctxKeyInterceptor).(*resolverItCtx); ok {
-		pits = pic.All()
-	}
-	if len(pits) == 0 {
-		return dc.Its
-	} else if len(dc.Its) == 0 {
-		return pits
-	}
-	return fstypes.SliceMerge(pits, dc.Its)
-}
-
 // ContextWithInterceptor set Resolver Interceptor to context
 // these interceptors will exec before Dialer.Interceptors
 func ContextWithInterceptor(ctx context.Context, its ...*Interceptor) context.Context {
-	if len(its) == 0 {
-		return ctx
-	}
-	val := &resolverItCtx{
-		Ctx: ctx,
-		Its: its,
-	}
-	return context.WithValue(ctx, ctxKeyInterceptor, val)
+	return xctx.WithValues(ctx, ctxKeyInterceptor, its...)
 }
 
 type interceptors []*Interceptor
