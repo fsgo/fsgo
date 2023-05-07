@@ -7,6 +7,7 @@ package fsserver
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"strings"
 	"sync"
@@ -32,11 +33,13 @@ var _ GracefulServer = (*AnyServer)(nil)
 
 // AnyServer 一个通用的 server
 type AnyServer struct {
+	// Handler 处理请求的 Handler，必填
 	Handler Handler
 
-	listener     net.Listener
+	// BeforeAccept Accept 之前的回调，可选
 	BeforeAccept func(l net.Listener) error
 
+	// OnConn 创建新链接后的回调，可选
 	OnConn func(ctx context.Context, conn net.Conn, err error) (context.Context, net.Conn, error)
 
 	closeCancel context.CancelFunc
@@ -49,12 +52,27 @@ type AnyServer struct {
 }
 
 const (
-	statusInit    int64 = 0
-	statusRunning int64 = 1
-	statusClosed  int64 = 2
+	statusInit    int64 = 0 // server 状态，初始状态
+	statusRunning int64 = 1 // 已经调用 Serve 方法，处于运行中
+	statusClosed  int64 = 2 // 已经调用 Shutdown 方法，server 已经关闭
 )
 
-var ErrShutdown = errors.New("server shutdown")
+func statusTxt(s int64) string {
+	switch s {
+	case statusInit:
+		return "init"
+	case statusRunning:
+		return "running"
+	case statusClosed:
+		return "closed"
+	default:
+		return "invalid status"
+	}
+}
+
+var (
+	ErrShutdown = errors.New("server shutdown")
+)
 
 type temporary interface {
 	Temporary() bool
@@ -64,18 +82,20 @@ func (as *AnyServer) Serve(l net.Listener) error {
 	if as.Handler == nil {
 		return errors.New("handler is nil")
 	}
-	atomic.StoreInt64(&as.status, statusRunning)
+	if !atomic.CompareAndSwapInt64(&as.status, statusInit, statusRunning) {
+		s := atomic.LoadInt64(&as.status)
+		return fmt.Errorf("invalid status (%s) for Serve", statusTxt(s))
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	as.closeCancel = cancel
 	as.serverExit = make(chan bool, 1)
-	as.listener = l
 	as.connections = make(map[net.Conn]struct{})
 
 	var errResult error
 	var wg sync.WaitGroup
 
 	loopAccept := func() error {
-		if atomic.LoadInt64(&as.status) == statusClosed {
+		if atomic.LoadInt64(&as.status) != statusRunning {
 			return ErrShutdown
 		}
 
@@ -147,15 +167,16 @@ func (as *AnyServer) closeAllConn() {
 
 func (as *AnyServer) Shutdown(ctx context.Context) error {
 	switch atomic.LoadInt64(&as.status) {
-	case statusClosed:
+	case statusClosed,
+		statusInit:
 		return nil
-	case statusInit:
-		return errors.New("server not started")
 	}
-	atomic.StoreInt64(&as.status, statusClosed)
+	if !atomic.CompareAndSwapInt64(&as.status, statusRunning, statusClosed) {
+		s := atomic.LoadInt64(&as.status)
+		return fmt.Errorf("invalid status (%s) for Shutdown", statusTxt(s))
+	}
 	select {
 	case <-ctx.Done():
-		_ = as.listener.Close()
 		as.closeAllConn()
 	case <-as.serverExit:
 	}

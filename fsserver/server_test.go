@@ -48,7 +48,8 @@ func TestAnyServer(t *testing.T) {
 	require.NoError(t, conn.Close())
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	_ = ser.Shutdown(ctx)
+	require.NoError(t, ser.Shutdown(ctx))
+	require.NoError(t, l.Close())
 	wg.Wait()
 }
 
