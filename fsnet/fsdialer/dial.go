@@ -162,5 +162,5 @@ func (d *Simple) getSTDDialer() Dialer {
 
 func (d *Simple) getInterceptors(ctx context.Context) interceptors {
 	ctxIts := InterceptorsFromContext(ctx)
-	return xctx.ValuesMerge(ctxIts, d.Interceptors)
+	return xctx.ValuesMerge(d.Interceptors, ctxIts)
 }
