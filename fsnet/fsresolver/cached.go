@@ -14,6 +14,7 @@ import (
 	"github.com/fsgo/fscache/lrucache"
 
 	"github.com/fsgo/fsgo/fsnet/internal"
+	"github.com/fsgo/fsgo/internal/xctx"
 )
 
 // Cached Resolver with Cache
@@ -32,9 +33,13 @@ type Cached struct {
 	mux sync.Mutex
 }
 
+func (r *Cached) getInterceptors(ctx context.Context) interceptors {
+	return xctx.ValuesMerge(r.Interceptors, InterceptorFromContext(ctx))
+}
+
 // LookupIP Lookup IP
 func (r *Cached) LookupIP(ctx context.Context, network, host string) (ips []net.IP, err error) {
-	its := interceptors(r.Interceptors)
+	its := r.getInterceptors(ctx)
 	lookIdx := -1
 	afterIdx := -1
 	for i := 0; i < len(its); i++ {
@@ -79,7 +84,7 @@ func (r *Cached) lookupIP(ctx context.Context, network, host string) ([]net.IP, 
 
 // LookupIPAddr Lookup IPAddr
 func (r *Cached) LookupIPAddr(ctx context.Context, host string) (ips []net.IPAddr, err error) {
-	its := interceptors(r.Interceptors)
+	its := r.getInterceptors(ctx)
 	lookIdx := -1
 	afterIdx := -1
 	for i := 0; i < len(its); i++ {

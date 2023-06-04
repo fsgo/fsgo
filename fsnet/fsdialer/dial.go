@@ -13,6 +13,7 @@ import (
 	"github.com/fsgo/fsgo/fsnet/fsconn"
 	"github.com/fsgo/fsgo/fsnet/fsresolver"
 	"github.com/fsgo/fsgo/fsnet/internal"
+	"github.com/fsgo/fsgo/internal/xctx"
 )
 
 // Dialer dial connWithIt type
@@ -161,11 +162,5 @@ func (d *Simple) getSTDDialer() Dialer {
 
 func (d *Simple) getInterceptors(ctx context.Context) interceptors {
 	ctxIts := InterceptorsFromContext(ctx)
-	if len(ctxIts) == 0 {
-		return d.Interceptors
-	}
-	if len(d.Interceptors) == 0 {
-		return nil
-	}
-	return append(d.Interceptors, ctxIts...)
+	return xctx.ValuesMerge(ctxIts, d.Interceptors)
 }

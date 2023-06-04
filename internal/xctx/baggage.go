@@ -45,3 +45,13 @@ func Values[K comparable, V any](ctx context.Context, key K) []V {
 	}
 	return nil
 }
+
+func ValuesMerge[S ~[]T, T any](one S, two S) S {
+	if len(one) == 0 {
+		return two
+	}
+	if len(two) == 0 {
+		return one
+	}
+	return fstypes.SliceMerge(one, two)
+}

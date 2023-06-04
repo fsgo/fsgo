@@ -361,7 +361,7 @@ func NewSelect(opts ...Element) *Any {
 // NewOption 创建一个 option
 func NewOption(value string, b Element) *Any {
 	return &Any{
-		Tag:  "legend",
+		Tag:  "option",
 		Body: ToElements(b),
 	}
 }

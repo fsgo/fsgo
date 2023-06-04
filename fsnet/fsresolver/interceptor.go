@@ -32,6 +32,10 @@ func ContextWithInterceptor(ctx context.Context, its ...*Interceptor) context.Co
 	return xctx.WithValues(ctx, ctxKeyInterceptor, its...)
 }
 
+func InterceptorFromContext(ctx context.Context) []*Interceptor {
+	return xctx.Values[ctxKey, *Interceptor](ctx, ctxKeyInterceptor)
+}
+
 type interceptors []*Interceptor
 
 func (rhs interceptors) CallLookupIP(ctx context.Context, network, host string, invoker LookupIPFunc,
