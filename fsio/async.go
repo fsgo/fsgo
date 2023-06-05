@@ -81,8 +81,13 @@ func (aw *AsyncWriter) init() {
 			}
 		}()
 		defer close(aw.loopExit)
-		for !aw.closed.Load() {
+
+		for {
 			aw.doLoop()
+			// 放在后面判断，以避免 aw.closed 在高并发下还未执行 doLoop，closed的状态就发生变化
+			if aw.closed.Load() {
+				break
+			}
 		}
 	}()
 }
