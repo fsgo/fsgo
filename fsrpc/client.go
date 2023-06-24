@@ -86,7 +86,7 @@ func (cc *ClientConn) readOnePackage() error {
 	}
 	switch header.Type {
 	default:
-		return fmt.Errorf("%w, got=%d", ErrInvalidHeaderType, header.Type)
+		return fmt.Errorf("%w, got=%d", ErrInvalidHeader, header.Type)
 	case HeaderTypeResponse:
 		resp, err := readMessage(cc.rw, int(header.Length), &Response{})
 		if err != nil {

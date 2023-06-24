@@ -5,6 +5,8 @@
 package fsrpc
 
 import (
+	"bytes"
+	"context"
 	"fmt"
 	"io"
 	"sync/atomic"
@@ -42,10 +44,6 @@ type PayloadReader interface {
 	Payload() (*Payload, []byte, error)
 }
 
-type PayloadWriter interface {
-	WritePayload(b []byte, more bool) error
-}
-
 func newPayloadWriter(rid uint64, q *bufferQueue) *plWriter {
 	return &plWriter{
 		queue: q,
@@ -53,20 +51,40 @@ func newPayloadWriter(rid uint64, q *bufferQueue) *plWriter {
 	}
 }
 
-var _ PayloadWriter = (*plWriter)(nil)
-
 type plWriter struct {
 	queue *bufferQueue
 	RID   uint64
 	index atomic.Uint32
 }
 
-func (p *plWriter) WritePayload(b []byte, more bool) error {
+func (pw *plWriter) writeChan(ctx context.Context, pl <-chan *bytes.Buffer) error {
+	var last *bytes.Buffer
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case data, ok := <-pl:
+			if !ok {
+				if last != nil {
+					pw.WritePayload(last, false)
+				}
+				return nil
+			}
+
+			if last != nil {
+				pw.WritePayload(last, true)
+			}
+			last = data
+		}
+	}
+}
+
+func (pw *plWriter) WritePayload(b *bytes.Buffer, more bool) error {
 	meta := &Payload{
-		Length: uint32(len(b)),
+		Length: uint32(b.Len()),
 		More:   more,
-		RID:    p.RID,
-		Index:  p.index.Add(1) - 1,
+		RID:    pw.RID,
+		Index:  pw.index.Add(1) - 1,
 	}
 	bf1, err1 := proto.Marshal(meta)
 	if err1 != nil {
@@ -83,9 +101,9 @@ func (p *plWriter) WritePayload(b []byte, more bool) error {
 	if _, err3 := bp.Write(bf1); err3 != nil {
 		return err3
 	}
-	_, err4 := bp.Write(b)
+	_, err4 := bp.Write(b.Bytes())
 	if err4 == nil {
-		p.queue.send(bp)
+		pw.queue.send(bp)
 		return nil
 	}
 	return err4

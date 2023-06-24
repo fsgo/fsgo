@@ -90,15 +90,15 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, requests *fss
 
 	switch header.Type {
 	default:
-		return fmt.Errorf("%w, got=%d", ErrInvalidHeaderType, header.Type)
+		return fmt.Errorf("%w, got=%d", ErrInvalidHeader, header.Type)
 	case HeaderTypeRequest:
 		req, err2 := readMessage(rd, int(header.Length), &Request{})
 		if err2 != nil {
 			return err2
 		}
 		method := req.GetMethod()
-		hd := s.Router.HandlerFunc(method)
-		if hd == nil {
+		handler := s.Router.HandlerFunc(method)
+		if handler == nil {
 			return fmt.Errorf("%w: %q", ErrMethodNotFound, method)
 		}
 		id := req.GetID()
@@ -106,7 +106,7 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, requests *fss
 		requests.Store(id, requestReader)
 		go func() {
 			defer requests.Delete(id)
-			hd(ctx, requestReader, rw)
+			handler(ctx, requestReader, rw)
 		}()
 	case HeaderTypePayload:
 		pl := readPayload(rd, int(header.Length))
@@ -144,13 +144,13 @@ func (rt *Router) Register(method string, h HandlerFunc) {
 	if _, has := rt.handler[method]; has {
 		panic(fmt.Sprintf("cannot register handler %q twice", method))
 	}
-	rt.handler[method] = func(ctx context.Context, req RequestReader, w ResponseWriter) {
+	rt.handler[method] = func(ctx context.Context, req RequestReader, w ResponseWriter) error {
 		defer func() {
 			if re := recover(); re != nil {
 				log.Println("panic:", re)
 			}
 		}()
-		h(ctx, req, w)
+		return h(ctx, req, w)
 	}
 }
 
@@ -158,4 +158,4 @@ func (rt *Router) HandlerFunc(method string) HandlerFunc {
 	return rt.handler[method]
 }
 
-type HandlerFunc func(ctx context.Context, rr RequestReader, rw ResponseWriter)
+type HandlerFunc func(ctx context.Context, rr RequestReader, rw ResponseWriter) error

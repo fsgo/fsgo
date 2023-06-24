@@ -12,9 +12,13 @@ import (
 type testHandler1 struct {
 }
 
-func (t *testHandler1) Echo(ctx context.Context, req RequestReader, w ResponseWriter) {}
+func (t *testHandler1) Echo(ctx context.Context, req RequestReader, w ResponseWriter) error {
+	return nil
+}
 
-func (t *testHandler1) Hello(ctx context.Context, req RequestReader, w ResponseWriter) {}
+func (t *testHandler1) Hello(ctx context.Context, req RequestReader, w ResponseWriter) error {
+	return nil
+}
 
 func TestRouterRegister(t *testing.T) {
 	rt := NewRouter()

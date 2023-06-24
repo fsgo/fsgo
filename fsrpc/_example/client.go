@@ -14,13 +14,13 @@ import (
 	"github.com/fsgo/fsgo/fsrpc"
 )
 
-var serverAddr = flag.String("addr", "127.0.0.1:8128", "")
+var serverAddr = flag.String("addr", "127.0.0.1:8013", "")
 
 func main() {
 	flag.Parse()
 	conn, err := net.DialTimeout("tcp", *serverAddr, time.Second)
 	if err != nil {
-		log.Println(err)
+		log.Fatalln(err)
 	}
 	defer conn.Close()
 
@@ -33,13 +33,8 @@ func main() {
 		for i := 0; i < 10; i++ {
 			log.Println("i=", i)
 			req := fsrpc.NewRequest("hello")
-			req.HasPayload = true
-			req.LogID = time.Now().String()
-			pw, rr, err2 := rw.WriteRequest(req)
+			rr, err2 := rw.WriteRequest(ctx, req, nil)
 			log.Println("WriteRequest=", err2, rr)
-
-			err3 := pw.WritePayload([]byte("hello"), false)
-			log.Println("WritePayload=", err3)
 
 			resp := rr.Response()
 			log.Println("resp:", resp.String())
@@ -48,5 +43,12 @@ func main() {
 	})
 	log.Println("Open.Err=", err)
 	log.Println("lastErr=", client.LastError())
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	err = client.Open(ctx, fsrpc.PingSender("sys_ping"))
+	log.Println("Ping.Err=", err)
+
 	log.Println("Close()", client.Close())
 }

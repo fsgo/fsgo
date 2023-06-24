@@ -26,6 +26,7 @@ func main() {
 
 	rt := fsrpc.NewRouter()
 	rt.Register("hello", hello)
+	rt.Register("sys_ping", fsrpc.PingReceiver)
 
 	ser := &fsrpc.Server{
 		Router: rt,
@@ -33,7 +34,7 @@ func main() {
 	log.Println(ser.Serve(l))
 }
 
-func hello(ctx context.Context, rr fsrpc.RequestReader, rw fsrpc.ResponseWriter) {
+func hello(ctx context.Context, rr fsrpc.RequestReader, rw fsrpc.ResponseWriter) error {
 	req := rr.Request()
 	hasPl := req.GetHasPayload()
 	for hasPl {
@@ -46,6 +47,7 @@ func hello(ctx context.Context, rr fsrpc.RequestReader, rw fsrpc.ResponseWriter)
 	}
 	log.Println("request", req.String())
 	resp := fsrpc.NewResponse(req.GetID(), 0, "success")
-	err1 := rw.WriteResponse(resp)
+	err1 := rw.WriteResponse(ctx, resp, nil)
 	log.Println("WriteResponse", err1)
+	return nil
 }

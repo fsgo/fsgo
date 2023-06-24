@@ -10,11 +10,15 @@ import (
 )
 
 var (
-	ErrInvalidHeaderType = errors.New("invalid Header type")
-	ErrInvalidProtocol   = fmt.Errorf("invalid Protocol Header, expect is %s", Protocol)
-	ErrMissWriteMeta     = errors.New("should wirte meta first")
-	ErrMethodNotFound    = errors.New("method not found")
-	ErrClosed            = errors.New("already closed")
+	ErrInvalidProtocol = fmt.Errorf("invalid Protocol Header, expect is %s", Protocol)
+	ErrInvalidHeader   = errors.New("invalid Header type")
+
+	ErrInvalidCode = errors.New("invalid error code")
+
+	ErrCannotWritePayload = errors.New("cannot write payload")
+
+	ErrMethodNotFound = errors.New("method not found")
+	ErrClosed         = errors.New("already closed")
 
 	ErrCanceledByDefer = errors.New("canceled by defer")
 )

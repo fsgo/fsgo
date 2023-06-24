@@ -5,6 +5,8 @@
 package fsrpc
 
 import (
+	"bytes"
+	"context"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -12,7 +14,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func NewResponse(requestID uint64, code int64, msg string) *Response {
+func NewResponse(requestID uint64, code ErrCode, msg string) *Response {
 	return &Response{
 		RequestID: requestID,
 		Code:      code,
@@ -20,9 +22,12 @@ func NewResponse(requestID uint64, code int64, msg string) *Response {
 	}
 }
 
+func NewResponseSuccess(requestID uint64) *Response {
+	return NewResponse(requestID, ErrCode_Success, "OK")
+}
+
 type ResponseWriter interface {
-	WriteResponse(resp *Response) error
-	WritePayload(b []byte, more bool) error
+	WriteResponse(ctx context.Context, resp *Response, payload <-chan *bytes.Buffer) error
 }
 
 var _ ResponseWriter = (*respWriter)(nil)
@@ -34,14 +39,16 @@ func newResponseWriter(queue *bufferQueue) *respWriter {
 }
 
 type respWriter struct {
-	queue       *bufferQueue
-	wroteHeader atomic.Bool
-	responseID  uint64
-	index       atomic.Uint32
+	queue     *bufferQueue
+	requestID uint64
+	index     atomic.Uint32
 }
 
-func (rw *respWriter) WriteResponse(meta *Response) error {
-	bf, err := proto.Marshal(meta)
+func (rw *respWriter) WriteResponse(ctx context.Context, resp *Response, payload <-chan *bytes.Buffer) error {
+	if payload != nil {
+		resp.HasPayload = true
+	}
+	bf, err := proto.Marshal(resp)
 	if err != nil {
 		return err
 	}
@@ -55,47 +62,16 @@ func (rw *respWriter) WriteResponse(meta *Response) error {
 		return err1
 	}
 	_, err = bp.Write(bf)
-	rw.queue.send(bp)
-	if err == nil {
-		rw.wroteHeader.Store(true)
-	}
-	return err
-}
-
-func (rw *respWriter) WritePayload(b []byte, more bool) error {
-	if !rw.wroteHeader.Load() {
-		return ErrMissWriteMeta
-	}
-
-	meta := &Payload{
-		Index:  rw.index.Add(1),
-		RID:    rw.responseID,
-		More:   more,
-		Length: uint32(len(b)),
-	}
-
-	bf, err := proto.Marshal(meta)
 	if err != nil {
 		return err
 	}
-	h := Header{
-		Type:   HeaderTypePayload,
-		Length: uint32(len(bf)),
-	}
+	rw.queue.send(bp)
 
-	bp := bytesPool.Get()
-	if err1 := h.Write(bp); err1 != nil {
-		return err1
+	if payload == nil {
+		return nil
 	}
-	_, err2 := bp.Write(bf)
-	if err2 != nil {
-		return err2
-	}
-	_, err3 := bp.Write(b)
-	if err3 == nil {
-		rw.queue.send(bp)
-	}
-	return err3
+	pw := newPayloadWriter(rw.requestID, rw.queue)
+	return pw.writeChan(ctx, payload)
 }
 
 type ResponseReader interface {
@@ -137,4 +113,25 @@ func (r *respReader) Close() {
 		close(r.pl)
 		close(r.resp)
 	})
+}
+
+func QuickWriteResponse[T proto.Message](ctx context.Context, w ResponseWriter, resp *Response, data ...T) error {
+	bc, err := msgChan[T](data...)
+	if err != nil {
+		return err
+	}
+	if bc != nil {
+		resp.HasPayload = true
+	}
+	return w.WriteResponse(ctx, resp, bc)
+}
+
+func QuickReadResponse[T proto.Message](r ResponseReader, data T) (*Response, T, error) {
+	resp := r.Response()
+	_, bf, err := r.Payload()
+	if err != nil {
+		return nil, data, err
+	}
+	err = proto.Unmarshal(bf, data)
+	return resp, data, err
 }

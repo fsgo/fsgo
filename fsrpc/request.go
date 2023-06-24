@@ -5,6 +5,9 @@
 package fsrpc
 
 import (
+	"bytes"
+	"context"
+	"fmt"
 	"io"
 	"sync"
 	"sync/atomic"
@@ -22,7 +25,7 @@ func NewRequest(method string) *Request {
 var globalRequestID atomic.Uint64
 
 type RequestWriter interface {
-	WriteRequest(req *Request) (PayloadWriter, ResponseReader, error)
+	WriteRequest(ctx context.Context, req *Request, pl <-chan *bytes.Buffer) (ResponseReader, error)
 }
 
 var _ RequestWriter = (*reqWriter)(nil)
@@ -32,10 +35,13 @@ type reqWriter struct {
 	newResponseReader func(req *Request) ResponseReader
 }
 
-func (rw *reqWriter) WriteRequest(req *Request) (PayloadWriter, ResponseReader, error) {
+func (rw *reqWriter) WriteRequest(ctx context.Context, req *Request, pl <-chan *bytes.Buffer) (ResponseReader, error) {
+	if pl != nil {
+		req.HasPayload = true
+	}
 	bf, err1 := proto.Marshal(req)
 	if err1 != nil {
-		return nil, nil, err1
+		return nil, err1
 	}
 	h := Header{
 		Type:   HeaderTypeRequest,
@@ -44,15 +50,24 @@ func (rw *reqWriter) WriteRequest(req *Request) (PayloadWriter, ResponseReader, 
 
 	bp := bytesPool.Get()
 	if err2 := h.Write(bp); err2 != nil {
-		return nil, nil, err2
+		return nil, err2
 	}
 	_, err3 := bp.Write(bf)
 	if err3 != nil {
-		return nil, nil, err3
+		return nil, err3
 	}
-	pw := newPayloadWriter(req.GetID(), rw.queue)
 	rw.queue.send(bp)
-	return pw, rw.newResponseReader(req), nil
+
+	reader := rw.newResponseReader(req)
+
+	if pl != nil {
+		pw := newPayloadWriter(req.GetID(), rw.queue)
+		if err4 := pw.writeChan(ctx, pl); err4 != nil {
+			return reader, err4
+		}
+	}
+
+	return reader, nil
 }
 
 type RequestReader interface {
@@ -98,4 +113,41 @@ func (r *reqReader) Close() {
 		close(r.pl)
 		close(r.req)
 	})
+}
+
+func msgChan[T proto.Message](items ...T) (<-chan *bytes.Buffer, error) {
+	if len(items) == 0 {
+		return nil, nil
+	}
+	ch := make(chan *bytes.Buffer, len(items))
+	for i := 0; i < len(items); i++ {
+		bf, err := proto.Marshal(items[i])
+		if err != nil {
+			return nil, fmt.Errorf("index %d: %w", i, err)
+		}
+		ch <- bytes.NewBuffer(bf)
+	}
+	close(ch)
+	return ch, nil
+}
+
+func QuickWriteRequest[T proto.Message](ctx context.Context, w RequestWriter, req *Request, data ...T) (ResponseReader, error) {
+	bc, err := msgChan[T](data...)
+	if err != nil {
+		return nil, err
+	}
+	if bc != nil {
+		req.HasPayload = true
+	}
+	return w.WriteRequest(ctx, req, bc)
+}
+
+func QuickReadRequest[T proto.Message](r RequestReader, data T) (*Request, T, error) {
+	req := r.Request()
+	_, bf, err := r.Payload()
+	if err != nil {
+		return nil, data, err
+	}
+	err = proto.Unmarshal(bf, data)
+	return req, data, err
 }

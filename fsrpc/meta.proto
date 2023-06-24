@@ -9,8 +9,6 @@ import "google/protobuf/any.proto";
 enum CompressType{
   No = 0;
   GZIP = 1;
-  BR = 2;
-  Snappy = 3;
 }
 
 // Request 一条请求信息
@@ -36,7 +34,7 @@ message Payload{
 }
 
 message Response{
-  int64 Code = 1;  // 错误码
+  ErrCode Code = 1;  // 错误码
   string Message = 2; // 错误详情
   uint64 RequestID = 3; // 请求的唯一 ID
   bool HasPayload = 4; // 是否有消息体
@@ -58,4 +56,17 @@ enum ErrCode{
   SerShutdown = 2002;              // 服务正在关闭
   SerLimit = 2003;                // 服务达到处理上线，当前请求被限流
   SerBadConn = 2004;              // 异常的网络连接
+}
+
+// AuthRequest 鉴权请求
+message AuthRequest{
+  string UserName=1;   // 用户名
+  string Token=2;      // 鉴权的密码
+  int64 Timespan=3;    // 当前时间错，单位-秒
+  string Type=4;       // 鉴权算法类型，可选
+}
+
+message PingPong{
+  uint64 ID=1;       // 编号
+  string Message=2;  // 消息内容
 }
