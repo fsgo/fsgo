@@ -22,7 +22,7 @@ type Copy struct {
 	// ReadTo 将 Read 到的数据写入此处,比如 os.Stdout
 	ReadTo io.Writer
 
-	// WriterTo 将 Writer 的数据写入此处，比如 os.Stdout
+	// WriterTo 将 writer 的数据写入此处，比如 os.Stdout
 	WriterTo io.Writer
 
 	interceptor *Interceptor

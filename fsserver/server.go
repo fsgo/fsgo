@@ -12,6 +12,8 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+
+	"github.com/fsgo/fsgo/fssync"
 )
 
 type Server interface {
@@ -45,19 +47,18 @@ type AnyServer struct {
 	closeCancel context.CancelFunc
 	serverExit  chan bool
 
-	connections map[net.Conn]struct{}
+	connections fssync.Map[net.Conn, struct{}]
 
-	status int64
-	mux    sync.RWMutex
+	status atomic.Int32
 }
 
 const (
-	statusInit    int64 = 0 // server 状态，初始状态
-	statusRunning int64 = 1 // 已经调用 Serve 方法，处于运行中
-	statusClosed  int64 = 2 // 已经调用 Shutdown 方法，server 已经关闭
+	statusInit    int32 = iota // server 状态，初始状态
+	statusRunning              // 已经调用 Serve 方法，处于运行中
+	statusClosed               // 已经调用 Shutdown 方法，server 已经关闭
 )
 
-func statusTxt(s int64) string {
+func statusTxt(s int32) string {
 	switch s {
 	case statusInit:
 		return "init"
@@ -82,20 +83,19 @@ func (as *AnyServer) Serve(l net.Listener) error {
 	if as.Handler == nil {
 		return errors.New("handler is nil")
 	}
-	if !atomic.CompareAndSwapInt64(&as.status, statusInit, statusRunning) {
-		s := atomic.LoadInt64(&as.status)
+	if !as.status.CompareAndSwap(statusInit, statusRunning) {
+		s := as.status.Load()
 		return fmt.Errorf("invalid status (%s) for Serve", statusTxt(s))
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	as.closeCancel = cancel
 	as.serverExit = make(chan bool, 1)
-	as.connections = make(map[net.Conn]struct{})
 
 	var errResult error
 	var wg sync.WaitGroup
 
 	loopAccept := func() error {
-		if atomic.LoadInt64(&as.status) != statusRunning {
+		if as.status.Load() != statusRunning {
 			return ErrShutdown
 		}
 
@@ -138,41 +138,34 @@ func (as *AnyServer) Serve(l net.Listener) error {
 
 	wg.Wait()
 	as.serverExit <- true
-	atomic.StoreInt64(&as.status, statusClosed)
+	as.status.Store(statusClosed)
 	return errResult
 }
 
 func (as *AnyServer) handleConn(ctx context.Context, conn net.Conn) {
-	as.mux.Lock()
-	as.connections[conn] = struct{}{}
-	as.mux.Unlock()
+	as.connections.Store(conn, struct{}{})
+	defer as.connections.Delete(conn)
 
-	defer func() {
-		as.mux.Lock()
-		delete(as.connections, conn)
-		as.mux.Unlock()
-	}()
 	ctx = ContextWithConn(ctx, conn)
 	as.Handler.Handle(ctx, conn)
 }
 
 func (as *AnyServer) closeAllConn() {
-	as.mux.Lock()
-	for c := range as.connections {
+	as.connections.Range(func(c net.Conn, value struct{}) bool {
 		_ = c.Close()
-		delete(as.connections, c)
-	}
-	as.mux.Unlock()
+		as.connections.Delete(c)
+		return true
+	})
 }
 
 func (as *AnyServer) Shutdown(ctx context.Context) error {
-	switch atomic.LoadInt64(&as.status) {
+	switch as.status.Load() {
 	case statusClosed,
 		statusInit:
 		return nil
 	}
-	if !atomic.CompareAndSwapInt64(&as.status, statusRunning, statusClosed) {
-		s := atomic.LoadInt64(&as.status)
+	if !as.status.CompareAndSwap(statusRunning, statusClosed) {
+		s := as.status.Load()
 		return fmt.Errorf("invalid status (%s) for Shutdown", statusTxt(s))
 	}
 	select {
