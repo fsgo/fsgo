@@ -6,6 +6,8 @@ package fsrpc
 
 import (
 	"encoding/binary"
+	"fmt"
+	"hash/crc32"
 	"io"
 )
 
@@ -18,7 +20,7 @@ var Protocol = []byte{'F', 'S', 'R', 'P', 'C'}
 //
 // 消息格式为：
 // |--5 Byte(Header)--|--------------Body--------------|
-const HeaderLen = 5
+const HeaderLen = 9
 
 type HeaderType uint8
 
@@ -27,9 +29,6 @@ const (
 	HeaderTypeRequest  HeaderType = 1
 	HeaderTypeResponse HeaderType = 2
 	HeaderTypePayload  HeaderType = 3
-
-	HeaderTypeMin = HeaderTypeRequest
-	HeaderTypeMax = HeaderTypePayload
 )
 
 type Header struct {
@@ -38,12 +37,14 @@ type Header struct {
 }
 
 func (h Header) Write(w io.Writer) error {
-	_, err := w.Write([]byte{byte(h.Type)})
-	if err != nil {
-		return err
+	b := []byte{
+		byte(h.Type), // 数据类型
+		0, 0, 0, 0,   // 数据长度
+		0, 0, 0, 0, // 校验ma
 	}
-	b := make([]byte, 4)
-	binary.LittleEndian.PutUint32(b, h.Length)
+	binary.LittleEndian.PutUint32(b[1:], h.Length)
+	sum := crc32.ChecksumIEEE(b[:5])
+	binary.LittleEndian.PutUint32(b[5:], sum)
 	_, err1 := w.Write(b)
 	return err1
 }
@@ -53,6 +54,11 @@ func ReadHeader(rd io.Reader) (Header, error) {
 	_, err := io.ReadFull(rd, bf)
 	if err != nil {
 		return Header{}, err
+	}
+	got := crc32.ChecksumIEEE(bf[:5])
+	want := binary.LittleEndian.Uint32(bf[5:])
+	if got != want {
+		return Header{}, fmt.Errorf("%w: got checksum %d, want %d", ErrInvalidHeader, got, want)
 	}
 	ty := HeaderType(bf[0])
 	return Header{

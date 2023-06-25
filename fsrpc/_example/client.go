@@ -33,10 +33,10 @@ func main() {
 		for i := 0; i < 10; i++ {
 			log.Println("i=", i)
 			req := fsrpc.NewRequest("hello")
-			rr, err2 := rw.WriteRequest(ctx, req, nil)
+			rr, err2 := rw.WriteChan(ctx, req, nil)
 			log.Println("WriteRequest=", err2, rr)
 
-			resp := rr.Response()
+			resp, _ := rr.Response()
 			log.Println("resp:", resp.String())
 		}
 		return nil

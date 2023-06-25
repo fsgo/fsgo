@@ -26,7 +26,7 @@ message Request {
   map<string, google.protobuf.Any> ExtKV = 9; // 其他 kv 数据
 };
 
-message Payload{
+message PayloadMeta{
   uint32 Index = 1;  // 数据的编号，从 0 依次递增
   uint64 RID = 2;    // Request 或者  Response 的 ID
   bool More = 3;     // 是否有更多消息

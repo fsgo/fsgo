@@ -35,19 +35,13 @@ func main() {
 }
 
 func hello(ctx context.Context, rr fsrpc.RequestReader, rw fsrpc.ResponseWriter) error {
-	req := rr.Request()
-	hasPl := req.GetHasPayload()
-	for hasPl {
-		p, b, err0 := rr.Payload()
-		if err0 != nil {
-			break
-		}
-		log.Println("pl:", p.String(), string(b))
-		hasPl = p.GetMore()
+	req, pl := rr.Request()
+	for item := range pl {
+		log.Println("pl:", item.Err)
 	}
 	log.Println("request", req.String())
 	resp := fsrpc.NewResponse(req.GetID(), 0, "success")
-	err1 := rw.WriteResponse(ctx, resp, nil)
+	err1 := rw.WriteChan(ctx, resp, nil)
 	log.Println("WriteResponse", err1)
 	return nil
 }

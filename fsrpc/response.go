@@ -5,7 +5,6 @@
 package fsrpc
 
 import (
-	"bytes"
 	"context"
 	"io"
 	"sync"
@@ -27,7 +26,8 @@ func NewResponseSuccess(requestID uint64) *Response {
 }
 
 type ResponseWriter interface {
-	WriteResponse(ctx context.Context, resp *Response, payload <-chan *bytes.Buffer) error
+	WriteChan(ctx context.Context, resp *Response, payload <-chan io.Reader) error
+	Write(ctx context.Context, resp *Response, body ...proto.Message) error
 }
 
 var _ ResponseWriter = (*respWriter)(nil)
@@ -44,7 +44,15 @@ type respWriter struct {
 	index     atomic.Uint32
 }
 
-func (rw *respWriter) WriteResponse(ctx context.Context, resp *Response, payload <-chan *bytes.Buffer) error {
+func (rw *respWriter) Write(ctx context.Context, resp *Response, body ...proto.Message) error {
+	ch, err := msgChan[proto.Message](body...)
+	if err != nil {
+		return err
+	}
+	return rw.WriteChan(ctx, resp, ch)
+}
+
+func (rw *respWriter) WriteChan(ctx context.Context, resp *Response, payload <-chan io.Reader) error {
 	if payload != nil {
 		resp.HasPayload = true
 	}
@@ -75,37 +83,28 @@ func (rw *respWriter) WriteResponse(ctx context.Context, resp *Response, payload
 }
 
 type ResponseReader interface {
-	Response() *Response
-	PayloadReader
+	Response() (*Response, <-chan *Payload)
 }
 
 func newRespReader() *respReader {
 	return &respReader{
 		resp: make(chan *Response, 1),
-		pl:   make(chan payloadData, 1024),
+		pl:   make(chan *Payload, 128),
 	}
 }
 
 type respReader struct {
 	resp      chan *Response
-	pl        chan payloadData
+	pl        chan *Payload
 	closeOnce sync.Once
 }
 
-func (r *respReader) Response() *Response {
-	return <-r.resp
+func (r *respReader) Response() (*Response, <-chan *Payload) {
+	return <-r.resp, r.pl
 }
 
-func (r *respReader) sendPayload(pl payloadData) {
+func (r *respReader) sendPayload(pl *Payload) {
 	r.pl <- pl
-}
-
-func (r *respReader) Payload() (*Payload, []byte, error) {
-	pd, ok := <-r.pl
-	if ok {
-		return pd.Meta, pd.Data, pd.Err
-	}
-	return nil, nil, io.EOF
 }
 
 func (r *respReader) Close() {
@@ -123,15 +122,21 @@ func QuickWriteResponse[T proto.Message](ctx context.Context, w ResponseWriter, 
 	if bc != nil {
 		resp.HasPayload = true
 	}
-	return w.WriteResponse(ctx, resp, bc)
+	return w.WriteChan(ctx, resp, bc)
 }
 
 func QuickReadResponse[T proto.Message](r ResponseReader, data T) (*Response, T, error) {
-	resp := r.Response()
-	_, bf, err := r.Payload()
-	if err != nil {
-		return nil, data, err
+	resp, body := r.Response()
+	if body == nil {
+		return nil, data, ErrNoPayload
 	}
-	err = proto.Unmarshal(bf, data)
+	pl, ok := <-body
+	if !ok {
+		return nil, data, ErrNoPayload
+	}
+	if pl.Err != nil {
+		return nil, data, pl.Err
+	}
+	err := proto.Unmarshal(pl.Data, data)
 	return resp, data, err
 }

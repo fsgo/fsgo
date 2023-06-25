@@ -14,34 +14,40 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func readPayload(rd io.Reader, length int) payloadData {
-	meta, err := readMessage(rd, length, &Payload{})
+func readPayload(rd io.Reader, length int) *Payload {
+	meta, err := readMessage(rd, length, &PayloadMeta{})
 	if err != nil {
-		return payloadData{
+		return &Payload{
 			Err: err,
 		}
 	}
 	bf := make([]byte, meta.Length)
 	_, err = io.ReadFull(rd, bf)
 	if err != nil {
-		return payloadData{
+		return &Payload{
 			Err: fmt.Errorf("read payload failed: %w", err),
 		}
 	}
-	return payloadData{
+	return &Payload{
 		Meta: meta,
 		Data: bf,
 	}
 }
 
-type payloadData struct {
-	Meta *Payload
+var payloadChanEmpty = make(chan *Payload)
+
+func init() {
+	close(payloadChanEmpty)
+}
+
+type Payload struct {
+	Meta *PayloadMeta
 	Data []byte
 	Err  error
 }
 
 type PayloadReader interface {
-	Payload() (*Payload, []byte, error)
+	Payload() (*PayloadMeta, []byte, error)
 }
 
 func newPayloadWriter(rid uint64, q *bufferQueue) *plWriter {
@@ -57,8 +63,8 @@ type plWriter struct {
 	index atomic.Uint32
 }
 
-func (pw *plWriter) writeChan(ctx context.Context, pl <-chan *bytes.Buffer) error {
-	var last *bytes.Buffer
+func (pw *plWriter) writeChan(ctx context.Context, pl <-chan io.Reader) error {
+	var last io.Reader
 	for {
 		select {
 		case <-ctx.Done():
@@ -79,9 +85,20 @@ func (pw *plWriter) writeChan(ctx context.Context, pl <-chan *bytes.Buffer) erro
 	}
 }
 
-func (pw *plWriter) WritePayload(b *bytes.Buffer, more bool) error {
-	meta := &Payload{
-		Length: uint32(b.Len()),
+func (pw *plWriter) WritePayload(b io.Reader, more bool) error {
+	var bb *bytes.Buffer
+	switch val := b.(type) {
+	case *bytes.Buffer:
+		bb = val
+	default:
+		bb = &bytes.Buffer{}
+		_, err0 := io.Copy(bb, b)
+		if err0 != nil {
+			return err0
+		}
+	}
+	meta := &PayloadMeta{
+		Length: uint32(bb.Len()),
 		More:   more,
 		RID:    pw.RID,
 		Index:  pw.index.Add(1) - 1,
@@ -101,7 +118,7 @@ func (pw *plWriter) WritePayload(b *bytes.Buffer, more bool) error {
 	if _, err3 := bp.Write(bf1); err3 != nil {
 		return err3
 	}
-	_, err4 := bp.Write(b.Bytes())
+	_, err4 := bp.Write(bb.Bytes())
 	if err4 == nil {
 		pw.queue.send(bp)
 		return nil

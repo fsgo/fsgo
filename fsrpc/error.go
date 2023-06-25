@@ -11,7 +11,7 @@ import (
 
 var (
 	ErrInvalidProtocol = fmt.Errorf("invalid Protocol Header, expect is %s", Protocol)
-	ErrInvalidHeader   = errors.New("invalid Header type")
+	ErrInvalidHeader   = errors.New("invalid Header")
 
 	ErrInvalidCode = errors.New("invalid error code")
 
@@ -21,4 +21,6 @@ var (
 	ErrClosed         = errors.New("already closed")
 
 	ErrCanceledByDefer = errors.New("canceled by defer")
+
+	ErrNoPayload = errors.New("no payload")
 )

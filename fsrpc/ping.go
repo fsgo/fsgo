@@ -32,7 +32,7 @@ func PingSender(method string) ClientHandlerFunc {
 			}
 			req := NewRequest(method)
 			ping.ID = id
-			rr, err := QuickWriteRequest(ctx, rw, req, ping)
+			rr, err := rw.Write(ctx, req, ping)
 			if err != nil {
 				return err
 			}

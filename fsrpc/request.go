@@ -25,7 +25,8 @@ func NewRequest(method string) *Request {
 var globalRequestID atomic.Uint64
 
 type RequestWriter interface {
-	WriteRequest(ctx context.Context, req *Request, pl <-chan *bytes.Buffer) (ResponseReader, error)
+	Write(ctx context.Context, req *Request, body ...proto.Message) (ResponseReader, error)
+	WriteChan(ctx context.Context, req *Request, pl <-chan io.Reader) (ResponseReader, error)
 }
 
 var _ RequestWriter = (*reqWriter)(nil)
@@ -35,7 +36,15 @@ type reqWriter struct {
 	newResponseReader func(req *Request) ResponseReader
 }
 
-func (rw *reqWriter) WriteRequest(ctx context.Context, req *Request, pl <-chan *bytes.Buffer) (ResponseReader, error) {
+func (rw *reqWriter) Write(ctx context.Context, req *Request, body ...proto.Message) (ResponseReader, error) {
+	ch, err := msgChan[proto.Message](body...)
+	if err != nil {
+		return nil, err
+	}
+	return rw.WriteChan(ctx, req, ch)
+}
+
+func (rw *reqWriter) WriteChan(ctx context.Context, req *Request, pl <-chan io.Reader) (ResponseReader, error) {
 	if pl != nil {
 		req.HasPayload = true
 	}
@@ -71,55 +80,49 @@ func (rw *reqWriter) WriteRequest(ctx context.Context, req *Request, pl <-chan *
 }
 
 type RequestReader interface {
-	Request() *Request
-	PayloadReader
+	Request() (*Request, <-chan *Payload)
 }
 
-func newReqReader(meta *Request) *reqReader {
-	mc := make(chan *Request, 1)
-	if meta != nil {
-		mc <- meta
+func newReqReader(req *Request) *reqReader {
+	var pl chan *Payload
+	if req.GetHasPayload() {
+		pl = make(chan *Payload, 128)
+	} else {
+		pl = payloadChanEmpty
 	}
 	return &reqReader{
-		req: mc,
-		pl:  make(chan payloadData, 1024),
+		req: req,
+		pl:  pl,
 	}
 }
 
 type reqReader struct {
-	req       chan *Request
-	pl        chan payloadData
+	req       *Request
+	pl        chan *Payload
 	closeOnce sync.Once
 }
 
-func (r *reqReader) Request() *Request {
-	return <-r.req
+func (r *reqReader) Request() (*Request, <-chan *Payload) {
+	return r.req, r.pl
 }
 
-func (r *reqReader) sendPayload(pl payloadData) {
+func (r *reqReader) sendPayload(pl *Payload) {
 	r.pl <- pl
-}
-
-func (r *reqReader) Payload() (*Payload, []byte, error) {
-	pd, ok := <-r.pl
-	if ok {
-		return pd.Meta, pd.Data, pd.Err
-	}
-	return nil, nil, io.EOF
 }
 
 func (r *reqReader) Close() {
 	r.closeOnce.Do(func() {
-		close(r.pl)
-		close(r.req)
+		if r.req.GetHasPayload() {
+			close(r.pl)
+		}
 	})
 }
 
-func msgChan[T proto.Message](items ...T) (<-chan *bytes.Buffer, error) {
+func msgChan[T proto.Message](items ...T) (<-chan io.Reader, error) {
 	if len(items) == 0 {
 		return nil, nil
 	}
-	ch := make(chan *bytes.Buffer, len(items))
+	ch := make(chan io.Reader, len(items))
 	for i := 0; i < len(items); i++ {
 		bf, err := proto.Marshal(items[i])
 		if err != nil {
@@ -139,15 +142,21 @@ func QuickWriteRequest[T proto.Message](ctx context.Context, w RequestWriter, re
 	if bc != nil {
 		req.HasPayload = true
 	}
-	return w.WriteRequest(ctx, req, bc)
+	return w.WriteChan(ctx, req, bc)
 }
 
 func QuickReadRequest[T proto.Message](r RequestReader, data T) (*Request, T, error) {
-	req := r.Request()
-	_, bf, err := r.Payload()
-	if err != nil {
-		return nil, data, err
+	req, body := r.Request()
+	if body == nil {
+		return nil, data, ErrNoPayload
 	}
-	err = proto.Unmarshal(bf, data)
+	pl, ok := <-body
+	if !ok {
+		return nil, data, ErrNoPayload
+	}
+	if pl.Err != nil {
+		return nil, data, pl.Err
+	}
+	err := proto.Unmarshal(pl.Data, data)
 	return req, data, err
 }
