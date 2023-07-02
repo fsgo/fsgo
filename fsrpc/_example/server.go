@@ -25,7 +25,7 @@ func main() {
 	log.Println("Listen At:", l.Addr().String())
 
 	rt := fsrpc.NewRouter()
-	rt.Register("hello", hello)
+	rt.Register("hello", fsrpc.HandlerFunc(hello))
 
 	ph := fsrpc.PingHandler{}
 	ph.RegisterTo(rt)

@@ -8,6 +8,7 @@ import (
 	"context"
 	"flag"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/fsgo/fsgo/fsnet/fsconn"
@@ -17,6 +18,10 @@ import (
 
 var serverAddr = flag.String("addr", "127.0.0.1:8000", "")
 var debug = flag.Bool("d", false, "enable debug")
+
+func init() {
+	log.SetFlags(log.LstdFlags | log.Lshortfile)
+}
 
 func forDebug() {
 	pt := &fsconn.PrintByteTracer{}
@@ -40,23 +45,33 @@ func main() {
 	// 	conn.SetReadDeadline(time.Now().Add(time.Second))
 	// })
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()
 
+	var wg sync.WaitGroup
+	wg.Add(2)
 	stream := client.MustOpen(ctx)
-	// for i := 0; i < 10; i++ {
-	// 	log.Println("i=", i)
-	// 	req := fsrpc.NewRequest("hello")
-	// 	rr, err2 := stream.WriteChan(ctx, req, nil)
-	// 	log.Println("WriteRequest=", err2)
-	//
-	// 	resp, _ := rr.Response()
-	// 	log.Println("resp:", resp.String())
-	// }
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 100; i++ {
+			log.Println("i=", i)
+			req := fsrpc.NewRequest("hello")
+			rr, err2 := stream.WriteChan(ctx, req, nil)
+			log.Println("WriteChan=", err2)
 
+			resp, _, err3 := rr.Response()
+			log.Println("resp:", resp.String(), err3)
+			time.Sleep(100 * time.Millisecond)
+		}
+	}()
 	ph := &fsrpc.PingHandler{}
-	err = ph.SendMany(ctx, stream, time.Second)
-	log.Println("Ping.Err=", err)
+	go func() {
+		defer wg.Done()
+		err = ph.SendMany(ctx, stream, time.Second)
+		log.Println("Ping.Err=", err)
+	}()
+	wg.Wait()
+
 	log.Println("Client.Err=", client.LastError())
 
 	log.Println("Close()", client.Close())

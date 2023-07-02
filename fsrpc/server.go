@@ -11,9 +11,11 @@ import (
 	"log"
 	"net"
 	"sync"
+	"sync/atomic"
 
 	"github.com/fsgo/fsgo/fsserver"
 	"github.com/fsgo/fsgo/fssync"
+	"github.com/fsgo/fsgo/fssync/fsatomic"
 )
 
 type Server struct {
@@ -53,6 +55,12 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
 	// connReader := bufio.NewReader(conn)
 	connReader := conn
+
+	session := &ServerConnSession{
+		RemoteAddr: conn.RemoteAddr(),
+		LocalAddr:  conn.LocalAddr(),
+	}
+	ctx = ctxWithServerConnSession(ctx, session)
 
 	err1 := ReadProtocol(connReader)
 	if err1 != nil {
@@ -104,7 +112,7 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 			return fmt.Errorf("read Request: %w", err2)
 		}
 		method := req.GetMethod()
-		handler := s.Router.HandlerFunc(method)
+		handler := s.Router.Handler(method)
 		if handler == nil {
 			return fmt.Errorf("%w: %q", ErrMethodNotFound, method)
 		}
@@ -124,7 +132,7 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 			hp.Handlers.Store(method, reader)
 			go func() {
 				defer hp.Handlers.Delete(method)
-				_ = handler(ctx, reader, rw)
+				handler.Handle(ctx, reader, rw)
 			}()
 		} else {
 			hr.requests <- req
@@ -158,40 +166,51 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 
 type (
 	RouteFinder interface {
-		HandlerFunc(method string) HandlerFunc
+		Handler(method string) Handler
 	}
 
 	RouteRegister interface {
-		Register(method string, h HandlerFunc)
+		Register(method string, h Handler)
 	}
 )
 
 func NewRouter() *Router {
 	return &Router{
-		handler: map[string]HandlerFunc{},
+		handlers: map[string]Handler{},
 	}
 }
+
+var _ RouteFinder = (*Router)(nil)
+var _ RouteRegister = (*Router)(nil)
 
 type Router struct {
-	handler map[string]HandlerFunc
+	handlers map[string]Handler
 }
 
-func (rt *Router) Register(method string, h HandlerFunc) {
-	if _, has := rt.handler[method]; has {
+func (rt *Router) Register(method string, h Handler) {
+	if _, has := rt.handlers[method]; has {
 		panic(fmt.Sprintf("cannot register handler %q twice", method))
 	}
-	rt.handler[method] = func(ctx context.Context, req RequestReader, w ResponseWriter) error {
-		defer func() {
-			if re := recover(); re != nil {
-				log.Println("panic:", re)
-			}
-		}()
-		return h(ctx, req, w)
-	}
+	rt.handlers[method] = h
 }
 
-func (rt *Router) HandlerFunc(method string) HandlerFunc {
-	return rt.handler[method]
+func (rt *Router) Handler(method string) Handler {
+	return rt.handlers[method]
+}
+
+type Handler interface {
+	Handle(ctx context.Context, rr RequestReader, rw ResponseWriter) error
 }
 
 type HandlerFunc func(ctx context.Context, rr RequestReader, rw ResponseWriter) error
+
+func (h HandlerFunc) Handle(ctx context.Context, rr RequestReader, rw ResponseWriter) error {
+	return h(ctx, rr, rw)
+}
+
+type ServerConnSession struct {
+	LoggedIn   atomic.Bool
+	User       fsatomic.String
+	RemoteAddr net.Addr
+	LocalAddr  net.Addr
+}

@@ -4,4 +4,21 @@
 
 package fsrpc
 
+import (
+	"context"
+)
+
 type ctxKey uint8
+
+const (
+	ctxKeyServerConnSession ctxKey = iota
+)
+
+func ctxWithServerConnSession(ctx context.Context, session *ServerConnSession) context.Context {
+	return context.WithValue(ctx, ctxKeyServerConnSession, session)
+}
+
+func ServerConnSessionFromCtx(ctx context.Context) *ServerConnSession {
+	val, _ := ctx.Value(ctxKeyServerConnSession).(*ServerConnSession)
+	return val
+}

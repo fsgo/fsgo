@@ -23,6 +23,6 @@ func (t *testHandler1) Hello(ctx context.Context, req RequestReader, w ResponseW
 func TestRouterRegister(t *testing.T) {
 	rt := NewRouter()
 	th1 := &testHandler1{}
-	rt.Register("demo.echo", th1.Echo)
-	rt.Register("demo.hello", th1.Hello)
+	rt.Register("demo.echo", HandlerFunc(th1.Echo))
+	rt.Register("demo.hello", HandlerFunc(th1.Hello))
 }

@@ -25,4 +25,6 @@ var (
 	ErrCanceledByDefer = errors.New("canceled by defer")
 
 	ErrNoPayload = errors.New("no payload")
+
+	ErrAuthFailed = errors.New("auth failed")
 )

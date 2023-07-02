@@ -74,7 +74,7 @@ func (pp *PingHandler) SendMany(ctx context.Context, rw RequestProtoWriter, inte
 }
 
 func (pp *PingHandler) RegisterTo(rt RouteRegister) {
-	rt.Register(pp.getMethod(), pp.Receiver)
+	rt.Register(pp.getMethod(), HandlerFunc(pp.Receiver))
 }
 
 func (pp *PingHandler) Receiver(ctx context.Context, rr RequestReader, rw ResponseWriter) (ret error) {
