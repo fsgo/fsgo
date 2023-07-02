@@ -44,6 +44,10 @@ func (pb *PrintByteWriter) getOut() io.Writer {
 }
 
 func (pb *PrintByteWriter) Write(p []byte) (n int, err error) {
+	return pb.WriteWithMeta(p, "")
+}
+
+func (pb *PrintByteWriter) WriteWithMeta(p []byte, meta string) (n int, err error) {
 	pb.mux.Lock()
 	defer pb.mux.Unlock()
 
@@ -51,7 +55,7 @@ func (pb *PrintByteWriter) Write(p []byte) (n int, err error) {
 	maxLen := pb.getLineMax()
 
 	bf := &bytes.Buffer{}
-	fmt.Fprintf(bf, "[%s][%d][Len=%d] %s\n", pb.Name, pb.id.Add(1), len(p), time.Now().Format(time.DateTime+".99999"))
+	fmt.Fprintf(bf, "[%s][%d][Len=%d] %s %s\n", pb.Name, pb.id.Add(1), len(p), meta, time.Now().Format(time.DateTime+".99999"))
 	lineNo := -1
 	startIndex := 0
 	for len(p) > 0 {

@@ -33,8 +33,14 @@ type DialContextFunc func(ctx context.Context, network string, address string) (
 var Default Dialer = &Simple{}
 
 // DialContext dial default
-var DialContext = func(ctx context.Context, network string, address string) (net.Conn, error) {
+func DialContext(ctx context.Context, network string, address string) (net.Conn, error) {
 	return Default.DialContext(ctx, network, address)
+}
+
+func DialTimeout(network string, address string, timeout time.Duration) (net.Conn, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return DialContext(ctx, network, address)
 }
 
 // Simple dialer

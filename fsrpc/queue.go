@@ -54,7 +54,6 @@ func (sc *bufferQueue) startWrite(w io.Writer) error {
 			return sc.closeErr.Load()
 		}
 	}
-	return nil
 }
 
 func (sc *bufferQueue) sendReader(b io.Reader) error {

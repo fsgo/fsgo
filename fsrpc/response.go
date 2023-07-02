@@ -75,14 +75,16 @@ func (rw *respWriter) WriteChan(ctx context.Context, resp *Response, payloads <-
 	}
 
 	bp := bytesPool.Get()
-	if err1 := h.Write(bp); err1 != nil {
-		return err1
+	if err = h.Write(bp); err != nil {
+		return err
 	}
 	_, err = bp.Write(bf)
 	if err != nil {
 		return err
 	}
-	rw.queue.sendReader(bp)
+	if err = rw.queue.sendReader(bp); err != nil {
+		return err
+	}
 
 	if payloads == nil {
 		return nil

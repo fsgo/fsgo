@@ -67,7 +67,7 @@ func (ch *ConnStatTracer) init() {
 				ch.dialFailTimes.Add(1)
 				return nil, err
 			}
-			return fsconn.WithInterceptor(conn, ch.connInterceptor), nil
+			return fsconn.Wrap(conn, ch.connInterceptor), nil
 		},
 	}
 }

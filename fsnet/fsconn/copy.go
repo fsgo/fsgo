@@ -101,7 +101,7 @@ type StreamConn struct {
 	mux sync.Mutex
 
 	// 关闭状态，0-正常，1-已关闭
-	closed int32
+	closed atomic.Bool
 }
 
 var zeroDialer = &net.Dialer{}
@@ -261,11 +261,13 @@ func (sc *StreamConn) Read(b []byte) (int, error) {
 }
 
 func (sc *StreamConn) isClosed() bool {
-	return atomic.LoadInt32(&sc.closed) == 1
+	return sc.closed.Load()
 }
 
 func (sc *StreamConn) Close() error {
-	atomic.StoreInt32(&sc.closed, 1)
+	if !sc.closed.CompareAndSwap(false, true) {
+		return nil
+	}
 
 	sc.mux.Lock()
 	defer sc.mux.Unlock()

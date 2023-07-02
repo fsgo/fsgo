@@ -57,8 +57,8 @@ func TestNewConn(t *testing.T) {
 			},
 		}
 
-		w1 := WithInterceptor(w, tr, tr2)
-		r1 := WithInterceptor(r)
+		w1 := Wrap(w, tr, tr2)
+		r1 := Wrap(r)
 
 		msg := []byte("hello")
 		go func() {
@@ -96,7 +96,7 @@ func TestNewConn_merge(t *testing.T) {
 			assert.Equal(t, 4, id)
 		},
 	}
-	nc := WithInterceptor(&net.TCPConn{}, hk1)
+	nc := Wrap(&net.TCPConn{}, hk1)
 
 	hk2 := &Interceptor{
 		Read: func(info Info, b []byte, raw func([]byte) (int, error)) (int, error) {
@@ -123,7 +123,7 @@ func TestNewConn_merge(t *testing.T) {
 			assert.Equal(t, 6, id)
 		},
 	}
-	nc1 := WithInterceptor(nc, hk2, hk3, hk4)
+	nc1 := Wrap(nc, hk2, hk3, hk4)
 	assert.NotEqual(t, nc, nc1)
 	bf := make([]byte, 1)
 	_, _ = nc1.Read(bf)
@@ -132,7 +132,7 @@ func TestNewConn_merge(t *testing.T) {
 
 func TestOriginConn(t *testing.T) {
 	c1 := &net.TCPConn{}
-	c2 := WithInterceptor(c1)
+	c2 := Wrap(c1)
 
 	assert.Equal(t, c1, OriginConn(c2))
 	assert.Equal(t, c1, OriginConn(c1))
@@ -158,7 +158,7 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 	})
 
 	c1 := &net.TCPConn{}
-	c2 := WithInterceptor(c1, &Interceptor{
+	c2 := Wrap(c1, &Interceptor{
 		SetDeadline: func(info Info, tm time.Time, raw func(t time.Time) error) error {
 			require.Equal(t, int32(3), atomic.AddInt32(&num, 1))
 			require.Equal(t, want, tm)
@@ -181,7 +181,7 @@ func BenchmarkConnInterceptor_Read(b *testing.B) {
 
 		its = append(its, hk1)
 	}
-	conn := WithInterceptor(&net.TCPConn{}, its...)
+	conn := Wrap(&net.TCPConn{}, its...)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		bf := make([]byte, 1)
@@ -200,7 +200,7 @@ func BenchmarkConnInterceptor_AfterRead(b *testing.B) {
 		}
 		its = append(its, hk1)
 	}
-	conn := WithInterceptor(&net.TCPConn{}, its...)
+	conn := Wrap(&net.TCPConn{}, its...)
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		bf := make([]byte, 1)

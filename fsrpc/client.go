@@ -60,13 +60,12 @@ func (cc *ClientConn) init() {
 		if !cc.lastErr.CompareAndSwap(nil, err) {
 			return
 		}
-		cc.closeWithError(err)
+		_ = cc.closeWithError(err)
 		cc.errors <- err
 		cc.ctxCancel(err)
 	}
 
 	go func() {
-		// rd := io.TeeReader(cc.readWriter, &fsio.PrintByteWriter{Name: "Client Read"})
 		if err := ReadProtocol(cc.readWriter); err != nil {
 			storeError(err)
 			return
@@ -82,7 +81,6 @@ func (cc *ClientConn) init() {
 	}()
 
 	go func() {
-		// mw := io.MultiWriter(cc.readWriter, &fsio.PrintByteWriter{Name: "Client Write"})
 		err := cc.writeQueue.startWrite(cc.readWriter)
 		if err != nil {
 			storeError(err)

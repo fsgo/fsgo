@@ -187,7 +187,7 @@ func (d *Dumper) WrapListener(name string, l net.Listener) net.Listener {
 		AfterAccepts: []func(conn net.Conn) (net.Conn, error){
 			func(conn net.Conn) (net.Conn, error) {
 				c := fsconn.WithService(name, conn)
-				return fsconn.WithInterceptor(c, d.ServerConnInterceptor()), nil
+				return fsconn.Wrap(c, d.ServerConnInterceptor()), nil
 			},
 		},
 	}

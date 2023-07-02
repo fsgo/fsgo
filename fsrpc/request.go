@@ -53,9 +53,9 @@ func (rw *Stream) WriteChan(ctx context.Context, req *Request, payloads <-chan i
 	if payloads != nil {
 		req.HasPayload = true
 	}
-	reqBf, err1 := proto.Marshal(req)
-	if err1 != nil {
-		return nil, err1
+	reqBf, err := proto.Marshal(req)
+	if err != nil {
+		return nil, err
 	}
 	h := Header{
 		Type:   HeaderTypeRequest,
@@ -63,14 +63,17 @@ func (rw *Stream) WriteChan(ctx context.Context, req *Request, payloads <-chan i
 	}
 
 	bp := bytesPool.Get()
-	if err2 := h.Write(bp); err2 != nil {
-		return nil, err2
+	if err = h.Write(bp); err != nil {
+		return nil, err
 	}
-	_, err3 := bp.Write(reqBf)
-	if err3 != nil {
-		return nil, err3
+	_, err = bp.Write(reqBf)
+	if err != nil {
+		return nil, err
 	}
-	rw.queue.sendReader(bp)
+
+	if err = rw.queue.sendReader(bp); err != nil {
+		return nil, err
+	}
 
 	reader := rw.newResReader(req)
 

@@ -16,14 +16,14 @@ func NewWithContext(ctx context.Context, conn net.Conn) net.Conn {
 	if len(cks) == 0 {
 		return conn
 	}
-	return WithInterceptor(conn, cks...)
+	return Wrap(conn, cks...)
 }
 
 var _ net.Conn = (*connWithIt)(nil)
 
-// WithInterceptor wrap connWithIt with Interceptor
+// Wrap  conn WithIt with Interceptor
 // its 将倒序执行：后注册的先执行
-func WithInterceptor(c net.Conn, its ...*Interceptor) net.Conn {
+func Wrap(c net.Conn, its ...*Interceptor) net.Conn {
 	if rc, ok := c.(*connWithIt); ok {
 		nc := &connWithIt{
 			raw:  rc.raw,

@@ -75,7 +75,7 @@ func TransConnInterceptor(its ...*fsconn.Interceptor) *Interceptor {
 			if err != nil || len(its) == 0 {
 				return conn, err
 			}
-			return fsconn.WithInterceptor(conn, its...), nil
+			return fsconn.Wrap(conn, its...), nil
 		},
 	}
 }

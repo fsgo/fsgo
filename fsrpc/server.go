@@ -67,7 +67,8 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	defer writeQueue.CloseWithErr(ErrCanceledByDefer)
 
 	go func() {
-		writeQueue.startWrite(conn)
+		err := writeQueue.startWrite(conn)
+		cancel(err)
 	}()
 
 	rw := newResponseWriter(writeQueue)
@@ -123,7 +124,7 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 			hp.Handlers.Store(method, reader)
 			go func() {
 				defer hp.Handlers.Delete(method)
-				handler(ctx, reader, rw)
+				_ = handler(ctx, reader, rw)
 			}()
 		} else {
 			hr.requests <- req

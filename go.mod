@@ -6,7 +6,6 @@ require (
 	github.com/fsgo/fscache v0.0.0-20221106082135-4385911b5ab4
 	github.com/fsgo/fsconf v0.2.10
 	github.com/fsgo/fsenv v0.3.2
-	github.com/golang/snappy v0.0.4
 	github.com/miekg/dns v1.1.53
 	github.com/stretchr/testify v1.8.4
 	golang.org/x/net v0.10.0

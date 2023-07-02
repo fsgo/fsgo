@@ -6,7 +6,11 @@ package fsconn
 
 import (
 	"bytes"
+	"fmt"
+	"io"
 	"sync"
+
+	"github.com/fsgo/fsgo/fsio"
 )
 
 // ReadTracer 获取所有通过 Read 方法读取的数据的副本
@@ -87,4 +91,36 @@ func (ch *WriteTracer) Reset() {
 	ch.mux.Lock()
 	ch.buf.Reset()
 	ch.mux.Unlock()
+}
+
+type PrintByteTracer struct {
+	interceptor *Interceptor
+	once        sync.Once
+	Out         io.Writer
+}
+
+func (pb *PrintByteTracer) init() {
+	rb := &fsio.PrintByteWriter{
+		Name: "Read",
+		Out:  pb.Out,
+	}
+	wb := &fsio.PrintByteWriter{
+		Name: "Write",
+		Out:  pb.Out,
+	}
+	pb.interceptor = &Interceptor{
+		AfterRead: func(info Info, b []byte, readSize int, err error) {
+			meta := info.RemoteAddr().String() + ", err=" + fmt.Sprint(err)
+			_, _ = rb.WriteWithMeta(b, meta)
+		},
+		AfterWrite: func(info Info, b []byte, readSize int, err error) {
+			meta := info.RemoteAddr().String() + ", err=" + fmt.Sprint(err)
+			_, _ = wb.WriteWithMeta(b, meta)
+		},
+	}
+}
+
+func (pb *PrintByteTracer) Interceptor() *Interceptor {
+	pb.once.Do(pb.init)
+	return pb.interceptor
 }

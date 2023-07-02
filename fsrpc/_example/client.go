@@ -8,21 +8,28 @@ import (
 	"context"
 	"flag"
 	"log"
-	"net"
 	"time"
 
+	"github.com/fsgo/fsgo/fsnet/fsconn"
+	"github.com/fsgo/fsgo/fsnet/fsdialer"
 	"github.com/fsgo/fsgo/fsrpc"
 )
 
 var serverAddr = flag.String("addr", "127.0.0.1:8000", "")
 
+func init() {
+	pt := &fsconn.PrintByteTracer{}
+	fsconn.RegisterInterceptor(pt.Interceptor())
+}
+
 func main() {
 	flag.Parse()
-	conn, err := net.DialTimeout("tcp", *serverAddr, time.Second)
+	conn, err := fsdialer.DialTimeout("tcp", *serverAddr, time.Second)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	defer conn.Close()
+	conn = fsconn.Wrap(conn)
 
 	client := fsrpc.NewClientConn(conn)
 	// client.SetBeforeReadLoop(func() {
