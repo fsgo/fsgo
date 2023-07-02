@@ -30,7 +30,7 @@ message PayloadMeta{
   uint32 Index = 1;  // 数据的编号，从 0 依次递增
   uint64 RID = 2;    // Request 或者  Response 的 ID
   bool More = 3;     // 是否有更多消息
-  uint32 Length = 4; // 数据内容长度
+  int64 Length = 4; // 数据内容长度
 }
 
 message Response{

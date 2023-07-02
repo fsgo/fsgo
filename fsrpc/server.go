@@ -5,7 +5,6 @@
 package fsrpc
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"io"
@@ -52,9 +51,10 @@ func (s *Server) callOnError(ctx context.Context, conn net.Conn, err error) {
 
 func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
-	connBR := bufio.NewReader(conn)
+	// connReader := bufio.NewReader(conn)
+	connReader := conn
 
-	err1 := ReadProtocol(connBR)
+	err1 := ReadProtocol(connReader)
 	if err1 != nil {
 		s.callOnError(ctx, conn, err1)
 		return
@@ -71,18 +71,24 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	}()
 
 	rw := newResponseWriter(writeQueue)
+	hp := &handlerParam{}
 
-	requests := &fssync.Map[uint64, *reqReader]{}
-
-	for i := uint64(0); ; i++ {
-		if err3 := s.readOnePackage(ctx, connBR, requests, rw); err3 != nil {
+	for {
+		err3 := s.readOnePackage(ctx, connReader, rw, hp)
+		if err3 != nil {
 			s.callOnError(ctx, conn, err3)
 			return
 		}
 	}
 }
 
-func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, requests *fssync.Map[uint64, *reqReader], rw *respWriter) error {
+type handlerParam struct {
+	Handlers fssync.Map[string, *requestReader]
+	Requests fssync.Map[uint64, *requestReader]
+	Payloads fssync.Map[uint64, payloadChan]
+}
+
+func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWriter, hp *handlerParam) error {
 	header, err1 := ReadHeader(rd)
 	if err1 != nil {
 		return err1
@@ -101,26 +107,49 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, requests *fss
 		if handler == nil {
 			return fmt.Errorf("%w: %q", ErrMethodNotFound, method)
 		}
-		id := req.GetID()
-		requestReader := newReqReader(req)
-		requests.Store(id, requestReader)
-		go func() {
-			defer requests.Delete(id)
-			handler(ctx, requestReader, rw)
-		}()
+
+		hr, ok := hp.Handlers.Load(method)
+		if !ok {
+			reader := newRequestReader()
+			reader.requests <- req
+			if !req.GetHasPayload() {
+				reader.payloads <- emptyPayloadChan
+			} else {
+				hp.Requests.Store(req.GetID(), reader)
+				plc := make(payloadChan, 1)
+				reader.payloads <- plc
+				hp.Payloads.Store(req.GetID(), plc)
+			}
+			hp.Handlers.Store(method, reader)
+			go func() {
+				defer hp.Handlers.Delete(method)
+				handler(ctx, reader, rw)
+			}()
+		} else {
+			hr.requests <- req
+			if !req.GetHasPayload() {
+				hr.payloads <- emptyPayloadChan
+			} else {
+				plc := make(payloadChan, 1)
+				hr.payloads <- plc
+				hp.Payloads.Store(req.GetID(), plc)
+			}
+		}
 	case HeaderTypePayload:
-		pl := readPayload(rd, int(header.Length))
-		if pl.Err != nil {
-			return pl.Err
+		pl, err := readPayload(rd, int(header.Length))
+		if err != nil {
+			return err
 		}
 		rid := pl.Meta.GetRID()
-		requestReader, ok := requests.Load(rid)
+		plc, ok := hp.Payloads.Load(rid)
 		if !ok {
-			return fmt.Errorf("request id not found:%d", rid)
+			return fmt.Errorf("request not found: %d", rid)
 		}
-		requestReader.sendPayload(pl)
+		plc <- pl
 		if !pl.Meta.More {
-			requestReader.Close()
+			close(plc)
+			hp.Requests.Delete(rid)
+			hp.Payloads.Delete(rid)
 		}
 	}
 	return nil

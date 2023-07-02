@@ -14,7 +14,7 @@ import (
 	"github.com/fsgo/fsgo/fsrpc"
 )
 
-var serverAddr = flag.String("addr", "127.0.0.1:8013", "")
+var serverAddr = flag.String("addr", "127.0.0.1:8000", "")
 
 func main() {
 	flag.Parse()
@@ -25,29 +25,25 @@ func main() {
 	defer conn.Close()
 
 	client := fsrpc.NewClientConn(conn)
-	client.SetBeforeReadLoop(func() {
-		conn.SetReadDeadline(time.Now().Add(time.Second))
-	})
+	// client.SetBeforeReadLoop(func() {
+	// 	conn.SetReadDeadline(time.Now().Add(time.Second))
+	// })
 
-	err = client.Open(context.Background(), func(ctx context.Context, rw fsrpc.RequestWriter) error {
-		for i := 0; i < 10; i++ {
-			log.Println("i=", i)
-			req := fsrpc.NewRequest("hello")
-			rr, err2 := rw.WriteChan(ctx, req, nil)
-			log.Println("WriteRequest=", err2, rr)
-
-			resp, _ := rr.Response()
-			log.Println("resp:", resp.String())
-		}
-		return nil
-	})
-	log.Println("Open.Err=", err)
-	log.Println("lastErr=", client.LastError())
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 
-	err = client.Open(ctx, fsrpc.PingSender("sys_ping"))
+	stream := client.MustOpen(ctx)
+	// for i := 0; i < 10; i++ {
+	// 	log.Println("i=", i)
+	// 	req := fsrpc.NewRequest("hello")
+	// 	rr, err2 := stream.WriteChan(ctx, req, nil)
+	// 	log.Println("WriteRequest=", err2)
+	//
+	// 	resp, _ := rr.Response()
+	// 	log.Println("resp:", resp.String())
+	// }
+
+	err = fsrpc.PingSender(ctx, stream, "sys_ping")
 	log.Println("Ping.Err=", err)
 
 	log.Println("Close()", client.Close())

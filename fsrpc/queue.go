@@ -53,7 +53,7 @@ func (sc *bufferQueue) startWrite(w io.Writer) error {
 	return nil
 }
 
-func (sc *bufferQueue) send(b *bytes.Buffer) {
+func (sc *bufferQueue) sendReader(b io.Reader) {
 	select {
 	case <-sc.done:
 	case sc.queue <- b:

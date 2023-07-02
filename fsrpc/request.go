@@ -9,7 +9,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync"
 	"sync/atomic"
 
 	"google.golang.org/protobuf/proto"
@@ -24,56 +23,61 @@ func NewRequest(method string) *Request {
 
 var globalRequestID atomic.Uint64
 
-type RequestWriter interface {
-	Write(ctx context.Context, req *Request, body ...proto.Message) (ResponseReader, error)
-	WriteChan(ctx context.Context, req *Request, pl <-chan io.Reader) (ResponseReader, error)
-}
+type (
+	RequestProtoWriter interface {
+		Write(ctx context.Context, req *Request, body ...proto.Message) (ResponseReader, error)
+	}
 
-var _ RequestWriter = (*reqWriter)(nil)
+	RequestChanWriter interface {
+		WriteChan(ctx context.Context, req *Request, pl <-chan io.Reader) (ResponseReader, error)
+	}
+)
 
-type reqWriter struct {
+var _ RequestProtoWriter = (*Stream)(nil)
+var _ RequestChanWriter = (*Stream)(nil)
+
+type Stream struct {
 	queue             *bufferQueue
 	newResponseReader func(req *Request) ResponseReader
 }
 
-func (rw *reqWriter) Write(ctx context.Context, req *Request, body ...proto.Message) (ResponseReader, error) {
-	ch, err := msgChan[proto.Message](body...)
+func (rw *Stream) Write(ctx context.Context, req *Request, payload ...proto.Message) (ResponseReader, error) {
+	ch, err := msgChan[proto.Message](payload...)
 	if err != nil {
 		return nil, err
 	}
 	return rw.WriteChan(ctx, req, ch)
 }
 
-func (rw *reqWriter) WriteChan(ctx context.Context, req *Request, pl <-chan io.Reader) (ResponseReader, error) {
-	if pl != nil {
+func (rw *Stream) WriteChan(ctx context.Context, req *Request, payloads <-chan io.Reader) (ResponseReader, error) {
+	if payloads != nil {
 		req.HasPayload = true
 	}
-	bf, err1 := proto.Marshal(req)
+	reqBf, err1 := proto.Marshal(req)
 	if err1 != nil {
 		return nil, err1
 	}
 	h := Header{
 		Type:   HeaderTypeRequest,
-		Length: uint32(len(bf)),
+		Length: uint32(len(reqBf)),
 	}
 
 	bp := bytesPool.Get()
 	if err2 := h.Write(bp); err2 != nil {
 		return nil, err2
 	}
-	_, err3 := bp.Write(bf)
+	_, err3 := bp.Write(reqBf)
 	if err3 != nil {
 		return nil, err3
 	}
-	rw.queue.send(bp)
+	rw.queue.sendReader(bp)
 
 	reader := rw.newResponseReader(req)
 
-	if pl != nil {
+	if payloads != nil {
 		pw := newPayloadWriter(req.GetID(), rw.queue)
-		if err4 := pw.writeChan(ctx, pl); err4 != nil {
-			return reader, err4
-		}
+		err4 := pw.writeChan(ctx, payloads)
+		return reader, err4
 	}
 
 	return reader, nil
@@ -83,39 +87,22 @@ type RequestReader interface {
 	Request() (*Request, <-chan *Payload)
 }
 
-func newReqReader(req *Request) *reqReader {
-	var pl chan *Payload
-	if req.GetHasPayload() {
-		pl = make(chan *Payload, 128)
-	} else {
-		pl = payloadChanEmpty
-	}
-	return &reqReader{
-		req: req,
-		pl:  pl,
+var _ RequestReader = (*requestReader)(nil)
+
+func newRequestReader() *requestReader {
+	return &requestReader{
+		requests: make(chan *Request, 1),
+		payloads: make(chan payloadChan, 1),
 	}
 }
 
-type reqReader struct {
-	req       *Request
-	pl        chan *Payload
-	closeOnce sync.Once
+type requestReader struct {
+	requests chan *Request
+	payloads chan payloadChan
 }
 
-func (r *reqReader) Request() (*Request, <-chan *Payload) {
-	return r.req, r.pl
-}
-
-func (r *reqReader) sendPayload(pl *Payload) {
-	r.pl <- pl
-}
-
-func (r *reqReader) Close() {
-	r.closeOnce.Do(func() {
-		if r.req.GetHasPayload() {
-			close(r.pl)
-		}
-	})
+func (r *requestReader) Request() (*Request, <-chan *Payload) {
+	return <-r.requests, <-r.payloads
 }
 
 func msgChan[T proto.Message](items ...T) (<-chan io.Reader, error) {
@@ -134,29 +121,19 @@ func msgChan[T proto.Message](items ...T) (<-chan io.Reader, error) {
 	return ch, nil
 }
 
-func QuickWriteRequest[T proto.Message](ctx context.Context, w RequestWriter, req *Request, data ...T) (ResponseReader, error) {
-	bc, err := msgChan[T](data...)
-	if err != nil {
-		return nil, err
+func ReadProtoRequest[T proto.Message](ctx context.Context, r RequestReader, data T) (*Request, T, error) {
+	req, bodyChan := r.Request()
+	if bodyChan == nil {
+		return nil, data, fmt.Errorf("read request: %w, bodyChan is nil", ErrNoPayload)
 	}
-	if bc != nil {
-		req.HasPayload = true
+	select {
+	case <-ctx.Done():
+		return nil, data, context.Cause(ctx)
+	case pl, ok := <-bodyChan:
+		if !ok {
+			return nil, data, fmt.Errorf("read request: %w, bodyChan closed,rid=%d", ErrNoPayload, req.GetID())
+		}
+		err := pl.ProtoUnmarshal(data)
+		return req, data, err
 	}
-	return w.WriteChan(ctx, req, bc)
-}
-
-func QuickReadRequest[T proto.Message](r RequestReader, data T) (*Request, T, error) {
-	req, body := r.Request()
-	if body == nil {
-		return nil, data, ErrNoPayload
-	}
-	pl, ok := <-body
-	if !ok {
-		return nil, data, ErrNoPayload
-	}
-	if pl.Err != nil {
-		return nil, data, pl.Err
-	}
-	err := proto.Unmarshal(pl.Data, data)
-	return req, data, err
 }

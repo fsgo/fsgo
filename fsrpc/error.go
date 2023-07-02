@@ -11,14 +11,16 @@ import (
 
 var (
 	ErrInvalidProtocol = fmt.Errorf("invalid Protocol Header, expect is %s", Protocol)
-	ErrInvalidHeader   = errors.New("invalid Header")
+
+	ErrInvalidHeader = errors.New("invalid Header")
 
 	ErrInvalidCode = errors.New("invalid error code")
 
 	ErrCannotWritePayload = errors.New("cannot write payload")
 
 	ErrMethodNotFound = errors.New("method not found")
-	ErrClosed         = errors.New("already closed")
+
+	ErrClosed = errors.New("already closed")
 
 	ErrCanceledByDefer = errors.New("canceled by defer")
 

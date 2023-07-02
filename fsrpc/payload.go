@@ -7,73 +7,72 @@ package fsrpc
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"io"
 	"sync/atomic"
 
 	"google.golang.org/protobuf/proto"
 )
 
-func readPayload(rd io.Reader, length int) *Payload {
+type Payload struct {
+	Meta *PayloadMeta
+	Data io.Reader
+}
+
+func (pl *Payload) ProtoUnmarshal(obj proto.Message) error {
+	bf, err := io.ReadAll(pl.Data)
+	if err != nil {
+		return err
+	}
+	return proto.Unmarshal(bf, obj)
+}
+
+func readPayload(rd io.Reader, length int) (*Payload, error) {
 	meta, err := readMessage(rd, length, &PayloadMeta{})
 	if err != nil {
-		return &Payload{
-			Err: err,
-		}
+		return nil, err
 	}
 	bf := make([]byte, meta.Length)
 	_, err = io.ReadFull(rd, bf)
 	if err != nil {
-		return &Payload{
-			Err: fmt.Errorf("read payload failed: %w", err),
-		}
+		return nil, err
 	}
 	return &Payload{
 		Meta: meta,
-		Data: bf,
-	}
+		// Data: io.LimitReader(rd, meta.Length),
+		Data: bytes.NewBuffer(bf),
+	}, nil
 }
 
-var payloadChanEmpty = make(chan *Payload)
+type payloadChan chan *Payload
+
+var emptyPayloadChan = make(chan *Payload)
 
 func init() {
-	close(payloadChanEmpty)
+	close(emptyPayloadChan)
 }
 
-type Payload struct {
-	Meta *PayloadMeta
-	Data []byte
-	Err  error
-}
-
-type PayloadReader interface {
-	Payload() (*PayloadMeta, []byte, error)
-}
-
-func newPayloadWriter(rid uint64, q *bufferQueue) *plWriter {
-	return &plWriter{
+func newPayloadWriter(rid uint64, q *bufferQueue) *payloadWriter {
+	return &payloadWriter{
 		queue: q,
 		RID:   rid,
 	}
 }
 
-type plWriter struct {
+type payloadWriter struct {
 	queue *bufferQueue
 	RID   uint64
 	index atomic.Uint32
 }
 
-func (pw *plWriter) writeChan(ctx context.Context, pl <-chan io.Reader) error {
+func (pw *payloadWriter) writeChan(ctx context.Context, readers <-chan io.Reader) error {
 	var last io.Reader
 	for {
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case data, ok := <-pl:
-			if !ok {
-				if last != nil {
-					pw.WritePayload(last, false)
-				}
+		case data, ok := <-readers:
+			if !ok && last != nil {
+				pw.WritePayload(last, false)
 				return nil
 			}
 
@@ -85,7 +84,7 @@ func (pw *plWriter) writeChan(ctx context.Context, pl <-chan io.Reader) error {
 	}
 }
 
-func (pw *plWriter) WritePayload(b io.Reader, more bool) error {
+func (pw *payloadWriter) WritePayload(b io.Reader, more bool) error {
 	var bb *bytes.Buffer
 	switch val := b.(type) {
 	case *bytes.Buffer:
@@ -98,7 +97,7 @@ func (pw *plWriter) WritePayload(b io.Reader, more bool) error {
 		}
 	}
 	meta := &PayloadMeta{
-		Length: uint32(bb.Len()),
+		Length: int64(bb.Len()),
 		More:   more,
 		RID:    pw.RID,
 		Index:  pw.index.Add(1) - 1,
@@ -120,7 +119,7 @@ func (pw *plWriter) WritePayload(b io.Reader, more bool) error {
 	}
 	_, err4 := bp.Write(bb.Bytes())
 	if err4 == nil {
-		pw.queue.send(bp)
+		pw.queue.sendReader(bp)
 		return nil
 	}
 	return err4

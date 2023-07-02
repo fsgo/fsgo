@@ -6,9 +6,8 @@ package fsrpc
 
 import (
 	"context"
+	"fmt"
 	"io"
-	"sync"
-	"sync/atomic"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -25,12 +24,23 @@ func NewResponseSuccess(requestID uint64) *Response {
 	return NewResponse(requestID, ErrCode_Success, "OK")
 }
 
-type ResponseWriter interface {
-	WriteChan(ctx context.Context, resp *Response, payload <-chan io.Reader) error
-	Write(ctx context.Context, resp *Response, body ...proto.Message) error
-}
+type (
+	ResponseWriter interface {
+		ResponseProtoWriter
+		ResponseChanWriter
+	}
 
-var _ ResponseWriter = (*respWriter)(nil)
+	ResponseProtoWriter interface {
+		Write(ctx context.Context, resp *Response, body ...proto.Message) error
+	}
+
+	ResponseChanWriter interface {
+		WriteChan(ctx context.Context, resp *Response, payload <-chan io.Reader) error
+	}
+)
+
+var _ ResponseProtoWriter = (*respWriter)(nil)
+var _ ResponseChanWriter = (*respWriter)(nil)
 
 func newResponseWriter(queue *bufferQueue) *respWriter {
 	return &respWriter{
@@ -39,9 +49,7 @@ func newResponseWriter(queue *bufferQueue) *respWriter {
 }
 
 type respWriter struct {
-	queue     *bufferQueue
-	requestID uint64
-	index     atomic.Uint32
+	queue *bufferQueue
 }
 
 func (rw *respWriter) Write(ctx context.Context, resp *Response, body ...proto.Message) error {
@@ -52,8 +60,8 @@ func (rw *respWriter) Write(ctx context.Context, resp *Response, body ...proto.M
 	return rw.WriteChan(ctx, resp, ch)
 }
 
-func (rw *respWriter) WriteChan(ctx context.Context, resp *Response, payload <-chan io.Reader) error {
-	if payload != nil {
+func (rw *respWriter) WriteChan(ctx context.Context, resp *Response, payloads <-chan io.Reader) error {
+	if payloads != nil {
 		resp.HasPayload = true
 	}
 	bf, err := proto.Marshal(resp)
@@ -73,70 +81,61 @@ func (rw *respWriter) WriteChan(ctx context.Context, resp *Response, payload <-c
 	if err != nil {
 		return err
 	}
-	rw.queue.send(bp)
+	rw.queue.sendReader(bp)
 
-	if payload == nil {
+	if payloads == nil {
 		return nil
 	}
-	pw := newPayloadWriter(rw.requestID, rw.queue)
-	return pw.writeChan(ctx, payload)
+	pw := newPayloadWriter(resp.GetRequestID(), rw.queue)
+	return pw.writeChan(ctx, payloads)
 }
 
 type ResponseReader interface {
-	Response() (*Response, <-chan *Payload)
+	Response() (*Response, <-chan *Payload, error)
 }
 
 func newRespReader() *respReader {
 	return &respReader{
-		resp: make(chan *Response, 1),
-		pl:   make(chan *Payload, 128),
+		responses: make(chan *Response, 1),
+		payloads:  make(chan payloadChan, 1),
+		errors:    make(chan error, 1),
 	}
 }
+
+var _ ResponseReader = (*respReader)(nil)
 
 type respReader struct {
-	resp      chan *Response
-	pl        chan *Payload
-	closeOnce sync.Once
+	responses chan *Response
+	payloads  chan payloadChan
+	errors    chan error
 }
 
-func (r *respReader) Response() (*Response, <-chan *Payload) {
-	return <-r.resp, r.pl
+func (r *respReader) sendError(err error) {
+	r.responses <- nil
+	r.payloads <- nil
+	r.errors <- err
 }
 
-func (r *respReader) sendPayload(pl *Payload) {
-	r.pl <- pl
+func (r *respReader) Response() (*Response, <-chan *Payload, error) {
+	return <-r.responses, <-r.payloads, <-r.errors
 }
 
-func (r *respReader) Close() {
-	r.closeOnce.Do(func() {
-		close(r.pl)
-		close(r.resp)
-	})
-}
-
-func QuickWriteResponse[T proto.Message](ctx context.Context, w ResponseWriter, resp *Response, data ...T) error {
-	bc, err := msgChan[T](data...)
+func ReadProtoResponse[T proto.Message](ctx context.Context, r ResponseReader, data T) (*Response, T, error) {
+	resp, bodyChan, err := r.Response()
 	if err != nil {
-		return err
+		return nil, data, err
 	}
-	if bc != nil {
-		resp.HasPayload = true
+	if bodyChan == nil {
+		return nil, data, fmt.Errorf("read response: %w, bodyChan is nil", ErrNoPayload)
 	}
-	return w.WriteChan(ctx, resp, bc)
-}
-
-func QuickReadResponse[T proto.Message](r ResponseReader, data T) (*Response, T, error) {
-	resp, body := r.Response()
-	if body == nil {
-		return nil, data, ErrNoPayload
+	select {
+	case <-ctx.Done():
+		return nil, data, context.Cause(ctx)
+	case pl, ok := <-bodyChan:
+		if !ok {
+			return nil, data, fmt.Errorf("read response: %w, bodyChan closed, rid=%d", ErrNoPayload, resp.GetRequestID())
+		}
+		err1 := pl.ProtoUnmarshal(data)
+		return resp, data, err1
 	}
-	pl, ok := <-body
-	if !ok {
-		return nil, data, ErrNoPayload
-	}
-	if pl.Err != nil {
-		return nil, data, pl.Err
-	}
-	err := proto.Unmarshal(pl.Data, data)
-	return resp, data, err
 }

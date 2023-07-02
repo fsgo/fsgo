@@ -31,6 +31,21 @@ const (
 	HeaderTypePayload  HeaderType = 3
 )
 
+func (h HeaderType) String() string {
+	switch h {
+	case HeaderTypeInvalid:
+		return "0-invalid"
+	case HeaderTypeRequest:
+		return "1-request"
+	case HeaderTypeResponse:
+		return "2-response"
+	case HeaderTypePayload:
+		return "3-payload"
+	default:
+		return fmt.Sprintf("%d-unknown", h)
+	}
+}
+
 type Header struct {
 	Type   HeaderType
 	Length uint32
