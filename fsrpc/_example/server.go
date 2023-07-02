@@ -26,7 +26,9 @@ func main() {
 
 	rt := fsrpc.NewRouter()
 	rt.Register("hello", hello)
-	rt.Register("sys_ping", fsrpc.PingReceiver)
+
+	ph := fsrpc.PingHandler{}
+	ph.RegisterTo(rt)
 
 	ser := &fsrpc.Server{
 		Router: rt,

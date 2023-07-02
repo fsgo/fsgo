@@ -6,71 +6,78 @@ package fsrpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
+	"sync/atomic"
 	"time"
 )
 
-// PingSender 发送 ping 消息并校验响应 pong 是否正确
-func PingSender(ctx context.Context, rw RequestProtoWriter, method string) (ret error) {
-	log.Println("PingSender start")
-	defer func() {
-		log.Println("PingSender exit:", ret)
-	}()
-
-	tk := time.NewTicker(time.Second)
-	defer tk.Stop()
-
-	ping := &PingPong{
-		Message: "ping",
-	}
-
-	id := uint64(0)
-	send := func() error {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-		req := NewRequest(method)
-		ping.ID = id
-		rr, err := rw.Write(ctx, req, ping)
-		if err != nil {
-			return err
-		}
-		resp, pong, err := ReadProtoResponse(ctx, rr, &PingPong{})
-		if err != nil {
-			return err
-		}
-		if resp.GetCode() != ErrCode_Success {
-			return fmt.Errorf("%w, got=%d", ErrInvalidCode, resp.GetCode())
-		}
-		if pong.GetID() != id {
-			return fmt.Errorf("invalid Pong.ID=%d, want=%d", pong.GetID(), id)
-		}
-		return nil
-	}
-
-	for {
-		err := send()
-		log.Println("ping:", err)
-		if err != nil {
-			return err
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-tk.C:
-		}
-		id++
-	}
+type PingHandler struct {
+	Method string
+	id     atomic.Uint64
 }
 
-func PingReceiver(ctx context.Context, rr RequestReader, rw ResponseWriter) (ret error) {
-	log.Println("PingReceiver start")
-	defer func() {
-		log.Println("PingReceiver exit:", ret)
-	}()
+func (pp *PingHandler) getMethod() string {
+	if pp.Method != "" {
+		return pp.Method
+	}
+	return "sys_ping"
+}
 
+func (pp *PingHandler) Send(ctx context.Context, rw RequestProtoWriter) (ret error) {
+	id := pp.id.Add(1)
+	defer func() {
+		log.Println("Ping, id=", id, ret)
+	}()
+	data := &PingPong{
+		Message: "ping",
+		ID:      id,
+	}
+	req := NewRequest(pp.getMethod())
+	rr, err := rw.Write(ctx, req, data)
+	if err != nil {
+		return err
+	}
+	resp, pong, err := ReadProtoResponse(ctx, rr, &PingPong{})
+	if err != nil {
+		return err
+	}
+	if resp.GetCode() != ErrCode_Success {
+		return fmt.Errorf("%w, got=%d", ErrInvalidCode, resp.GetCode())
+	}
+	if pong.GetID() != id {
+		return fmt.Errorf("invalid Pong.ID=%d, want=%d", pong.GetID(), id)
+	}
+	return nil
+}
+
+func (pp *PingHandler) SendMany(ctx context.Context, rw RequestProtoWriter, interval time.Duration) error {
+	tk := time.NewTimer(0)
+	defer tk.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-tk.C:
+		}
+		err := pp.Send(ctx, rw)
+		if err != nil {
+			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+				return nil
+			}
+			return err
+		}
+		tk.Reset(interval)
+	}
+	return nil
+}
+
+func (pp *PingHandler) RegisterTo(rt RouteRegister) {
+	rt.Register(pp.getMethod(), pp.Receiver)
+}
+
+func (pp *PingHandler) Receiver(ctx context.Context, rr RequestReader, rw ResponseWriter) (ret error) {
 	pong := &PingPong{
 		Message: "pong",
 	}

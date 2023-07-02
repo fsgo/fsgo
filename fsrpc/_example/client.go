@@ -16,14 +16,18 @@ import (
 )
 
 var serverAddr = flag.String("addr", "127.0.0.1:8000", "")
+var debug = flag.Bool("d", false, "enable debug")
 
-func init() {
+func forDebug() {
 	pt := &fsconn.PrintByteTracer{}
 	fsconn.RegisterInterceptor(pt.Interceptor())
 }
 
 func main() {
 	flag.Parse()
+	if *debug {
+		forDebug()
+	}
 	conn, err := fsdialer.DialTimeout("tcp", *serverAddr, time.Second)
 	if err != nil {
 		log.Fatalln(err)
@@ -36,7 +40,7 @@ func main() {
 	// 	conn.SetReadDeadline(time.Now().Add(time.Second))
 	// })
 
-	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	stream := client.MustOpen(ctx)
@@ -50,7 +54,8 @@ func main() {
 	// 	log.Println("resp:", resp.String())
 	// }
 
-	err = fsrpc.PingSender(ctx, stream, "sys_ping")
+	ph := &fsrpc.PingHandler{}
+	err = ph.SendMany(ctx, stream, time.Second)
 	log.Println("Ping.Err=", err)
 	log.Println("Client.Err=", client.LastError())
 

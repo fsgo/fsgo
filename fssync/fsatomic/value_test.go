@@ -5,6 +5,7 @@
 package fsatomic
 
 import (
+	"io"
 	"testing"
 	"time"
 
@@ -24,6 +25,17 @@ func TestValue_Load(t *testing.T) {
 	require.Equal(t, got, got1)
 	require.False(t, val.CompareAndSwap(time.Now(), time.Now()))
 	require.True(t, val.CompareAndSwap(n2, time.Now()))
+}
+
+func TestError(t *testing.T) {
+	var val Error
+	require.Nil(t, val.Load())
+	var e1 error
+	val.Store(e1)
+	require.Nil(t, val.Load())
+	require.Nil(t, val.Swap(io.EOF))
+	require.Error(t, val.Load())
+	require.Error(t, val.Swap(nil))
 }
 
 func BenchmarkValue_Load(b *testing.B) {

@@ -21,7 +21,7 @@ type Server struct {
 	initOnce sync.Once
 
 	// Router 路由
-	Router RouterFinder
+	Router RouteFinder
 
 	// OnConn 创建新链接后的回调,可选
 	OnConn func(ctx context.Context, conn net.Conn, err error) (context.Context, net.Conn, error)
@@ -156,9 +156,15 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 	return nil
 }
 
-type RouterFinder interface {
-	HandlerFunc(method string) HandlerFunc
-}
+type (
+	RouteFinder interface {
+		HandlerFunc(method string) HandlerFunc
+	}
+
+	RouteRegister interface {
+		Register(method string, h HandlerFunc)
+	}
+)
 
 func NewRouter() *Router {
 	return &Router{
