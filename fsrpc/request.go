@@ -37,8 +37,8 @@ var _ RequestProtoWriter = (*Stream)(nil)
 var _ RequestChanWriter = (*Stream)(nil)
 
 type Stream struct {
-	queue             *bufferQueue
-	newResponseReader func(req *Request) ResponseReader
+	queue        *bufferQueue
+	newResReader func(req *Request) ResponseReader
 }
 
 func (rw *Stream) Write(ctx context.Context, req *Request, payload ...proto.Message) (ResponseReader, error) {
@@ -72,7 +72,7 @@ func (rw *Stream) WriteChan(ctx context.Context, req *Request, payloads <-chan i
 	}
 	rw.queue.sendReader(bp)
 
-	reader := rw.newResponseReader(req)
+	reader := rw.newResReader(req)
 
 	if payloads != nil {
 		pw := newPayloadWriter(req.GetID(), rw.queue)

@@ -69,15 +69,16 @@ func (pw *payloadWriter) writeChan(ctx context.Context, readers <-chan io.Reader
 	for {
 		select {
 		case <-ctx.Done():
-			return ctx.Err()
+			return context.Cause(ctx)
 		case data, ok := <-readers:
 			if !ok && last != nil {
-				pw.WritePayload(last, false)
-				return nil
+				return pw.WritePayload(last, false)
 			}
 
 			if last != nil {
-				pw.WritePayload(last, true)
+				if err := pw.WritePayload(last, true); err != nil {
+					return err
+				}
 			}
 			last = data
 		}
@@ -119,8 +120,7 @@ func (pw *payloadWriter) WritePayload(b io.Reader, more bool) error {
 	}
 	_, err4 := bp.Write(bb.Bytes())
 	if err4 == nil {
-		pw.queue.sendReader(bp)
-		return nil
+		return pw.queue.sendReader(bp)
 	}
 	return err4
 }

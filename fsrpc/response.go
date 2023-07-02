@@ -8,6 +8,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -110,10 +111,12 @@ type respReader struct {
 	errors    chan error
 }
 
-func (r *respReader) sendError(err error) {
-	r.responses <- nil
-	r.payloads <- nil
+func (r *respReader) closeWithError(err error) {
+	close(r.responses)
+	close(r.payloads)
 	r.errors <- err
+	close(r.errors)
+	log.Println("respReader) closeWithError:", err)
 }
 
 func (r *respReader) Response() (*Response, <-chan *Payload, error) {

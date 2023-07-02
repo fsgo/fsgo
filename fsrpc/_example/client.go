@@ -45,6 +45,7 @@ func main() {
 
 	err = fsrpc.PingSender(ctx, stream, "sys_ping")
 	log.Println("Ping.Err=", err)
+	log.Println("Client.Err=", client.LastError())
 
 	log.Println("Close()", client.Close())
 }

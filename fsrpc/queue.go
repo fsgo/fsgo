@@ -7,7 +7,9 @@ package fsrpc
 import (
 	"bytes"
 	"io"
+	"sync"
 
+	"github.com/fsgo/fsgo/fssync/fsatomic"
 	"github.com/fsgo/fsgo/internal/xpool"
 )
 
@@ -21,8 +23,10 @@ func newBufferQueue(size int) *bufferQueue {
 }
 
 type bufferQueue struct {
-	queue chan io.Reader
-	done  chan struct{}
+	queue     chan io.Reader
+	done      chan struct{}
+	closeErr  fsatomic.Error
+	closeOnce sync.Once
 }
 
 func (sc *bufferQueue) startWrite(w io.Writer) error {
@@ -47,19 +51,24 @@ func (sc *bufferQueue) startWrite(w io.Writer) error {
 			}
 
 		case <-sc.done:
-			return nil
+			return sc.closeErr.Load()
 		}
 	}
 	return nil
 }
 
-func (sc *bufferQueue) sendReader(b io.Reader) {
+func (sc *bufferQueue) sendReader(b io.Reader) error {
 	select {
 	case <-sc.done:
+		return sc.closeErr.Load()
 	case sc.queue <- b:
+		return nil
 	}
 }
 
-func (sc *bufferQueue) Close() {
-	close(sc.done)
+func (sc *bufferQueue) CloseWithErr(err error) {
+	sc.closeOnce.Do(func() {
+		sc.closeErr.Store(err)
+		close(sc.done)
+	})
 }

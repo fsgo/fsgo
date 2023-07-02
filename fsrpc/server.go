@@ -64,7 +64,7 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	defer cancel(ErrCanceledByDefer)
 
 	writeQueue := newBufferQueue(1024)
-	defer writeQueue.Close()
+	defer writeQueue.CloseWithErr(ErrCanceledByDefer)
 
 	go func() {
 		writeQueue.startWrite(conn)
@@ -91,7 +91,7 @@ type handlerParam struct {
 func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWriter, hp *handlerParam) error {
 	header, err1 := ReadHeader(rd)
 	if err1 != nil {
-		return err1
+		return fmt.Errorf("read Header: %w", err1)
 	}
 
 	switch header.Type {
@@ -100,7 +100,7 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 	case HeaderTypeRequest:
 		req, err2 := readMessage(rd, int(header.Length), &Request{})
 		if err2 != nil {
-			return err2
+			return fmt.Errorf("read Request: %w", err2)
 		}
 		method := req.GetMethod()
 		handler := s.Router.HandlerFunc(method)
@@ -138,7 +138,7 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 	case HeaderTypePayload:
 		pl, err := readPayload(rd, int(header.Length))
 		if err != nil {
-			return err
+			return fmt.Errorf("read Payload: %w", err)
 		}
 		rid := pl.Meta.GetRID()
 		plc, ok := hp.Payloads.Load(rid)

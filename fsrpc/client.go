@@ -6,6 +6,7 @@ package fsrpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -17,22 +18,21 @@ import (
 
 func NewClientConn(rw io.ReadWriter) *ClientConn {
 	cc := &ClientConn{
-		rw: rw,
+		readWriter: rw,
 	}
-	cc.ctx, cc.ctxCancel = context.WithCancelCause(context.Background())
 	return cc
 }
 
 type ClientConn struct {
-	rw     io.ReadWriter
-	closed atomic.Bool
+	readWriter io.ReadWriter
+	closed     atomic.Bool
 
 	writeQueue *bufferQueue
 
 	responses fssync.Map[uint64, *respReader]
 	payloads  fssync.Map[uint64, payloadChan]
 
-	rwErr chan error
+	errors chan error
 
 	beforeReadLoop fsatomic.FuncVoid // 每次循环前执行
 
@@ -52,38 +52,46 @@ func (cc *ClientConn) LastError() error {
 }
 
 func (cc *ClientConn) init() {
-	cc.rwErr = make(chan error, 2)
+	cc.errors = make(chan error, 2)
 	cc.writeQueue = newBufferQueue(1024)
+	cc.ctx, cc.ctxCancel = context.WithCancelCause(context.Background())
+
+	storeError := func(err error) {
+		if !cc.lastErr.CompareAndSwap(nil, err) {
+			return
+		}
+		cc.closeWithError(err)
+		cc.errors <- err
+		cc.ctxCancel(err)
+	}
 
 	go func() {
-		defer cc.Close()
-
-		// rd := io.TeeReader(cc.rw, &fsio.PrintByteWriter{Name: "Client Read"})
-		if err := ReadProtocol(cc.rw); err != nil {
-			cc.lastErr.Store(err)
-			cc.ctxCancel(err)
-			cc.rwErr <- err
+		// rd := io.TeeReader(cc.readWriter, &fsio.PrintByteWriter{Name: "Client Read"})
+		if err := ReadProtocol(cc.readWriter); err != nil {
+			storeError(err)
 			return
 		}
 
 		for !cc.closed.Load() {
-			err := cc.readOnePackage(cc.rw)
+			err := cc.readOnePackage(cc.readWriter)
 			if err != nil {
-				cc.lastErr.Store(err)
-				cc.ctxCancel(err)
-				cc.rwErr <- err
+				storeError(err)
 				return
 			}
 		}
 	}()
 
 	go func() {
-		// mw := io.MultiWriter(cc.rw, &fsio.PrintByteWriter{Name: "Client Write"})
-		if err := cc.writeQueue.startWrite(cc.rw); err != nil {
-			cc.lastErr.Store(err)
-			cc.ctxCancel(err)
-			cc.rwErr <- err
+		// mw := io.MultiWriter(cc.readWriter, &fsio.PrintByteWriter{Name: "Client Write"})
+		err := cc.writeQueue.startWrite(cc.readWriter)
+		if err != nil {
+			storeError(err)
 		}
+	}()
+
+	go func() {
+		<-cc.ctx.Done()
+		_ = cc.closeWithError(context.Cause(cc.ctx))
 	}()
 }
 
@@ -93,7 +101,7 @@ func (cc *ClientConn) readOnePackage(rd io.Reader) error {
 	}
 	header, err1 := ReadHeader(rd)
 	if err1 != nil {
-		return err1
+		return fmt.Errorf("read Header: %w", err1)
 	}
 	switch header.Type {
 	default:
@@ -101,7 +109,7 @@ func (cc *ClientConn) readOnePackage(rd io.Reader) error {
 	case HeaderTypeResponse:
 		resp, err := readMessage(rd, int(header.Length), &Response{})
 		if err != nil {
-			return err
+			return fmt.Errorf("read Response: %w", err)
 		}
 		rid := resp.GetRequestID()
 		reader, ok := cc.responses.LoadAndDelete(rid)
@@ -120,7 +128,7 @@ func (cc *ClientConn) readOnePackage(rd io.Reader) error {
 	case HeaderTypePayload:
 		payload, err := readPayload(rd, int(header.Length))
 		if err != nil {
-			return err
+			return fmt.Errorf("read Payload: %w", err)
 		}
 		rid := payload.Meta.RID
 		plReader, ok := cc.payloads.Load(rid)
@@ -156,7 +164,7 @@ func (cc *ClientConn) Open(ctx context.Context) (*Stream, error) {
 	go func() {
 		select {
 		case <-ctx.Done():
-		case err, ok := <-cc.rwErr:
+		case err, ok := <-cc.errors:
 			if ok && err != nil {
 				cancel(err)
 			}
@@ -167,7 +175,7 @@ func (cc *ClientConn) Open(ctx context.Context) (*Stream, error) {
 
 	rw := &Stream{
 		queue: cc.writeQueue,
-		newResponseReader: func(req *Request) ResponseReader {
+		newResReader: func(req *Request) ResponseReader {
 			rr := newRespReader()
 			cc.responses.Store(req.GetID(), rr)
 			return rr
@@ -176,14 +184,18 @@ func (cc *ClientConn) Open(ctx context.Context) (*Stream, error) {
 	return rw, nil
 }
 
-func (cc *ClientConn) Close() error {
+func (cc *ClientConn) closeWithError(err error) error {
 	if !cc.closed.CompareAndSwap(false, true) {
 		return nil
 	}
-	cc.writeQueue.Close()
+	cc.writeQueue.CloseWithErr(err)
 	cc.responses.Range(func(key uint64, value *respReader) bool {
-		value.sendError(cc.lastErr.Load())
+		value.closeWithError(err)
 		return true
 	})
 	return nil
+}
+
+func (cc *ClientConn) Close() error {
+	return cc.closeWithError(errors.New("by Close"))
 }
