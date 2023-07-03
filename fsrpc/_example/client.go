@@ -18,6 +18,7 @@ import (
 
 var serverAddr = flag.String("addr", "127.0.0.1:8000", "")
 var debug = flag.Bool("d", false, "enable debug")
+var wait = flag.Int("wait", 1, "wait seconds")
 
 func init() {
 	log.SetFlags(log.LstdFlags | log.Lshortfile)
@@ -67,7 +68,7 @@ func main() {
 	ph := &fsrpc.PingHandler{}
 	go func() {
 		defer wg.Done()
-		err = ph.SendMany(ctx, stream, time.Second)
+		err = ph.SendMany(ctx, stream, time.Duration(*wait)*time.Second)
 		log.Println("Ping.Err=", err)
 	}()
 	wg.Wait()

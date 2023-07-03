@@ -5,10 +5,8 @@
 package fsrpc
 
 import (
-	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"sync/atomic"
 
 	"google.golang.org/protobuf/proto"
@@ -29,7 +27,7 @@ type (
 	}
 
 	RequestChanWriter interface {
-		WriteChan(ctx context.Context, req *Request, pl <-chan io.Reader) (ResponseReader, error)
+		WriteChan(ctx context.Context, req *Request, pl <-chan *Payload) (ResponseReader, error)
 	}
 )
 
@@ -42,14 +40,14 @@ type Stream struct {
 }
 
 func (rw *Stream) Write(ctx context.Context, req *Request, payload ...proto.Message) (ResponseReader, error) {
-	ch, err := msgChan[proto.Message](payload...)
+	ch, err := toPayloadChan[proto.Message](req.GetID(), payload...)
 	if err != nil {
 		return nil, err
 	}
 	return rw.WriteChan(ctx, req, ch)
 }
 
-func (rw *Stream) WriteChan(ctx context.Context, req *Request, payloads <-chan io.Reader) (ResponseReader, error) {
+func (rw *Stream) WriteChan(ctx context.Context, req *Request, payloads <-chan *Payload) (ResponseReader, error) {
 	if payloads != nil {
 		req.HasPayload = true
 	}
@@ -106,22 +104,6 @@ type requestReader struct {
 
 func (r *requestReader) Request() (*Request, <-chan *Payload) {
 	return <-r.requests, <-r.payloads
-}
-
-func msgChan[T proto.Message](items ...T) (<-chan io.Reader, error) {
-	if len(items) == 0 {
-		return nil, nil
-	}
-	ch := make(chan io.Reader, len(items))
-	for i := 0; i < len(items); i++ {
-		bf, err := proto.Marshal(items[i])
-		if err != nil {
-			return nil, fmt.Errorf("index %d: %w", i, err)
-		}
-		ch <- bytes.NewBuffer(bf)
-	}
-	close(ch)
-	return ch, nil
 }
 
 func ReadProtoRequest[T proto.Message](ctx context.Context, r RequestReader, data T) (*Request, T, error) {

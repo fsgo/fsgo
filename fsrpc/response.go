@@ -7,7 +7,6 @@ package fsrpc
 import (
 	"context"
 	"fmt"
-	"io"
 	"log"
 
 	"google.golang.org/protobuf/proto"
@@ -36,7 +35,7 @@ type (
 	}
 
 	ResponseChanWriter interface {
-		WriteChan(ctx context.Context, resp *Response, payload <-chan io.Reader) error
+		WriteChan(ctx context.Context, resp *Response, payload <-chan *Payload) error
 	}
 )
 
@@ -54,14 +53,14 @@ type respWriter struct {
 }
 
 func (rw *respWriter) Write(ctx context.Context, resp *Response, body ...proto.Message) error {
-	ch, err := msgChan[proto.Message](body...)
+	ch, err := toPayloadChan[proto.Message](resp.GetRequestID(), body...)
 	if err != nil {
 		return err
 	}
 	return rw.WriteChan(ctx, resp, ch)
 }
 
-func (rw *respWriter) WriteChan(ctx context.Context, resp *Response, payloads <-chan io.Reader) error {
+func (rw *respWriter) WriteChan(ctx context.Context, resp *Response, payloads <-chan *Payload) error {
 	if payloads != nil {
 		resp.HasPayload = true
 	}

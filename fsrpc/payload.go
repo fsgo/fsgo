@@ -7,6 +7,7 @@ package fsrpc
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"sync/atomic"
 
@@ -43,6 +44,32 @@ func readPayload(rd io.Reader, length int) (*Payload, error) {
 	}, nil
 }
 
+func toPayloadChan[T proto.Message](rid uint64, items ...T) (<-chan *Payload, error) {
+	if len(items) == 0 {
+		return nil, nil
+	}
+	ch := make(chan *Payload, len(items))
+	for i := 0; i < len(items); i++ {
+		bf, err := proto.Marshal(items[i])
+		if err != nil {
+			return nil, fmt.Errorf("index %d: %w", i, err)
+		}
+		pl := &Payload{
+			Meta: &PayloadMeta{
+				Index:  uint32(i),
+				Length: int64(len(bf)),
+				RID:    rid,
+				Type:   1,
+				More:   i < len(items)-1,
+			},
+			Data: bytes.NewBuffer(bf),
+		}
+		ch <- pl
+	}
+	close(ch)
+	return ch, nil
+}
+
 type payloadChan chan *Payload
 
 var emptyPayloadChan = make(chan *Payload)
@@ -64,19 +91,18 @@ type payloadWriter struct {
 	index atomic.Uint32
 }
 
-func (pw *payloadWriter) writeChan(ctx context.Context, readers <-chan io.Reader) error {
-	var last io.Reader
+func (pw *payloadWriter) writeChan(ctx context.Context, payloads <-chan *Payload) error {
+	var last *Payload
 	for {
 		select {
 		case <-ctx.Done():
 			return context.Cause(ctx)
-		case data, ok := <-readers:
+		case data, ok := <-payloads:
 			if !ok && last != nil {
-				return pw.WritePayload(last, false)
+				return pw.writePayload(last)
 			}
-
 			if last != nil {
-				if err := pw.WritePayload(last, true); err != nil {
+				if err := pw.writePayload(last); err != nil {
 					return err
 				}
 			}
@@ -85,25 +111,8 @@ func (pw *payloadWriter) writeChan(ctx context.Context, readers <-chan io.Reader
 	}
 }
 
-func (pw *payloadWriter) WritePayload(b io.Reader, more bool) error {
-	var bb *bytes.Buffer
-	switch val := b.(type) {
-	case *bytes.Buffer:
-		bb = val
-	default:
-		bb = &bytes.Buffer{}
-		_, err0 := io.Copy(bb, b)
-		if err0 != nil {
-			return err0
-		}
-	}
-	meta := &PayloadMeta{
-		Length: int64(bb.Len()),
-		More:   more,
-		RID:    pw.RID,
-		Index:  pw.index.Add(1) - 1,
-	}
-	bf1, err1 := proto.Marshal(meta)
+func (pw *payloadWriter) writePayload(pl *Payload) error {
+	bf1, err1 := proto.Marshal(pl.Meta)
 	if err1 != nil {
 		return err1
 	}
@@ -118,7 +127,7 @@ func (pw *payloadWriter) WritePayload(b io.Reader, more bool) error {
 	if _, err3 := bp.Write(bf1); err3 != nil {
 		return err3
 	}
-	_, err4 := bp.Write(bb.Bytes())
+	_, err4 := io.Copy(bp, pl.Data)
 	if err4 == nil {
 		return pw.queue.sendReader(bp)
 	}

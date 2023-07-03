@@ -13,57 +13,61 @@ enum CompressType{
 
 // Request 一条请求信息
 message Request {
-  string Method = 1;              // 请求的方法
-  uint64 ID = 2;                   // 请求的唯一 ID
-  bool HasPayload = 3;        // 是否有消息体
-  CompressType CompressType = 4; // 数据压缩类型
+  string Method              = 1; // 请求的方法
+  uint64 ID                  = 2; // 请求的唯一 ID
+  bool HasPayload            = 3; // 是否有消息体
+  CompressType CompressType  = 4; // 数据压缩类型
 
-  string LogID = 5;  // 日志 ID
-  string TraceID = 6;
-  string SpanID = 7;
-  string ParentSpanID = 8;
+  string LogID               = 5;  // 日志 ID
+  string TraceID             = 6;
+  string SpanID              = 7;
+  string ParentSpanID        = 8;
 
   map<string, google.protobuf.Any> ExtKV = 9; // 其他 kv 数据
 };
 
 message PayloadMeta{
-  uint32 Index = 1;  // 数据的编号，从 0 依次递增
-  uint64 RID = 2;    // Request 或者  Response 的 ID
-  bool More = 3;     // 是否有更多消息
-  int64 Length = 4; // 数据内容长度
+  uint32 Index     = 1; // 数据的编号，从 0 依次递增
+  uint64 RID       = 2; // Request 或者  Response 的 ID
+  bool More        = 3; // 是否有更多消息
+  int64 Length     = 4; // 数据内容长度
+  uint32 Type      = 5; // 数据的编码类型，0-原始的 []byte,1-Protobuf,2-JSON
+  map<string, google.protobuf.Any> ExtKV = 6; // 其他 kv 数据
 }
 
 message Response{
-  ErrCode Code = 1;  // 错误码
-  string Message = 2; // 错误详情
-  uint64 RequestID = 3; // 请求的唯一 ID
-  bool HasPayload = 4; // 是否有消息体
-  CompressType CompressType = 5; // 消息体压缩类型
+  ErrCode Code               = 1; // 错误码
+  string Message             = 2; // 错误详情
+  uint64 RequestID           = 3; // 请求的唯一 ID
+  bool HasPayload            = 4; // 是否有消息体
+  CompressType CompressType  = 5; // 消息体压缩类型
   map<string, google.protobuf.Any> ExtKV = 6; // 其他 kv 数据
 }
 
 // 错误编码
 enum ErrCode{
-  Success = 0;   // 成功
+  Success               = 0;     // 成功
 
-  ReqNoAuth = 1001;             // 没有校验权限
-  ReqNoService = 1002;          // service 不存在
-  ReqNoMethod = 1003;            // method 不存在
-  ReqUnknownCompressType = 1004; // 不支持的压缩类型
-  ReqBadParams = 1005;            // 参数异常
+  NoMethod              = 1001;  // method 不存在
+  NotAuth               = 1002;  // 没有校验权限
+  AuthFailed            = 1003;  // 权限校验失败
+  NoPayload             = 1004;  // 缺少 payload
+  UnknownCompress       = 1005;  // 不支持的压缩类型
+  BadParams             = 1006;  // 参数异常
 
-  SerInternal = 2001;              // 内部错误
-  SerShutdown = 2002;              // 服务正在关闭
-  SerLimit = 2003;                // 服务达到处理上线，当前请求被限流
-  SerBadConn = 2004;              // 异常的网络连接
+  Internal              = 2001;  // 内部错误
+  Shutdown              = 2002;  // 服务正在关闭
+  Limited               = 2003;  // 服务达到处理上线，当前请求被限流
+  BadConn               = 2004;  // 异常的网络连接
 }
 
-// AuthRequest 鉴权请求
-message AuthRequest{
-  string UserName=1;   // 用户名
-  string Token=2;      // 鉴权的密码
-  int64 Timespan=3;    // 当前时间错，单位-秒
-  string Type=4;       // 鉴权算法类型，可选
+// AuthData 鉴权请求数据
+message AuthData{
+  string UserName       = 1; // 用户名
+  string Token          = 2; // 鉴权的密码
+  int64 Timespan        = 3; // 当前时间错，单位-秒
+  string Type           = 4; // 鉴权算法类型，可选
+  map<string, google.protobuf.Any> ExtKV = 5; // 其他 kv 数据
 }
 
 message PingPong{

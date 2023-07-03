@@ -11,9 +11,9 @@ import (
 )
 
 type AuthHandler struct {
-	Method         string
-	NewAuthRequest func(ctx context.Context) *AuthRequest
-	CheckAuth      func(ctx context.Context, ar *AuthRequest) error
+	Method      string
+	NewAuthData func(ctx context.Context) *AuthData
+	CheckAuth   func(ctx context.Context, ar *AuthData) error
 }
 
 func (ah *AuthHandler) getMethod() string {
@@ -25,7 +25,7 @@ func (ah *AuthHandler) getMethod() string {
 
 func (ah *AuthHandler) Send(ctx context.Context, rw RequestProtoWriter) (ret error) {
 	req := NewRequest(ah.getMethod())
-	data := ah.NewAuthRequest(ctx)
+	data := ah.NewAuthData(ctx)
 	rr, err := rw.Write(ctx, req, data)
 	if err != nil {
 		return err
@@ -41,9 +41,9 @@ func (ah *AuthHandler) Send(ctx context.Context, rw RequestProtoWriter) (ret err
 }
 
 func (ah *AuthHandler) Receiver(ctx context.Context, rr RequestReader, rw ResponseWriter) (ret error) {
-	req, auth, err := ReadProtoRequest(ctx, rr, &AuthRequest{})
+	req, auth, err := ReadProtoRequest(ctx, rr, &AuthData{})
 	if err != nil {
-		resp := NewResponse(req.GetID(), ErrCode_ReqNoAuth, "auth failed")
+		resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "auth failed")
 		rw.Write(ctx, resp, nil)
 		return err
 	}
@@ -54,7 +54,7 @@ func (ah *AuthHandler) Receiver(ctx context.Context, rr RequestReader, rw Respon
 		session.User.Store(auth.UserName)
 		return nil
 	}
-	resp := NewResponse(req.GetID(), ErrCode_ReqNoAuth, "auth failed")
+	resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "auth failed")
 	rw.Write(ctx, resp, nil)
 	return errors.New("auth failed")
 }
