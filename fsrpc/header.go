@@ -11,7 +11,7 @@ import (
 	"io"
 )
 
-//go:generate protoc --go_out=. meta.proto
+//go:generate protoc --go_out=. fsrpcmeta.proto
 
 // Protocol 协议头，每次创建网络连接后，在发送首个 Request 或者 Response 之前，发送的的内容
 var Protocol = []byte{'F', 'S', 'R', 'P', 'C'}
