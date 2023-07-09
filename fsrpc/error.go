@@ -26,5 +26,10 @@ var (
 
 	ErrNoPayload = errors.New("no payload")
 
+	// ErrMorePayload 还有更多的 payload 数据需要读取
+	ErrMorePayload = errors.New("has more payload need to read")
+
+	ErrInvalidEncodingType = errors.New("invalid encoding type")
+
 	ErrAuthFailed = errors.New("auth failed")
 )

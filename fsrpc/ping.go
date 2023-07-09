@@ -25,21 +25,21 @@ func (pp *PingHandler) getMethod() string {
 	return "sys_ping"
 }
 
-func (pp *PingHandler) Send(ctx context.Context, rw RequestProtoWriter) (ret error) {
+func (pp *PingHandler) Send(ctx context.Context, w RequestWriter) (ret error) {
 	id := pp.id.Add(1)
 	defer func() {
 		log.Println("Ping, id=", id, ret)
 	}()
-	data := &PingPong{
+	data := &Echo{
 		Message: "ping",
 		ID:      id,
 	}
 	req := NewRequest(pp.getMethod())
-	rr, err := rw.Write(ctx, req, data)
+	rr, err := WriteRequestProto(ctx, w, req, data)
 	if err != nil {
 		return err
 	}
-	resp, pong, err := ReadProtoResponse(ctx, rr, &PingPong{})
+	resp, pong, err := ReadResponseProto(ctx, rr, &Echo{})
 	if err != nil {
 		return err
 	}
@@ -52,7 +52,7 @@ func (pp *PingHandler) Send(ctx context.Context, rw RequestProtoWriter) (ret err
 	return nil
 }
 
-func (pp *PingHandler) SendMany(ctx context.Context, rw RequestProtoWriter, interval time.Duration) error {
+func (pp *PingHandler) SendMany(ctx context.Context, w RequestWriter, interval time.Duration) error {
 	tk := time.NewTimer(0)
 	defer tk.Stop()
 	for {
@@ -61,7 +61,7 @@ func (pp *PingHandler) SendMany(ctx context.Context, rw RequestProtoWriter, inte
 			return nil
 		case <-tk.C:
 		}
-		err := pp.Send(ctx, rw)
+		err := pp.Send(ctx, w)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return nil
@@ -77,13 +77,13 @@ func (pp *PingHandler) RegisterTo(rt RouteRegister) {
 	rt.Register(pp.getMethod(), HandlerFunc(pp.Receiver))
 }
 
-func (pp *PingHandler) Receiver(ctx context.Context, rr RequestReader, rw ResponseWriter) (ret error) {
-	pong := &PingPong{
+func (pp *PingHandler) Receiver(ctx context.Context, r RequestReader, w ResponseWriter) (ret error) {
+	pong := &Echo{
 		Message: "pong",
 	}
 
 	for {
-		req, ping, err := ReadProtoRequest(ctx, rr, &PingPong{})
+		req, ping, err := ReadRequestProto(ctx, r, &Echo{})
 		if err != nil {
 			return err
 		}
@@ -92,7 +92,7 @@ func (pp *PingHandler) Receiver(ctx context.Context, rr RequestReader, rw Respon
 		resp := NewResponseSuccess(req.GetID())
 		log.Println("ping resp:", resp)
 
-		if err = rw.Write(ctx, resp, pong); err != nil {
+		if err = WriteResponseProto(ctx, w, resp, pong); err != nil {
 			return err
 		}
 	}

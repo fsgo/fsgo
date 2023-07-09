@@ -26,14 +26,23 @@ message Request {
   map<string, google.protobuf.Any> ExtKV = 9; // 其他 kv 数据
 };
 
+// PayloadMeta 消息体的元信息(Meta)
 message PayloadMeta{
-  uint32 Index     = 1; // 数据的编号，从 0 依次递增
-  uint64 RID       = 2; // Request 或者  Response 的 ID
-  bool More        = 3; // 是否有更多消息
-  int64 Length     = 4; // 数据内容长度
-  uint32 Type      = 5; // 数据的编码类型，0-原始的 []byte,1-Protobuf,2-JSON
-  map<string, google.protobuf.Any> ExtKV = 6; // 其他 kv 数据
+  uint32 Index                              = 1; // 数据的编号，从 0 依次递增
+  uint64 RID                                = 2; // Request 或者  Response 的 ID
+  bool More                                 = 3; // 是否有更多消息
+  int64 Length                              = 4; // 数据内容长度
+  EncodingType EncodingType                 = 5; // 数据的编码类型
+  map<string, google.protobuf.Any> ExtKV    = 6; // 其他 kv 数据
 }
+
+// EncodingType 数据编码方式
+enum EncodingType{
+  Bytes        = 0; // 原始的 []byte
+  Protobuf     = 1; // protobuf
+  JSON         = 2; // JSON
+}
+
 
 message Response{
   ErrCode Code               = 1; // 错误码
@@ -70,7 +79,8 @@ message AuthData{
   map<string, google.protobuf.Any> ExtKV = 5; // 其他 kv 数据
 }
 
-message PingPong{
+// Echo 简单的消息体
+message Echo{
   uint64 ID=1;       // 编号
   string Message=2;  // 消息内容
 }

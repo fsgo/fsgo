@@ -7,6 +7,7 @@ package fsrpc
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"sync/atomic"
@@ -20,11 +21,23 @@ type Payload struct {
 }
 
 func (pl *Payload) ProtoUnmarshal(obj proto.Message) error {
-	bf, err := io.ReadAll(pl.Data)
+	bf, err := pl.Bytes()
 	if err != nil {
 		return err
 	}
 	return proto.Unmarshal(bf, obj)
+}
+
+func (pl *Payload) JSONUnmarshal(obj any) error {
+	bf, err := pl.Bytes()
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(bf, obj)
+}
+
+func (pl *Payload) Bytes() ([]byte, error) {
+	return io.ReadAll(pl.Data)
 }
 
 func readPayload(rd io.Reader, length int) (*Payload, error) {
@@ -44,23 +57,39 @@ func readPayload(rd io.Reader, length int) (*Payload, error) {
 	}, nil
 }
 
-func toPayloadChan[T proto.Message](rid uint64, items ...T) (<-chan *Payload, error) {
+func toProtoPayloadChan(rid uint64, items ...proto.Message) (<-chan *Payload, error) {
+	return toPayloadChan[proto.Message](rid, EncodingType_Protobuf, proto.Marshal, items...)
+}
+
+func toBytesPayloadChan(rid uint64, items ...[]byte) (<-chan *Payload, error) {
+	return toPayloadChan[[]byte](rid, EncodingType_Bytes, bytesMarshal, items...)
+}
+
+func toJSONPayloadChan(rid uint64, items ...any) (<-chan *Payload, error) {
+	return toPayloadChan[any](rid, EncodingType_JSON, json.Marshal, items...)
+}
+
+func bytesMarshal(b []byte) ([]byte, error) {
+	return b, nil
+}
+
+func toPayloadChan[T any](rid uint64, et EncodingType, enc func(m T) ([]byte, error), items ...T) (<-chan *Payload, error) {
 	if len(items) == 0 {
 		return nil, nil
 	}
 	ch := make(chan *Payload, len(items))
 	for i := 0; i < len(items); i++ {
-		bf, err := proto.Marshal(items[i])
+		bf, err := enc(items[i])
 		if err != nil {
 			return nil, fmt.Errorf("index %d: %w", i, err)
 		}
 		pl := &Payload{
 			Meta: &PayloadMeta{
-				Index:  uint32(i),
-				Length: int64(len(bf)),
-				RID:    rid,
-				Type:   1,
-				More:   i < len(items)-1,
+				Index:        uint32(i),
+				Length:       int64(len(bf)),
+				RID:          rid,
+				EncodingType: et,
+				More:         i < len(items)-1,
 			},
 			Data: bytes.NewBuffer(bf),
 		}
@@ -132,4 +161,69 @@ func (pw *payloadWriter) writePayload(pl *Payload) error {
 		return pw.queue.sendReader(bp)
 	}
 	return err4
+}
+
+func ReadProtoPayload[T proto.Message](ctx context.Context, payloads <-chan *Payload, data T) (T, error) {
+	if payloads == nil {
+		return data, ErrNoPayload
+	}
+	select {
+	case <-ctx.Done():
+		return data, context.Cause(ctx)
+	case pl, ok := <-payloads:
+		if !ok {
+			return data, fmt.Errorf("%w, bodyChan closed", ErrNoPayload)
+		}
+		if pl.Meta.GetMore() {
+			return data, ErrMorePayload
+		}
+		if pl.Meta.GetEncodingType() != EncodingType_Protobuf {
+			return data, fmt.Errorf("%w, %v", ErrInvalidEncodingType, pl.Meta.GetEncodingType())
+		}
+		err := pl.ProtoUnmarshal(data)
+		return data, err
+	}
+}
+
+func ReadJSONPayload[T any](ctx context.Context, payloads <-chan *Payload, data T) (T, error) {
+	if payloads == nil {
+		return data, ErrNoPayload
+	}
+	select {
+	case <-ctx.Done():
+		return data, context.Cause(ctx)
+	case pl, ok := <-payloads:
+		if !ok {
+			return data, fmt.Errorf("%w, bodyChan closed", ErrNoPayload)
+		}
+		if pl.Meta.GetMore() {
+			return data, ErrMorePayload
+		}
+		if pl.Meta.GetEncodingType() != EncodingType_JSON {
+			return data, fmt.Errorf("%w, %v", ErrInvalidEncodingType, pl.Meta.GetEncodingType())
+		}
+		err := pl.JSONUnmarshal(data)
+		return data, err
+	}
+}
+
+func ReadBytesPayload(ctx context.Context, payloads <-chan *Payload) ([]byte, error) {
+	if payloads == nil {
+		return nil, ErrNoPayload
+	}
+	select {
+	case <-ctx.Done():
+		return nil, context.Cause(ctx)
+	case pl, ok := <-payloads:
+		if !ok {
+			return nil, fmt.Errorf("%w, bodyChan closed", ErrNoPayload)
+		}
+		if pl.Meta.GetMore() {
+			return nil, ErrMorePayload
+		}
+		if pl.Meta.GetEncodingType() != EncodingType_Bytes {
+			return nil, fmt.Errorf("%w, %v", ErrInvalidEncodingType, pl.Meta.GetEncodingType())
+		}
+		return pl.Bytes()
+	}
 }

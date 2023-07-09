@@ -6,8 +6,6 @@ package fsrpc
 
 import (
 	"context"
-	"fmt"
-	"log"
 
 	"google.golang.org/protobuf/proto"
 )
@@ -26,21 +24,11 @@ func NewResponseSuccess(requestID uint64) *Response {
 
 type (
 	ResponseWriter interface {
-		ResponseProtoWriter
-		ResponseChanWriter
-	}
-
-	ResponseProtoWriter interface {
-		Write(ctx context.Context, resp *Response, body ...proto.Message) error
-	}
-
-	ResponseChanWriter interface {
 		WriteChan(ctx context.Context, resp *Response, payload <-chan *Payload) error
 	}
 )
 
-var _ ResponseProtoWriter = (*respWriter)(nil)
-var _ ResponseChanWriter = (*respWriter)(nil)
+var _ ResponseWriter = (*respWriter)(nil)
 
 func newResponseWriter(queue *bufferQueue) *respWriter {
 	return &respWriter{
@@ -50,14 +38,6 @@ func newResponseWriter(queue *bufferQueue) *respWriter {
 
 type respWriter struct {
 	queue *bufferQueue
-}
-
-func (rw *respWriter) Write(ctx context.Context, resp *Response, body ...proto.Message) error {
-	ch, err := toPayloadChan[proto.Message](resp.GetRequestID(), body...)
-	if err != nil {
-		return err
-	}
-	return rw.WriteChan(ctx, resp, ch)
 }
 
 func (rw *respWriter) WriteChan(ctx context.Context, resp *Response, payloads <-chan *Payload) error {
@@ -92,6 +72,30 @@ func (rw *respWriter) WriteChan(ctx context.Context, resp *Response, payloads <-
 	return pw.writeChan(ctx, payloads)
 }
 
+func WriteResponseProto(ctx context.Context, w ResponseWriter, resp *Response, body ...proto.Message) error {
+	ch, err := toProtoPayloadChan(resp.GetRequestID(), body...)
+	if err != nil {
+		return err
+	}
+	return w.WriteChan(ctx, resp, ch)
+}
+
+func WriteResponseJSON(ctx context.Context, w ResponseWriter, resp *Response, body ...any) error {
+	ch, err := toJSONPayloadChan(resp.GetRequestID(), body...)
+	if err != nil {
+		return err
+	}
+	return w.WriteChan(ctx, resp, ch)
+}
+
+func WriteResponseBytes(ctx context.Context, w ResponseWriter, resp *Response, body ...[]byte) error {
+	ch, err := toBytesPayloadChan(resp.GetRequestID(), body...)
+	if err != nil {
+		return err
+	}
+	return w.WriteChan(ctx, resp, ch)
+}
+
 type ResponseReader interface {
 	Response() (*Response, <-chan *Payload, error)
 }
@@ -117,29 +121,35 @@ func (r *respReader) closeWithError(err error) {
 	close(r.payloads)
 	r.errors <- err
 	close(r.errors)
-	log.Println("respReader) closeWithError:", err)
 }
 
 func (r *respReader) Response() (*Response, <-chan *Payload, error) {
 	return <-r.responses, <-r.payloads, <-r.errors
 }
 
-func ReadProtoResponse[T proto.Message](ctx context.Context, r ResponseReader, data T) (*Response, T, error) {
+func ReadResponseProto[T proto.Message](ctx context.Context, r ResponseReader, data T) (*Response, T, error) {
 	resp, bodyChan, err := r.Response()
 	if err != nil {
 		return nil, data, err
 	}
-	if bodyChan == nil {
-		return nil, data, fmt.Errorf("read response: %w, bodyChan is nil", ErrNoPayload)
+	d, err1 := ReadProtoPayload(ctx, bodyChan, data)
+	return resp, d, err1
+}
+
+func ReadResponseJSON[T any](ctx context.Context, r ResponseReader, data T) (*Response, T, error) {
+	resp, bodyChan, err := r.Response()
+	if err != nil {
+		return nil, data, err
 	}
-	select {
-	case <-ctx.Done():
-		return nil, data, context.Cause(ctx)
-	case pl, ok := <-bodyChan:
-		if !ok {
-			return nil, data, fmt.Errorf("read response: %w, bodyChan closed, rid=%d", ErrNoPayload, resp.GetRequestID())
-		}
-		err1 := pl.ProtoUnmarshal(data)
-		return resp, data, err1
+	d, err1 := ReadJSONPayload(ctx, bodyChan, data)
+	return resp, d, err1
+}
+
+func ReadResponseBytes(ctx context.Context, r ResponseReader) (*Response, []byte, error) {
+	resp, bodyChan, err := r.Response()
+	if err != nil {
+		return nil, nil, err
 	}
+	d, err1 := ReadBytesPayload(ctx, bodyChan)
+	return resp, d, err1
 }

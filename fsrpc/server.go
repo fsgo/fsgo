@@ -92,8 +92,8 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 }
 
 type handlerParam struct {
-	Handlers fssync.Map[string, *requestReader]
-	Requests fssync.Map[uint64, *requestReader]
+	Handlers fssync.Map[string, *reqReader]
+	Requests fssync.Map[uint64, *reqReader]
 	Payloads fssync.Map[uint64, payloadChan]
 }
 

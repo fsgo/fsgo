@@ -142,7 +142,7 @@ func (cc *ClientConn) readOnePackage(rd io.Reader) error {
 	return nil
 }
 
-func (cc *ClientConn) MustOpen(ctx context.Context) *Stream {
+func (cc *ClientConn) MustOpen(ctx context.Context) RequestWriter {
 	s, err := cc.Open(ctx)
 	if err != nil {
 		panic(err)
@@ -150,7 +150,7 @@ func (cc *ClientConn) MustOpen(ctx context.Context) *Stream {
 	return s
 }
 
-func (cc *ClientConn) Open(ctx context.Context) (*Stream, error) {
+func (cc *ClientConn) Open(ctx context.Context) (RequestWriter, error) {
 	if cc.closed.Load() {
 		return nil, ErrClosed
 	}
@@ -171,7 +171,7 @@ func (cc *ClientConn) Open(ctx context.Context) (*Stream, error) {
 		}
 	}()
 
-	rw := &Stream{
+	rw := &reqWriter{
 		queue: cc.writeQueue,
 		newResReader: func(req *Request) ResponseReader {
 			rr := newRespReader()
