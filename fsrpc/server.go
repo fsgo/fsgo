@@ -193,7 +193,7 @@ type NotFoundHandler struct{}
 func (nh *NotFoundHandler) Handle(ctx context.Context, rr RequestReader, rw ResponseWriter) error {
 	req, _ := rr.Request()
 	resp := NewResponse(req.GetID(), ErrCode_NoMethod, fmt.Sprintf("method %q not found", req.GetMethod()))
-	_ = WriteResponseProto(ctx, rw, resp)
+	_ = WritePProto(ctx, rw, resp)
 	return ErrMethodNotFound
 }
 

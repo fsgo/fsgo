@@ -8,8 +8,10 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"sync/atomic"
 
 	"google.golang.org/protobuf/proto"
@@ -18,22 +20,6 @@ import (
 type Payload struct {
 	Meta *PayloadMeta
 	Data io.Reader
-}
-
-func (pl *Payload) ProtoUnmarshal(obj proto.Message) error {
-	bf, err := pl.Bytes()
-	if err != nil {
-		return err
-	}
-	return proto.Unmarshal(bf, obj)
-}
-
-func (pl *Payload) JSONUnmarshal(obj any) error {
-	bf, err := pl.Bytes()
-	if err != nil {
-		return err
-	}
-	return json.Unmarshal(bf, obj)
 }
 
 func (pl *Payload) Bytes() ([]byte, error) {
@@ -65,12 +51,12 @@ func toBytesPayloadChan(rid uint64, items ...[]byte) (<-chan *Payload, error) {
 	return toPayloadChan[[]byte](rid, EncodingType_Bytes, bytesMarshal, items...)
 }
 
-func toJSONPayloadChan(rid uint64, items ...any) (<-chan *Payload, error) {
-	return toPayloadChan[any](rid, EncodingType_JSON, json.Marshal, items...)
-}
-
 func bytesMarshal(b []byte) ([]byte, error) {
 	return b, nil
+}
+
+func toJSONPayloadChan(rid uint64, items ...any) (<-chan *Payload, error) {
+	return toPayloadChan[any](rid, EncodingType_JSON, json.Marshal, items...)
 }
 
 func toPayloadChan[T any](rid uint64, et EncodingType, enc func(m T) ([]byte, error), items ...T) (<-chan *Payload, error) {
@@ -163,7 +149,7 @@ func (pw *payloadWriter) writePayload(pl *Payload) error {
 	return err4
 }
 
-func ReadProtoPayload[T proto.Message](ctx context.Context, payloads <-chan *Payload, data T) (T, error) {
+func readPayloadXX[T any](ctx context.Context, payloads <-chan *Payload, data T, et EncodingType, dec func(b []byte, m T) error) (T, error) {
 	if payloads == nil {
 		return data, ErrNoPayload
 	}
@@ -177,53 +163,118 @@ func ReadProtoPayload[T proto.Message](ctx context.Context, payloads <-chan *Pay
 		if pl.Meta.GetMore() {
 			return data, ErrMorePayload
 		}
-		if pl.Meta.GetEncodingType() != EncodingType_Protobuf {
-			return data, fmt.Errorf("%w, %v", ErrInvalidEncodingType, pl.Meta.GetEncodingType())
+		if gt := pl.Meta.GetEncodingType(); gt != et {
+			return data, fmt.Errorf("%w, want %v,got %v", ErrInvalidEncodingType, et, gt)
 		}
-		err := pl.ProtoUnmarshal(data)
+		bf, err := pl.Bytes()
+		if err != nil {
+			return data, err
+		}
+		err = dec(bf, data)
 		return data, err
 	}
 }
 
-func ReadJSONPayload[T any](ctx context.Context, payloads <-chan *Payload, data T) (T, error) {
-	if payloads == nil {
-		return data, ErrNoPayload
-	}
-	select {
-	case <-ctx.Done():
-		return data, context.Cause(ctx)
-	case pl, ok := <-payloads:
-		if !ok {
-			return data, fmt.Errorf("%w, bodyChan closed", ErrNoPayload)
-		}
-		if pl.Meta.GetMore() {
-			return data, ErrMorePayload
-		}
-		if pl.Meta.GetEncodingType() != EncodingType_JSON {
-			return data, fmt.Errorf("%w, %v", ErrInvalidEncodingType, pl.Meta.GetEncodingType())
-		}
-		err := pl.JSONUnmarshal(data)
-		return data, err
-	}
+func ReadPayloadProto[T proto.Message](ctx context.Context, payloads <-chan *Payload, data T) (T, error) {
+	return readPayloadXX[T](ctx, payloads, data, EncodingType_Protobuf, func(b []byte, m T) error {
+		return proto.Unmarshal(b, m)
+	})
 }
 
-func ReadBytesPayload(ctx context.Context, payloads <-chan *Payload) ([]byte, error) {
-	if payloads == nil {
-		return nil, ErrNoPayload
+func ReadPayloadJSON[T any](ctx context.Context, payloads <-chan *Payload, data T) (T, error) {
+	return readPayloadXX[T](ctx, payloads, data, EncodingType_JSON, func(b []byte, m T) error {
+		return json.Unmarshal(b, m)
+	})
+}
+
+func ReadPayloadBytes(ctx context.Context, payloads <-chan *Payload) ([]byte, error) {
+	var bf []byte
+	return readPayloadXX[[]byte](ctx, payloads, bf, EncodingType_JSON, func(b []byte, m []byte) error {
+		bf = b
+		return nil
+	})
+}
+
+// PayloadChan 一个可异步发送 Payload 的辅助工具
+type PayloadChan[T any] struct {
+	// RID Request ID, 必填
+	RID uint64
+
+	// EncodingType 数据编码类型
+	EncodingType EncodingType
+
+	ch     chan *Payload
+	index  atomic.Uint32
+	closed atomic.Bool
+	once   sync.Once
+}
+
+func (pc *PayloadChan[T]) Chan() <-chan *Payload {
+	pc.initOnce()
+	return pc.ch
+}
+
+func (pc *PayloadChan[T]) initOnce() {
+	pc.once.Do(func() {
+		pc.ch = make(chan *Payload, 128)
+	})
+}
+
+func (pc *PayloadChan[T]) Write(ctx context.Context, data T, more bool) error {
+	if err0 := ctx.Err(); err0 != nil {
+		return err0
+	}
+	if pc.closed.Load() {
+		return errors.New("already closed")
+	}
+
+	pc.initOnce()
+
+	if !more {
+		if !pc.closed.CompareAndSwap(false, true) {
+			return errors.New("already closed")
+		}
+		defer close(pc.ch)
+	}
+
+	var obj any = data
+	var bf []byte
+	var err error
+	switch pc.EncodingType {
+	case EncodingType_Bytes:
+		if m, ok := obj.([]byte); ok {
+			bf = m
+		} else {
+			err = fmt.Errorf("data is %T,not []byte", data)
+		}
+	case EncodingType_Protobuf:
+		if m, ok := obj.(proto.Message); ok {
+			bf, err = proto.Marshal(m)
+		} else {
+			err = fmt.Errorf("data is %T,not proto.Message", data)
+		}
+	case EncodingType_JSON:
+		bf, err = json.Marshal(data)
+	default:
+		return fmt.Errorf("not support EncodingType %v", pc.EncodingType)
+	}
+	if err != nil {
+		return err
+	}
+	pl := &Payload{
+		Meta: &PayloadMeta{
+			Index:        pc.index.Add(1) - 1,
+			RID:          pc.RID,
+			More:         more,
+			EncodingType: pc.EncodingType,
+			Length:       int64(len(bf)),
+		},
+		Data: bytes.NewBuffer(bf),
 	}
 	select {
 	case <-ctx.Done():
-		return nil, context.Cause(ctx)
-	case pl, ok := <-payloads:
-		if !ok {
-			return nil, fmt.Errorf("%w, bodyChan closed", ErrNoPayload)
-		}
-		if pl.Meta.GetMore() {
-			return nil, ErrMorePayload
-		}
-		if pl.Meta.GetEncodingType() != EncodingType_Bytes {
-			return nil, fmt.Errorf("%w, %v", ErrInvalidEncodingType, pl.Meta.GetEncodingType())
-		}
-		return pl.Bytes()
+		return ctx.Err()
+	case pc.ch <- pl:
+		return nil
 	}
 }

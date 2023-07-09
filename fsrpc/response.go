@@ -22,11 +22,9 @@ func NewResponseSuccess(requestID uint64) *Response {
 	return NewResponse(requestID, ErrCode_Success, "OK")
 }
 
-type (
-	ResponseWriter interface {
-		WriteChan(ctx context.Context, resp *Response, payload <-chan *Payload) error
-	}
-)
+type ResponseWriter interface {
+	WriteChan(ctx context.Context, resp *Response, payload <-chan *Payload) error
+}
 
 var _ ResponseWriter = (*respWriter)(nil)
 
@@ -72,7 +70,7 @@ func (rw *respWriter) WriteChan(ctx context.Context, resp *Response, payloads <-
 	return pw.writeChan(ctx, payloads)
 }
 
-func WriteResponseProto(ctx context.Context, w ResponseWriter, resp *Response, body ...proto.Message) error {
+func WritePProto(ctx context.Context, w ResponseWriter, resp *Response, body ...proto.Message) error {
 	ch, err := toProtoPayloadChan(resp.GetRequestID(), body...)
 	if err != nil {
 		return err
@@ -80,7 +78,7 @@ func WriteResponseProto(ctx context.Context, w ResponseWriter, resp *Response, b
 	return w.WriteChan(ctx, resp, ch)
 }
 
-func WriteResponseJSON(ctx context.Context, w ResponseWriter, resp *Response, body ...any) error {
+func WritePJSON(ctx context.Context, w ResponseWriter, resp *Response, body ...any) error {
 	ch, err := toJSONPayloadChan(resp.GetRequestID(), body...)
 	if err != nil {
 		return err
@@ -88,7 +86,7 @@ func WriteResponseJSON(ctx context.Context, w ResponseWriter, resp *Response, bo
 	return w.WriteChan(ctx, resp, ch)
 }
 
-func WriteResponseBytes(ctx context.Context, w ResponseWriter, resp *Response, body ...[]byte) error {
+func WritPBytes(ctx context.Context, w ResponseWriter, resp *Response, body ...[]byte) error {
 	ch, err := toBytesPayloadChan(resp.GetRequestID(), body...)
 	if err != nil {
 		return err
@@ -127,29 +125,29 @@ func (r *respReader) Response() (*Response, <-chan *Payload, error) {
 	return <-r.responses, <-r.payloads, <-r.errors
 }
 
-func ReadResponseProto[T proto.Message](ctx context.Context, r ResponseReader, data T) (*Response, T, error) {
+func ReadPProto[T proto.Message](ctx context.Context, r ResponseReader, data T) (*Response, T, error) {
 	resp, bodyChan, err := r.Response()
 	if err != nil {
 		return nil, data, err
 	}
-	d, err1 := ReadProtoPayload(ctx, bodyChan, data)
+	d, err1 := ReadPayloadProto(ctx, bodyChan, data)
 	return resp, d, err1
 }
 
-func ReadResponseJSON[T any](ctx context.Context, r ResponseReader, data T) (*Response, T, error) {
+func ReadPJSON[T any](ctx context.Context, r ResponseReader, data T) (*Response, T, error) {
 	resp, bodyChan, err := r.Response()
 	if err != nil {
 		return nil, data, err
 	}
-	d, err1 := ReadJSONPayload(ctx, bodyChan, data)
+	d, err1 := ReadPayloadJSON(ctx, bodyChan, data)
 	return resp, d, err1
 }
 
-func ReadResponseBytes(ctx context.Context, r ResponseReader) (*Response, []byte, error) {
+func ReadPBytes(ctx context.Context, r ResponseReader) (*Response, []byte, error) {
 	resp, bodyChan, err := r.Response()
 	if err != nil {
 		return nil, nil, err
 	}
-	d, err1 := ReadBytesPayload(ctx, bodyChan)
+	d, err1 := ReadPayloadBytes(ctx, bodyChan)
 	return resp, d, err1
 }

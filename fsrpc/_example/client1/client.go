@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"sync"
 	"time"
@@ -49,9 +50,26 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()
 
+	stream := client.MustOpen(ctx)
+
+	go func() {
+		req2 := fsrpc.NewRequest("hello")
+		pc := &fsrpc.PayloadChan[*fsrpc.Echo]{
+			EncodingType: fsrpc.EncodingType_Protobuf,
+			RID:          req2.GetID(),
+		}
+		go func() {
+			for i := 0; i < 10; i++ {
+				pc.Write(ctx, &fsrpc.Echo{Message: fmt.Sprintf("PayloadChan:%d", i)}, i < 9)
+			}
+		}()
+		_, err2 := stream.WriteChan(ctx, req2, pc.Chan())
+		log.Println("PayloadChan err2:", err2)
+	}()
+
 	var wg sync.WaitGroup
 	wg.Add(2)
-	stream := client.MustOpen(ctx)
+
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 100; i++ {

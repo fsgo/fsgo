@@ -1,6 +1,6 @@
 // Copyright(C) 2023 github.com/fsgo  All Rights Reserved.
 // Author: hidu <duv123@gmail.com>
-// Date: 2023/6/23
+// Date: 2023/7/9
 
 package main
 
@@ -9,6 +9,8 @@ import (
 	"flag"
 	"log"
 	"net"
+
+	"google.golang.org/protobuf/proto"
 
 	"github.com/fsgo/fsgo/fsrpc"
 )
@@ -40,6 +42,14 @@ func hello(ctx context.Context, rr fsrpc.RequestReader, rw fsrpc.ResponseWriter)
 	req, pl := rr.Request()
 	for item := range pl {
 		log.Println("pl:", item.Meta)
+		bf, err := item.Bytes()
+		if err != nil {
+			log.Println("pl.Bytes().err=", err)
+			continue
+		}
+		echo := &fsrpc.Echo{}
+		proto.Unmarshal(bf, echo)
+		log.Println("pl.Echo:", echo.String())
 	}
 	log.Println("request", req.String())
 	resp := fsrpc.NewResponse(req.GetID(), 0, "success")

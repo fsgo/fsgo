@@ -26,7 +26,7 @@ func (ah *AuthHandler) getMethod() string {
 func (ah *AuthHandler) Client(ctx context.Context, rw RequestWriter) (ret error) {
 	req := NewRequest(ah.getMethod())
 	data := ah.NewAuthData(ctx)
-	rr, err := WriteRequestProto(ctx, rw, req, data)
+	rr, err := WriteQProto(ctx, rw, req, data)
 	if err != nil {
 		return err
 	}
@@ -41,10 +41,10 @@ func (ah *AuthHandler) Client(ctx context.Context, rw RequestWriter) (ret error)
 }
 
 func (ah *AuthHandler) Server(ctx context.Context, rr RequestReader, rw ResponseWriter) (ret error) {
-	req, auth, err := ReadRequestProto(ctx, rr, &AuthData{})
+	req, auth, err := ReadQProto(ctx, rr, &AuthData{})
 	if err != nil {
 		resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "auth failed")
-		_ = WriteResponseProto(ctx, rw, resp, nil)
+		_ = WritePProto(ctx, rw, resp, nil)
 		return err
 	}
 	err = ah.CheckAuth(ctx, auth)
@@ -55,6 +55,6 @@ func (ah *AuthHandler) Server(ctx context.Context, rr RequestReader, rw Response
 		return nil
 	}
 	resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "auth failed")
-	_ = WriteResponseProto(ctx, rw, resp, nil)
+	_ = WritePProto(ctx, rw, resp, nil)
 	return errors.New("auth failed")
 }
