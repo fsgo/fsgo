@@ -25,7 +25,7 @@ func (pp *PingHandler) getMethod() string {
 	return "sys_ping"
 }
 
-func (pp *PingHandler) Send(ctx context.Context, w RequestWriter) (ret error) {
+func (pp *PingHandler) ClientSend(ctx context.Context, w RequestWriter) (ret error) {
 	id := pp.id.Add(1)
 	defer func() {
 		log.Println("Ping, id=", id, ret)
@@ -52,7 +52,7 @@ func (pp *PingHandler) Send(ctx context.Context, w RequestWriter) (ret error) {
 	return nil
 }
 
-func (pp *PingHandler) SendMany(ctx context.Context, w RequestWriter, interval time.Duration) error {
+func (pp *PingHandler) ClientSendMany(ctx context.Context, w RequestWriter, interval time.Duration) error {
 	tk := time.NewTimer(0)
 	defer tk.Stop()
 	for {
@@ -61,7 +61,7 @@ func (pp *PingHandler) SendMany(ctx context.Context, w RequestWriter, interval t
 			return nil
 		case <-tk.C:
 		}
-		err := pp.Send(ctx, w)
+		err := pp.ClientSend(ctx, w)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return nil
@@ -74,14 +74,13 @@ func (pp *PingHandler) SendMany(ctx context.Context, w RequestWriter, interval t
 }
 
 func (pp *PingHandler) RegisterTo(rt RouteRegister) {
-	rt.Register(pp.getMethod(), HandlerFunc(pp.Receiver))
+	rt.Register(pp.getMethod(), HandlerFunc(pp.Server))
 }
 
-func (pp *PingHandler) Receiver(ctx context.Context, r RequestReader, w ResponseWriter) (ret error) {
+func (pp *PingHandler) Server(ctx context.Context, r RequestReader, w ResponseWriter) (ret error) {
 	pong := &Echo{
 		Message: "pong",
 	}
-
 	for {
 		req, ping, err := ReadRequestProto(ctx, r, &Echo{})
 		if err != nil {

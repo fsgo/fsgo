@@ -12,13 +12,23 @@ type ctxKey uint8
 
 const (
 	ctxKeyServerConnSession ctxKey = iota
+	ctxKeyHandlerMethod
 )
 
-func ctxWithServerConnSession(ctx context.Context, session *ServerConnSession) context.Context {
+func ctxWithServerConnSession(ctx context.Context, session *ConnSession) context.Context {
 	return context.WithValue(ctx, ctxKeyServerConnSession, session)
 }
 
-func ServerConnSessionFromCtx(ctx context.Context) *ServerConnSession {
-	val, _ := ctx.Value(ctxKeyServerConnSession).(*ServerConnSession)
+func ConnSessionFromCtx(ctx context.Context) *ConnSession {
+	val, _ := ctx.Value(ctxKeyServerConnSession).(*ConnSession)
+	return val
+}
+
+func ctxWithServerMethod(ctx context.Context, method string) context.Context {
+	return context.WithValue(ctx, ctxKeyHandlerMethod, method)
+}
+
+func HandlerMethod(ctx context.Context) string {
+	val, _ := ctx.Value(ctxKeyHandlerMethod).(string)
 	return val
 }

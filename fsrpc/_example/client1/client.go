@@ -68,7 +68,7 @@ func main() {
 	ph := &fsrpc.PingHandler{}
 	go func() {
 		defer wg.Done()
-		err = ph.SendMany(ctx, stream, time.Duration(*wait)*time.Second)
+		err = ph.ClientSendMany(ctx, stream, time.Duration(*wait)*time.Second)
 		log.Println("Ping.Err=", err)
 	}()
 	wg.Wait()

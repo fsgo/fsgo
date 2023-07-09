@@ -41,7 +41,7 @@ func (pl *Payload) Bytes() ([]byte, error) {
 }
 
 func readPayload(rd io.Reader, length int) (*Payload, error) {
-	meta, err := readMessage(rd, length, &PayloadMeta{})
+	meta, err := readProtoMessage(rd, length, &PayloadMeta{})
 	if err != nil {
 		return nil, err
 	}

@@ -105,7 +105,7 @@ func (cc *ClientConn) readOnePackage(rd io.Reader) error {
 	default:
 		return fmt.Errorf("%w, got=%d", ErrInvalidHeader, header.Type)
 	case HeaderTypeResponse:
-		resp, err := readMessage(rd, int(header.Length), &Response{})
+		resp, err := readProtoMessage(rd, int(header.Length), &Response{})
 		if err != nil {
 			return fmt.Errorf("read Response: %w", err)
 		}

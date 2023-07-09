@@ -23,7 +23,7 @@ func (ah *AuthHandler) getMethod() string {
 	return "sys_auth"
 }
 
-func (ah *AuthHandler) Send(ctx context.Context, rw RequestWriter) (ret error) {
+func (ah *AuthHandler) Client(ctx context.Context, rw RequestWriter) (ret error) {
 	req := NewRequest(ah.getMethod())
 	data := ah.NewAuthData(ctx)
 	rr, err := WriteRequestProto(ctx, rw, req, data)
@@ -40,7 +40,7 @@ func (ah *AuthHandler) Send(ctx context.Context, rw RequestWriter) (ret error) {
 	return fmt.Errorf("%w, code=%d, msg=%q", ErrAuthFailed, resp.GetCode(), resp.GetMessage())
 }
 
-func (ah *AuthHandler) Receiver(ctx context.Context, rr RequestReader, rw ResponseWriter) (ret error) {
+func (ah *AuthHandler) Server(ctx context.Context, rr RequestReader, rw ResponseWriter) (ret error) {
 	req, auth, err := ReadRequestProto(ctx, rr, &AuthData{})
 	if err != nil {
 		resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "auth failed")
@@ -49,7 +49,7 @@ func (ah *AuthHandler) Receiver(ctx context.Context, rr RequestReader, rw Respon
 	}
 	err = ah.CheckAuth(ctx, auth)
 	if err == nil {
-		session := ServerConnSessionFromCtx(ctx)
+		session := ConnSessionFromCtx(ctx)
 		session.LoggedIn.Store(true)
 		session.User.Store(auth.UserName)
 		return nil

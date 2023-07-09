@@ -29,7 +29,7 @@ func WriteProtocol(w io.Writer) error {
 	return err
 }
 
-func readMessage[T proto.Message](rd io.Reader, length int, obj T) (T, error) {
+func readProtoMessage[T proto.Message](rd io.Reader, length int, obj T) (T, error) {
 	bf := make([]byte, length)
 	_, err := io.ReadFull(rd, bf)
 	if err != nil {

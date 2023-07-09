@@ -56,7 +56,7 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	// connReader := bufio.NewReader(conn)
 	connReader := conn
 
-	session := &ServerConnSession{
+	session := &ConnSession{
 		RemoteAddr: conn.RemoteAddr(),
 		LocalAddr:  conn.LocalAddr(),
 	}
@@ -80,6 +80,7 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	}()
 
 	rw := newResponseWriter(writeQueue)
+
 	hp := &handlerParam{}
 
 	for {
@@ -107,14 +108,14 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 	default:
 		return fmt.Errorf("%w, got=%d", ErrInvalidHeader, header.Type)
 	case HeaderTypeRequest:
-		req, err2 := readMessage(rd, int(header.Length), &Request{})
+		req, err2 := readProtoMessage(rd, int(header.Length), &Request{})
 		if err2 != nil {
 			return fmt.Errorf("read Request: %w", err2)
 		}
 		method := req.GetMethod()
 		handler := s.Router.Handler(method)
 		if handler == nil {
-			return fmt.Errorf("%w: %q", ErrMethodNotFound, method)
+			handler = s.Router.NotFound()
 		}
 
 		hr, ok := hp.Handlers.Load(method)
@@ -132,6 +133,7 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 			hp.Handlers.Store(method, reader)
 			go func() {
 				defer hp.Handlers.Delete(method)
+				ctx = ctxWithServerMethod(ctx, method)
 				handler.Handle(ctx, reader, rw)
 			}()
 		} else {
@@ -167,6 +169,7 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 type (
 	RouteFinder interface {
 		Handler(method string) Handler
+		NotFound() Handler
 	}
 
 	RouteRegister interface {
@@ -183,8 +186,33 @@ func NewRouter() *Router {
 var _ RouteFinder = (*Router)(nil)
 var _ RouteRegister = (*Router)(nil)
 
+var _ Handler = (*NotFoundHandler)(nil)
+
+type NotFoundHandler struct{}
+
+func (nh *NotFoundHandler) Handle(ctx context.Context, rr RequestReader, rw ResponseWriter) error {
+	req, _ := rr.Request()
+	resp := NewResponse(req.GetID(), ErrCode_NoMethod, fmt.Sprintf("method %q not found", req.GetMethod()))
+	_ = WriteResponseProto(ctx, rw, resp)
+	return ErrMethodNotFound
+}
+
 type Router struct {
-	handlers map[string]Handler
+	handlers        map[string]Handler
+	notFoundHandler Handler
+}
+
+var defaultNotFound = &NotFoundHandler{}
+
+func (rt *Router) NotFound() Handler {
+	if rt.notFoundHandler != nil {
+		return rt.notFoundHandler
+	}
+	return defaultNotFound
+}
+
+func (rt *Router) SetNotFound(h Handler) {
+	rt.notFoundHandler = h
 }
 
 func (rt *Router) Register(method string, h Handler) {
@@ -208,9 +236,43 @@ func (h HandlerFunc) Handle(ctx context.Context, rr RequestReader, rw ResponseWr
 	return h(ctx, rr, rw)
 }
 
-type ServerConnSession struct {
+// ConnSession server 连接的信息
+type ConnSession struct {
 	LoggedIn   atomic.Bool
 	User       fsatomic.String
 	RemoteAddr net.Addr
 	LocalAddr  net.Addr
+	Data       sync.Map
+}
+
+var _ Handler = (*Interceptor)(nil)
+
+type Interceptor struct {
+	// Name  名称，可选
+	Name string
+
+	// Before 在 Handler 前执行，可选
+	// 若 返回的 error != nil,则 Handler 不会执行
+	Before func(ctx context.Context, rr RequestReader, rw ResponseWriter) (context.Context, RequestReader, ResponseWriter, error)
+
+	// After 在 Handler 后执行，可选
+	After func(ctx context.Context, rr RequestReader, rw ResponseWriter, err error) error
+
+	// Handler 业务逻辑 Handler，必填
+	Handler Handler
+}
+
+func (it *Interceptor) Handle(ctx context.Context, rr RequestReader, rw ResponseWriter) (err error) {
+	if it.After != nil {
+		defer func() {
+			err = it.After(ctx, rr, rw, err)
+		}()
+	}
+	if it.Before != nil {
+		ctx, rr, rw, err = it.Before(ctx, rr, rw)
+		if err != nil {
+			return err
+		}
+	}
+	return it.Handler.Handle(ctx, rr, rw)
 }
