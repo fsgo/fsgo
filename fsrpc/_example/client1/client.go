@@ -17,7 +17,7 @@ import (
 	"github.com/fsgo/fsgo/fsrpc"
 )
 
-var serverAddr = flag.String("addr", "127.0.0.1:8000", "")
+var serverAddr = flag.String("addr", "127.0.0.1:8001", "")
 var debug = flag.Bool("d", false, "enable debug")
 var wait = flag.Int("wait", 1, "wait seconds")
 
@@ -63,7 +63,7 @@ func main() {
 				pc.Write(ctx, &fsrpc.Echo{Message: fmt.Sprintf("PayloadChan:%d", i)}, i < 9)
 			}
 		}()
-		_, err2 := stream.WriteChan(ctx, req2, pc.Chan())
+		_, err2 := stream.Write(ctx, req2, pc.Chan())
 		log.Println("PayloadChan err2:", err2)
 	}()
 
@@ -75,7 +75,7 @@ func main() {
 		for i := 0; i < 100; i++ {
 			log.Println("i=", i)
 			req := fsrpc.NewRequest("hello")
-			rr, err2 := stream.WriteChan(ctx, req, nil)
+			rr, err2 := stream.Write(ctx, req, nil)
 			log.Println("WriteChan=", err2)
 
 			resp, _, err3 := rr.Response()

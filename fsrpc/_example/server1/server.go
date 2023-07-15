@@ -15,7 +15,7 @@ import (
 	"github.com/fsgo/fsgo/fsrpc"
 )
 
-var listenAddr = flag.String("addr", "127.0.0.1:8000", "")
+var listenAddr = flag.String("addr", "127.0.0.1:8001", "")
 
 func main() {
 	flag.Parse()
@@ -53,7 +53,7 @@ func hello(ctx context.Context, rr fsrpc.RequestReader, rw fsrpc.ResponseWriter)
 	}
 	log.Println("request", req.String())
 	resp := fsrpc.NewResponse(req.GetID(), 0, "success")
-	err1 := rw.WriteChan(ctx, resp, nil)
+	err1 := rw.Write(ctx, resp, nil)
 	log.Println("WriteResponse", err1)
 	return nil
 }

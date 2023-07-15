@@ -26,6 +26,39 @@ func (pl *Payload) Bytes() ([]byte, error) {
 	return io.ReadAll(pl.Data)
 }
 
+func ParserPayload[T any](pl *Payload, data T) (T, error) {
+	bf, err := pl.Bytes()
+	if err != nil {
+		return data, err
+	}
+	var dataAny any = data
+
+	switch pl.Meta.GetEncodingType() {
+	case EncodingType_Bytes:
+		switch obj := dataAny.(type) {
+		case []byte:
+			obj = bf
+			_ = obj
+			return data, nil
+		default:
+			return data, fmt.Errorf("data is %T, not []byte", data)
+		}
+	case EncodingType_Protobuf:
+		switch obj := dataAny.(type) {
+		case proto.Message:
+			err = proto.Unmarshal(bf, obj)
+			return data, err
+		default:
+			return data, fmt.Errorf("data is %T, not proto.Message", data)
+		}
+	case EncodingType_JSON:
+		err = json.Unmarshal(bf, dataAny)
+		return data, err
+	default:
+		return data, fmt.Errorf("%w: %v", ErrInvalidEncodingType, pl.Meta.GetEncodingType())
+	}
+}
+
 func readPayload(rd io.Reader, length int) (*Payload, error) {
 	meta, err := readProtoMessage(rd, length, &PayloadMeta{})
 	if err != nil {
@@ -149,7 +182,7 @@ func (pw *payloadWriter) writePayload(pl *Payload) error {
 	return err4
 }
 
-func readPayloadXX[T any](ctx context.Context, payloads <-chan *Payload, data T, et EncodingType, dec func(b []byte, m T) error) (T, error) {
+func readOnlyOnePayload[T any](ctx context.Context, payloads <-chan *Payload, data T, et EncodingType, dec func(b []byte, m T) error) (T, error) {
 	if payloads == nil {
 		return data, ErrNoPayload
 	}
@@ -175,21 +208,24 @@ func readPayloadXX[T any](ctx context.Context, payloads <-chan *Payload, data T,
 	}
 }
 
+// ReadPayloadProto 用于读取只有一条 proto.Message 的 Payload
 func ReadPayloadProto[T proto.Message](ctx context.Context, payloads <-chan *Payload, data T) (T, error) {
-	return readPayloadXX[T](ctx, payloads, data, EncodingType_Protobuf, func(b []byte, m T) error {
+	return readOnlyOnePayload[T](ctx, payloads, data, EncodingType_Protobuf, func(b []byte, m T) error {
 		return proto.Unmarshal(b, m)
 	})
 }
 
+// ReadPayloadJSON 用于读取只有一条 JSON 的 Payload
 func ReadPayloadJSON[T any](ctx context.Context, payloads <-chan *Payload, data T) (T, error) {
-	return readPayloadXX[T](ctx, payloads, data, EncodingType_JSON, func(b []byte, m T) error {
+	return readOnlyOnePayload[T](ctx, payloads, data, EncodingType_JSON, func(b []byte, m T) error {
 		return json.Unmarshal(b, m)
 	})
 }
 
+// ReadPayloadBytes 用于读取只有一条 []byte 的 Payload
 func ReadPayloadBytes(ctx context.Context, payloads <-chan *Payload) ([]byte, error) {
 	var bf []byte
-	return readPayloadXX[[]byte](ctx, payloads, bf, EncodingType_JSON, func(b []byte, m []byte) error {
+	return readOnlyOnePayload[[]byte](ctx, payloads, bf, EncodingType_JSON, func(b []byte, m []byte) error {
 		bf = b
 		return nil
 	})
@@ -200,7 +236,7 @@ type PayloadChan[T any] struct {
 	// RID Request ID, 必填
 	RID uint64
 
-	// EncodingType 数据编码类型
+	// EncodingType 数据编码类型,可选
 	EncodingType EncodingType
 
 	ch     chan *Payload
@@ -217,7 +253,63 @@ func (pc *PayloadChan[T]) Chan() <-chan *Payload {
 func (pc *PayloadChan[T]) initOnce() {
 	pc.once.Do(func() {
 		pc.ch = make(chan *Payload, 128)
+
+		if pc.EncodingType == EncodingType_Unknown {
+			var data T
+			var obj any = data
+			switch obj.(type) {
+			case []byte, *bytes.Buffer:
+				pc.EncodingType = EncodingType_Bytes
+			case proto.Message:
+				pc.EncodingType = EncodingType_Protobuf
+			default:
+				pc.EncodingType = EncodingType_JSON
+			}
+		}
 	})
+}
+
+func encodePayload(data any, et EncodingType) (rd io.Reader, length int, err error) {
+	switch et {
+	case EncodingType_Bytes:
+		switch val := data.(type) {
+		case []byte:
+			rd = bytes.NewBuffer(val)
+			length = len(val)
+		case *bytes.Buffer:
+			rd = val
+			length = val.Len()
+		case io.Reader:
+			bf := &bytes.Buffer{}
+			// todo  超大内容拆分
+			_, err = bf.ReadFrom(val)
+			rd = bf
+			length = bf.Len()
+		default:
+			err = fmt.Errorf("data is %T,not []byte", data)
+		}
+	case EncodingType_Protobuf:
+		if m, ok := data.(proto.Message); ok {
+			var bf []byte
+			bf, err = proto.Marshal(m)
+			if err == nil {
+				rd = bytes.NewBuffer(bf)
+				length = len(bf)
+			}
+		} else {
+			err = fmt.Errorf("data is %T,not proto.Message", data)
+		}
+	case EncodingType_JSON:
+		var bf []byte
+		bf, err = json.Marshal(data)
+		if err == nil {
+			rd = bytes.NewBuffer(bf)
+			length = len(bf)
+		}
+	default:
+		return nil, 0, fmt.Errorf("%w:%v", ErrInvalidEncodingType, et)
+	}
+	return rd, length, err
 }
 
 func (pc *PayloadChan[T]) Write(ctx context.Context, data T, more bool) error {
@@ -237,27 +329,7 @@ func (pc *PayloadChan[T]) Write(ctx context.Context, data T, more bool) error {
 		defer close(pc.ch)
 	}
 
-	var obj any = data
-	var bf []byte
-	var err error
-	switch pc.EncodingType {
-	case EncodingType_Bytes:
-		if m, ok := obj.([]byte); ok {
-			bf = m
-		} else {
-			err = fmt.Errorf("data is %T,not []byte", data)
-		}
-	case EncodingType_Protobuf:
-		if m, ok := obj.(proto.Message); ok {
-			bf, err = proto.Marshal(m)
-		} else {
-			err = fmt.Errorf("data is %T,not proto.Message", data)
-		}
-	case EncodingType_JSON:
-		bf, err = json.Marshal(data)
-	default:
-		return fmt.Errorf("not support EncodingType %v", pc.EncodingType)
-	}
+	rd, length, err := encodePayload(data, pc.EncodingType)
 	if err != nil {
 		return err
 	}
@@ -267,9 +339,9 @@ func (pc *PayloadChan[T]) Write(ctx context.Context, data T, more bool) error {
 			RID:          pc.RID,
 			More:         more,
 			EncodingType: pc.EncodingType,
-			Length:       int64(len(bf)),
+			Length:       int64(length),
 		},
-		Data: bytes.NewBuffer(bf),
+		Data: rd,
 	}
 	select {
 	case <-ctx.Done():
@@ -277,4 +349,42 @@ func (pc *PayloadChan[T]) Write(ctx context.Context, data T, more bool) error {
 	case pc.ch <- pl:
 		return nil
 	}
+}
+
+// RangeParserPayloads 遍历并解析所有的 Payloads
+func RangeParserPayloads[T any](ctx context.Context, ps <-chan *Payload, gen func() T, fn func(data T) error) error {
+	return RangePayloads(ctx, ps, func(pl *Payload) error {
+		data, err := ParserPayload[T](pl, gen())
+		if err == nil {
+			err = fn(data)
+		}
+		return err
+	})
+}
+
+// RangePayloads 遍历所有的 Payloads
+func RangePayloads(ctx context.Context, ps <-chan *Payload, fn func(pl *Payload) error) error {
+	if ps == nil {
+		return nil
+	}
+	for {
+		select {
+		case <-ctx.Done():
+			return context.Cause(ctx)
+		case pl, ok := <-ps:
+			if !ok {
+				return nil
+			}
+			if err := fn(pl); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func RangePayloadsDiscard(ctx context.Context, ps <-chan *Payload) error {
+	return RangePayloads(ctx, ps, func(pl *Payload) error {
+		return nil
+	})
 }

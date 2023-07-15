@@ -193,7 +193,7 @@ type NotFoundHandler struct{}
 func (nh *NotFoundHandler) Handle(ctx context.Context, rr RequestReader, rw ResponseWriter) error {
 	req, _ := rr.Request()
 	resp := NewResponse(req.GetID(), ErrCode_NoMethod, fmt.Sprintf("method %q not found", req.GetMethod()))
-	_ = WritePProto(ctx, rw, resp)
+	_ = WriteResponseProto(ctx, rw, resp)
 	return ErrMethodNotFound
 }
 
@@ -275,4 +275,15 @@ func (it *Interceptor) Handle(ctx context.Context, rr RequestReader, rw Response
 		}
 	}
 	return it.Handler.Handle(ctx, rr, rw)
+}
+
+func ListenAndServe(addr string, router RouteFinder) error {
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		return err
+	}
+	ser := &Server{
+		Router: router,
+	}
+	return ser.Serve(l)
 }

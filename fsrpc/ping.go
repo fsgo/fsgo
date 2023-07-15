@@ -35,11 +35,11 @@ func (pp *PingHandler) ClientSend(ctx context.Context, w RequestWriter) (ret err
 		ID:      id,
 	}
 	req := NewRequest(pp.getMethod())
-	rr, err := WriteQProto(ctx, w, req, data)
+	rr, err := WriteRequestProto(ctx, w, req, data)
 	if err != nil {
 		return err
 	}
-	resp, pong, err := ReadPProto(ctx, rr, &Echo{})
+	resp, pong, err := ReadResponseProto(ctx, rr, &Echo{})
 	if err != nil {
 		return err
 	}
@@ -82,7 +82,7 @@ func (pp *PingHandler) Server(ctx context.Context, r RequestReader, w ResponseWr
 		Message: "pong",
 	}
 	for {
-		req, ping, err := ReadQProto(ctx, r, &Echo{})
+		req, ping, err := ReadRequestProto(ctx, r, &Echo{})
 		if err != nil {
 			return err
 		}
@@ -91,7 +91,7 @@ func (pp *PingHandler) Server(ctx context.Context, r RequestReader, w ResponseWr
 		resp := NewResponseSuccess(req.GetID())
 		log.Println("ping resp:", resp)
 
-		if err = WritePProto(ctx, w, resp, pong); err != nil {
+		if err = WriteResponseProto(ctx, w, resp, pong); err != nil {
 			return err
 		}
 	}

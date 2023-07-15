@@ -9,8 +9,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/fsgo/fsgo/fssync"
 	"github.com/fsgo/fsgo/fssync/fsatomic"
@@ -41,10 +43,16 @@ type ClientConn struct {
 	ctxCancel context.CancelCauseFunc
 
 	initOnce sync.Once
+
+	onClose fssync.Slice[func()]
 }
 
 func (cc *ClientConn) SetBeforeReadLoop(fn func()) {
 	cc.beforeReadLoop.Store(fn)
+}
+
+func (cc *ClientConn) OnClose(fn func()) {
+	cc.onClose.Add(fn)
 }
 
 func (cc *ClientConn) LastError() error {
@@ -191,9 +199,24 @@ func (cc *ClientConn) closeWithError(err error) error {
 		value.closeWithError(err)
 		return true
 	})
+	for _, fn := range cc.onClose.Load() {
+		fn()
+	}
 	return nil
 }
 
 func (cc *ClientConn) Close() error {
 	return cc.closeWithError(errors.New("by Close"))
+}
+
+func DialTimeout(network string, addr string, timeout time.Duration) (*ClientConn, error) {
+	conn, err := net.DialTimeout(network, addr, timeout)
+	if err != nil {
+		return nil, err
+	}
+	nc := NewClientConn(conn)
+	nc.OnClose(func() {
+		_ = conn.Close()
+	})
+	return nc, nil
 }

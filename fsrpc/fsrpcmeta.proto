@@ -42,9 +42,10 @@ message PayloadMeta{
 
 // EncodingType 数据编码方式
 enum EncodingType{
-  Bytes        = 0; // 原始的 []byte
-  Protobuf     = 1; // protobuf
-  JSON         = 2; // JSON
+  Unknown       = 0; // 异常
+  Protobuf      = 1; // protobuf
+  Bytes         = 2; // 原始的 []byte
+  JSON          = 3; // JSON
 }
 
 // Response 一条响应信息的头部
