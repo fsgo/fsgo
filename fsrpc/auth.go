@@ -16,6 +16,10 @@ type AuthHandler struct {
 	CheckAuth   func(ctx context.Context, ar *AuthData) error
 }
 
+func (ah *AuthHandler) RegisterTo(rt RouteRegister) {
+	rt.Register(ah.getMethod(), HandlerFunc(ah.Server))
+}
+
 func (ah *AuthHandler) getMethod() string {
 	if ah.Method != "" {
 		return ah.Method
