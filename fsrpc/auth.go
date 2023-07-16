@@ -55,6 +55,8 @@ func (ah *AuthHandler) Server(ctx context.Context, rr RequestReader, rw Response
 		session := ConnSessionFromCtx(ctx)
 		session.LoggedIn.Store(true)
 		session.User.Store(auth.GetUserName())
+		resp := NewResponseSuccess(req.GetID())
+		_ = WriteResponseProto(ctx, rw, resp, nil)
 		return nil
 	}
 	resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "check auth: "+err.Error())
