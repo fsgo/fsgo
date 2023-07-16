@@ -4,6 +4,7 @@ package fsrpc;
 option go_package = "../fsrpc";
 
 import "google/protobuf/any.proto";
+import "google/protobuf/timestamp.proto";
 
 // CompressType 数据压缩类型
 enum CompressType{
@@ -83,9 +84,8 @@ enum ErrCode{
 message AuthData{
   string UserName       = 1; // 用户名
   string Token          = 2; // 鉴权的密码
-  int64 Timespan        = 3; // 当前时间错，单位-秒
+  google.protobuf.Timestamp Timespan        = 3; // 当前时间错，单位-秒
   string Type           = 4; // 鉴权算法类型，可选
-  map<string, google.protobuf.Any> ExtKV = 5; // 其他 kv 数据
 }
 
 // Echo 简单的消息体

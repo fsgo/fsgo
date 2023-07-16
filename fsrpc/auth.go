@@ -6,14 +6,13 @@ package fsrpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 )
 
 type AuthHandler struct {
 	Method      string
-	NewAuthData func(ctx context.Context) *AuthData
-	CheckAuth   func(ctx context.Context, ar *AuthData) error
+	ClientData  func(ctx context.Context) *AuthData
+	ServerCheck func(ctx context.Context, ar *AuthData) error
 }
 
 func (ah *AuthHandler) RegisterTo(rt RouteRegister) {
@@ -29,7 +28,7 @@ func (ah *AuthHandler) getMethod() string {
 
 func (ah *AuthHandler) Client(ctx context.Context, rw RequestWriter) (ret error) {
 	req := NewRequest(ah.getMethod())
-	data := ah.NewAuthData(ctx)
+	data := ah.ClientData(ctx)
 	rr, err := WriteRequestProto(ctx, rw, req, data)
 	if err != nil {
 		return err
@@ -47,18 +46,39 @@ func (ah *AuthHandler) Client(ctx context.Context, rw RequestWriter) (ret error)
 func (ah *AuthHandler) Server(ctx context.Context, rr RequestReader, rw ResponseWriter) (ret error) {
 	req, auth, err := ReadRequestProto(ctx, rr, &AuthData{})
 	if err != nil {
-		resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "auth failed")
+		resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "cannot read auth data: "+err.Error())
 		_ = WriteResponseProto(ctx, rw, resp, nil)
 		return err
 	}
-	err = ah.CheckAuth(ctx, auth)
+	err = ah.ServerCheck(ctx, auth)
 	if err == nil {
 		session := ConnSessionFromCtx(ctx)
 		session.LoggedIn.Store(true)
-		session.User.Store(auth.UserName)
+		session.User.Store(auth.GetUserName())
 		return nil
 	}
-	resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "auth failed")
+	resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "check auth: "+err.Error())
 	_ = WriteResponseProto(ctx, rw, resp, nil)
-	return errors.New("auth failed")
+	return fmt.Errorf("%w:%w", err, ErrAuthFailed)
+}
+
+func (ah *AuthHandler) WithInterceptor(h Handler) Handler {
+	it := &Interceptor{
+		Name: "auth",
+		Before: func(ctx context.Context, rr RequestReader, rw ResponseWriter) (context.Context, RequestReader, ResponseWriter, error) {
+			if ah.ServerCheck == nil {
+				return ctx, rr, rw, nil
+			}
+			session := ConnSessionFromCtx(ctx)
+			if !session.LoggedIn.Load() {
+				req, _ := rr.Request()
+				resp := NewResponse(req.GetID(), ErrCode_AuthFailed, "not authed")
+				_ = WriteResponseProto(ctx, rw, resp, nil)
+				return ctx, rr, rw, ErrAuthFailed
+			}
+			return ctx, rr, rw, nil
+		},
+		Handler: h,
+	}
+	return HandlerFunc(it.Handle)
 }
