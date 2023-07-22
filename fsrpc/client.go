@@ -150,34 +150,8 @@ func (cc *ClientConn) readOnePackage(rd io.Reader) error {
 	return nil
 }
 
-func (cc *ClientConn) MustOpen(ctx context.Context) RequestWriter {
-	s, err := cc.Open(ctx)
-	if err != nil {
-		panic(err)
-	}
-	return s
-}
-
-func (cc *ClientConn) Open(ctx context.Context) (RequestWriter, error) {
-	if cc.closed.Load() {
-		return nil, ErrClosed
-	}
+func (cc *ClientConn) OpenStream() RequestWriter {
 	cc.initOnce.Do(cc.init)
-
-	ctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(ErrCanceledByDefer)
-
-	go func() {
-		select {
-		case <-ctx.Done():
-		case err, ok := <-cc.errors:
-			if ok && err != nil {
-				cancel(err)
-			}
-		case <-cc.ctx.Done():
-			cancel(context.Cause(cc.ctx))
-		}
-	}()
 
 	rw := &reqWriter{
 		queue: cc.writeQueue,
@@ -187,7 +161,7 @@ func (cc *ClientConn) Open(ctx context.Context) (RequestWriter, error) {
 			return rr
 		},
 	}
-	return rw, nil
+	return rw
 }
 
 func (cc *ClientConn) closeWithError(err error) error {

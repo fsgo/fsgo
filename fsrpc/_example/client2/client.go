@@ -24,7 +24,7 @@ func main() {
 	}
 	defer client.Close()
 
-	rw := client.MustOpen(context.Background())
+	rw := client.OpenStream()
 	req := fsrpc.NewRequest("hello")
 	pl := &fsrpc.PayloadChan[*fsrpc.Echo]{
 		RID: req.GetID(),

@@ -312,19 +312,21 @@ func encodePayload(data any, et EncodingType) (rd io.Reader, length int, err err
 	return rd, length, err
 }
 
+var errClosedPayloadChan = errors.New("payloadChan already closed")
+
 func (pc *PayloadChan[T]) Write(ctx context.Context, data T, more bool) error {
 	if err0 := ctx.Err(); err0 != nil {
-		return err0
+		return fmt.Errorf("%w: when PayloadChan.Write", err0)
 	}
 	if pc.closed.Load() {
-		return errors.New("already closed")
+		return errClosedPayloadChan
 	}
 
 	pc.initOnce()
 
 	if !more {
 		if !pc.closed.CompareAndSwap(false, true) {
-			return errors.New("already closed")
+			return errClosedPayloadChan
 		}
 		defer close(pc.ch)
 	}
@@ -345,7 +347,7 @@ func (pc *PayloadChan[T]) Write(ctx context.Context, data T, more bool) error {
 	}
 	select {
 	case <-ctx.Done():
-		return ctx.Err()
+		return context.Cause(ctx)
 	case pc.ch <- pl:
 		return nil
 	}

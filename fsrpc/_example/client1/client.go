@@ -50,7 +50,7 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 12*time.Second)
 	defer cancel()
 
-	stream := client.MustOpen(ctx)
+	stream := client.OpenStream()
 
 	go func() {
 		req2 := fsrpc.NewRequest("hello")

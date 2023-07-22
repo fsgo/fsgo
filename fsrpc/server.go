@@ -6,6 +6,7 @@ package fsrpc
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -51,9 +52,10 @@ func (s *Server) callOnError(ctx context.Context, conn net.Conn, err error) {
 	log.Printf("Handler error, remote=%s err=%s", conn.RemoteAddr(), err.Error())
 }
 
+var errCanceledByDefer = errors.New("canceled by Server.handle defer")
+
 func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	defer conn.Close()
-	// connReader := bufio.NewReader(conn)
 	connReader := conn
 
 	session := &ConnSession{
@@ -69,10 +71,10 @@ func (s *Server) handle(ctx context.Context, conn net.Conn) {
 	}
 
 	ctx, cancel := context.WithCancelCause(ctx)
-	defer cancel(ErrCanceledByDefer)
+	defer cancel(errCanceledByDefer)
 
 	writeQueue := newBufferQueue(1024)
-	defer writeQueue.CloseWithErr(ErrCanceledByDefer)
+	defer writeQueue.CloseWithErr(errCanceledByDefer)
 
 	go func() {
 		err := writeQueue.startWrite(conn)
