@@ -6,7 +6,6 @@ package fsrpc
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"io"
 	"net"
@@ -18,59 +17,54 @@ import (
 	"github.com/fsgo/fsgo/fssync/fsatomic"
 )
 
-func NewClientConn(rw io.ReadWriter) *ClientConn {
-	cc := &ClientConn{
+func NewClient(rw io.ReadWriter) *Client {
+	cc := &Client{
 		readWriter: rw,
 	}
 	return cc
 }
 
-type ClientConn struct {
+type Client struct {
 	readWriter io.ReadWriter
 	closed     atomic.Bool
 
 	writeQueue *bufferQueue
 
-	responses fssync.Map[uint64, *respReader]
-	payloads  fssync.Map[uint64, payloadChan]
-
-	errors chan error
+	respReaders fssync.Map[uint64, *respReader]
 
 	beforeReadLoop fsatomic.FuncVoid // 每次循环前执行
 
-	lastErr   fsatomic.Error // 读错误
-	ctx       context.Context
-	ctxCancel context.CancelCauseFunc
+	lastErr fsatomic.Error
 
 	initOnce sync.Once
 
 	onClose fssync.Slice[func()]
 }
 
-func (cc *ClientConn) SetBeforeReadLoop(fn func()) {
+func (cc *Client) SetBeforeReadLoop(fn func()) {
 	cc.beforeReadLoop.Store(fn)
 }
 
-func (cc *ClientConn) OnClose(fn func()) {
+func (cc *Client) OnClose(fn func()) {
 	cc.onClose.Add(fn)
 }
 
-func (cc *ClientConn) LastError() error {
+func (cc *Client) LastError() error {
 	return cc.lastErr.Load()
 }
 
-func (cc *ClientConn) init() {
-	cc.errors = make(chan error, 2)
+func (cc *Client) init() {
 	cc.writeQueue = newBufferQueue(1024)
-	cc.ctx, cc.ctxCancel = context.WithCancelCause(context.Background())
+	ctx, cancel := context.WithCancelCause(context.Background())
 
+	var errOnce atomic.Bool
 	storeError := func(err error) {
-		if !cc.lastErr.CompareAndSwap(nil, err) {
+		if !errOnce.CompareAndSwap(false, true) {
 			return
 		}
+		cc.lastErr.Store(err)
 		_ = cc.closeWithError(err)
-		cc.errors <- err
-		cc.ctxCancel(err)
+		cancel(err)
 	}
 
 	go func() {
@@ -96,12 +90,12 @@ func (cc *ClientConn) init() {
 	}()
 
 	go func() {
-		<-cc.ctx.Done()
-		_ = cc.closeWithError(context.Cause(cc.ctx))
+		<-ctx.Done()
+		_ = cc.closeWithError(context.Cause(ctx))
 	}()
 }
 
-func (cc *ClientConn) readOnePackage(rd io.Reader) error {
+func (cc *Client) readOnePackage(rd io.Reader) error {
 	if fn := cc.beforeReadLoop.Load(); fn != nil {
 		fn()
 	}
@@ -109,6 +103,7 @@ func (cc *ClientConn) readOnePackage(rd io.Reader) error {
 	if err1 != nil {
 		return fmt.Errorf("read Header: %w", err1)
 	}
+
 	switch header.Type {
 	default:
 		return fmt.Errorf("%w, got=%d", ErrInvalidHeader, header.Type)
@@ -118,18 +113,16 @@ func (cc *ClientConn) readOnePackage(rd io.Reader) error {
 			return fmt.Errorf("read Response: %w", err)
 		}
 		rid := resp.GetRequestID()
-		reader, ok := cc.responses.LoadAndDelete(rid)
+		reader, ok := cc.respReaders.Load(rid)
 		if !ok {
 			return fmt.Errorf("response reader not found, rid=%d", rid)
 		}
-		reader.responses <- resp
-		reader.errors <- nil
-		if resp.GetHasPayload() {
-			pl := make(payloadChan, 1)
-			reader.payloads <- pl
-			cc.payloads.Store(rid, pl)
-		} else {
-			reader.payloads <- emptyPayloadChan
+		if err = reader.receiveResponseOnce(resp); err != nil {
+			return err
+		}
+		if !resp.HasPayload {
+			reader.readFinish()
+			cc.respReaders.Delete(rid)
 		}
 	case HeaderTypePayload:
 		payload, err := readPayload(rd, int(header.Length))
@@ -137,39 +130,40 @@ func (cc *ClientConn) readOnePackage(rd io.Reader) error {
 			return fmt.Errorf("read Payload: %w", err)
 		}
 		rid := payload.Meta.RID
-		plReader, ok := cc.payloads.Load(rid)
+		reader, ok := cc.respReaders.Load(rid)
 		if !ok {
 			return fmt.Errorf("response not found, rid=%d", rid)
 		}
-		plReader <- payload
+		if err = reader.receivePayload(payload); err != nil {
+			return err
+		}
 		if !payload.Meta.More {
-			close(plReader)
-			cc.payloads.Delete(rid)
+			reader.readFinish()
+			cc.respReaders.Delete(rid)
 		}
 	}
 	return nil
 }
 
-func (cc *ClientConn) OpenStream() RequestWriter {
+func (cc *Client) OpenStream() RequestWriter {
 	cc.initOnce.Do(cc.init)
-
 	rw := &reqWriter{
 		queue: cc.writeQueue,
 		newResReader: func(req *Request) ResponseReader {
 			rr := newRespReader()
-			cc.responses.Store(req.GetID(), rr)
+			cc.respReaders.Store(req.GetID(), rr)
 			return rr
 		},
 	}
 	return rw
 }
 
-func (cc *ClientConn) closeWithError(err error) error {
+func (cc *Client) closeWithError(err error) error {
 	if !cc.closed.CompareAndSwap(false, true) {
 		return nil
 	}
 	cc.writeQueue.CloseWithErr(err)
-	cc.responses.Range(func(key uint64, value *respReader) bool {
+	cc.respReaders.Range(func(_ uint64, value *respReader) bool {
 		value.closeWithError(err)
 		return true
 	})
@@ -179,16 +173,16 @@ func (cc *ClientConn) closeWithError(err error) error {
 	return nil
 }
 
-func (cc *ClientConn) Close() error {
-	return cc.closeWithError(errors.New("by Close"))
+func (cc *Client) Close() error {
+	return cc.closeWithError(stringError("by Close"))
 }
 
-func DialTimeout(network string, addr string, timeout time.Duration) (*ClientConn, error) {
+func DialTimeout(network string, addr string, timeout time.Duration) (*Client, error) {
 	conn, err := net.DialTimeout(network, addr, timeout)
 	if err != nil {
 		return nil, err
 	}
-	nc := NewClientConn(conn)
+	nc := NewClient(conn)
 	nc.OnClose(func() {
 		_ = conn.Close()
 	})

@@ -136,7 +136,6 @@ func newPayloadWriter(rid uint64, q *bufferQueue) *payloadWriter {
 type payloadWriter struct {
 	queue *bufferQueue
 	RID   uint64
-	index atomic.Uint32
 }
 
 func (pw *payloadWriter) writeChan(ctx context.Context, payloads <-chan *Payload) error {
@@ -382,7 +381,6 @@ func RangePayloads(ctx context.Context, ps <-chan *Payload, fn func(pl *Payload)
 			}
 		}
 	}
-	return nil
 }
 
 func RangePayloadsDiscard(ctx context.Context, ps <-chan *Payload) error {

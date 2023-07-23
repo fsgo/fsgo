@@ -6,8 +6,11 @@ package fsrpc
 
 import (
 	"context"
+	"sync/atomic"
 
 	"google.golang.org/protobuf/proto"
+
+	"github.com/fsgo/fsgo/fssync/fsatomic"
 )
 
 func NewResponse(requestID uint64, code ErrCode, msg string) *Response {
@@ -100,29 +103,81 @@ type ResponseReader interface {
 
 func newRespReader() *respReader {
 	return &respReader{
-		responses: make(chan *Response, 1),
-		payloads:  make(chan payloadChan, 1),
-		errors:    make(chan error, 1),
+		responses:  make(chan *Response, 1),
+		payloads:   make(payloadChan, 1),
+		closedChan: make(chan struct{}),
 	}
 }
 
 var _ ResponseReader = (*respReader)(nil)
 
 type respReader struct {
-	responses chan *Response
-	payloads  chan payloadChan
-	errors    chan error
+	responses     chan *Response
+	payloads      payloadChan
+	closedErr     fsatomic.Error
+	closedChan    chan struct{}
+	closed        atomic.Bool
+	hasResponse   atomic.Bool
+	payloadClosed atomic.Bool
 }
 
-func (r *respReader) closeWithError(err error) {
-	close(r.responses)
-	close(r.payloads)
-	r.errors <- err
-	close(r.errors)
+func (rd *respReader) receiveResponseOnce(resp *Response) error {
+	if !rd.hasResponse.CompareAndSwap(false, true) {
+		return stringError("cannot receive response twice")
+	}
+	select {
+	case rd.responses <- resp:
+		if resp.GetHasPayload() {
+			rd.payloads = make(payloadChan, 1)
+		} else {
+			rd.payloads = emptyPayloadChan
+		}
+		return nil
+	case <-rd.closedChan:
+		return stringError("response reader already closed")
+	}
 }
 
-func (r *respReader) Response() (*Response, <-chan *Payload, error) {
-	return <-r.responses, <-r.payloads, <-r.errors
+func (rd *respReader) receivePayload(p *Payload) error {
+	if rd.payloads == emptyPayloadChan {
+		return stringError("should no payload")
+	}
+	if rd.payloadClosed.Load() {
+		return stringError("should no more payload")
+	}
+	select {
+	case rd.payloads <- p:
+		if !p.Meta.More && rd.payloadClosed.CompareAndSwap(false, true) {
+			close(rd.payloads)
+		}
+		return nil
+	case <-rd.closedChan:
+		return stringError("response reader already closed")
+	}
+}
+
+func (rd *respReader) closeWithError(err error) {
+	if !rd.closed.CompareAndSwap(false, true) {
+		return
+	}
+	rd.closedErr.Store(err)
+	close(rd.closedChan)
+	if rd.payloads != emptyPayloadChan && rd.payloadClosed.CompareAndSwap(false, true) {
+		close(rd.payloads)
+	}
+}
+
+func (rd *respReader) readFinish() {
+	rd.closeWithError(stringError("response reader finished"))
+}
+
+func (rd *respReader) Response() (s *Response, p <-chan *Payload, e error) {
+	select {
+	case s = <-rd.responses:
+		return s, rd.payloads, nil
+	case <-rd.closedChan:
+		return s, rd.payloads, rd.closedErr.Load()
+	}
 }
 
 func ReadResponseProto[T proto.Message](ctx context.Context, r ResponseReader, data T) (*Response, T, error) {

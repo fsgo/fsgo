@@ -22,7 +22,7 @@ var debug = flag.Bool("d", false, "enable debug")
 var wait = flag.Int("wait", 1, "wait seconds")
 
 func init() {
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
+	log.SetFlags(log.LstdFlags | log.Llongfile)
 }
 
 func forDebug() {
@@ -42,7 +42,7 @@ func main() {
 	defer conn.Close()
 	conn = fsconn.Wrap(conn)
 
-	client := fsrpc.NewClientConn(conn)
+	client := fsrpc.NewClient(conn)
 	// client.SetBeforeReadLoop(func() {
 	// 	conn.SetReadDeadline(time.Now().Add(time.Second))
 	// })
@@ -52,43 +52,67 @@ func main() {
 
 	stream := client.OpenStream()
 
+	var wg sync.WaitGroup
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+
 		req2 := fsrpc.NewRequest("hello")
 		pc := &fsrpc.PayloadChan[*fsrpc.Echo]{
 			EncodingType: fsrpc.EncodingType_Protobuf,
 			RID:          req2.GetID(),
 		}
+		done := make(chan bool)
 		go func() {
+			defer close(done)
 			for i := 0; i < 10; i++ {
-				pc.Write(ctx, &fsrpc.Echo{Message: fmt.Sprintf("PayloadChan:%d", i)}, i < 9)
+				more := i < 9
+				err1 := pc.Write(ctx, &fsrpc.Echo{Message: fmt.Sprintf("PayloadChan:%d", i)}, more)
+				log.Println("go1 pc.Write, i=", i, "more=", more, err1)
 			}
 		}()
-		_, err2 := stream.Write(ctx, req2, pc.Chan())
+		rr, err2 := stream.Write(ctx, req2, pc.Chan())
+		<-done
 		log.Println("PayloadChan err2:", err2)
+		if rr != nil {
+			resp, pl, err3 := rr.Response()
+			log.Println("go1 response:", resp, err3)
+			if pl != nil {
+				fsrpc.RangePayloadsDiscard(ctx, pl)
+			}
+		}
 	}()
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		for i := 0; i < 100; i++ {
-			log.Println("i=", i)
+			log.Println("go2 100_i=", i)
 			req := fsrpc.NewRequest("hello")
 			rr, err2 := stream.Write(ctx, req, nil)
-			log.Println("WriteChan=", err2)
+			log.Println("go2 WriteChan=", err2)
+			if err2 != nil {
+				continue
+			}
 
-			resp, _, err3 := rr.Response()
-			log.Println("resp:", resp.String(), err3)
+			resp, pl, err3 := rr.Response()
+			log.Println("go2 rr.Response()", resp, pl, err3)
+			if pl != nil {
+				fsrpc.RangePayloadsDiscard(ctx, pl)
+			}
+			log.Println("resp:", resp, err3)
 			time.Sleep(100 * time.Millisecond)
 		}
+		log.Println("go2 exit")
 	}()
-	ph := &fsrpc.PingHandler{}
-	go func() {
-		defer wg.Done()
-		err = ph.ClientSendMany(ctx, stream, time.Duration(*wait)*time.Second)
-		log.Println("Ping.Err=", err)
-	}()
+
+	// wg.Add(1)
+	// ph := &fsrpc.PingHandler{}
+	// go func() {
+	// 	defer wg.Done()
+	// 	err = ph.ClientSendMany(ctx, stream, time.Duration(*wait)*time.Second)
+	// 	log.Println("Ping.Err=", err)
+	// }()
 	wg.Wait()
 
 	log.Println("Client.Err=", client.LastError())

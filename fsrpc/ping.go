@@ -62,6 +62,7 @@ func (pp *PingHandler) ClientSendMany(ctx context.Context, w RequestWriter, inte
 		case <-tk.C:
 		}
 		err := pp.ClientSend(ctx, w)
+		log.Println("PingHandler.ClientSend", err)
 		if err != nil {
 			if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 				return nil
@@ -70,7 +71,6 @@ func (pp *PingHandler) ClientSendMany(ctx context.Context, w RequestWriter, inte
 		}
 		tk.Reset(interval)
 	}
-	return nil
 }
 
 func (pp *PingHandler) RegisterTo(rt RouteRegister) {

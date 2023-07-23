@@ -49,7 +49,7 @@ func (s *Server) callOnError(ctx context.Context, conn net.Conn, err error) {
 		s.OnError(ctx, conn, err)
 		return
 	}
-	log.Printf("Handler error, remote=%s err=%s", conn.RemoteAddr(), err.Error())
+	log.Printf("Handler closedErr, remote=%s err=%s", conn.RemoteAddr(), err.Error())
 }
 
 var errCanceledByDefer = errors.New("canceled by Server.handle defer")
@@ -136,7 +136,7 @@ func (s *Server) readOnePackage(ctx context.Context, rd io.Reader, rw *respWrite
 			go func() {
 				defer hp.Handlers.Delete(method)
 				ctx = ctxWithServerMethod(ctx, method)
-				handler.Handle(ctx, reader, rw)
+				_ = handler.Handle(ctx, reader, rw)
 			}()
 		} else {
 			hr.requests <- req
@@ -254,7 +254,7 @@ type Interceptor struct {
 	Name string
 
 	// Before 在 Handler 前执行，可选
-	// 若 返回的 error != nil,则 Handler 不会执行
+	// 若 返回的 closedErr != nil,则 Handler 不会执行
 	Before func(ctx context.Context, rr RequestReader, rw ResponseWriter) (context.Context, RequestReader, ResponseWriter, error)
 
 	// After 在 Handler 后执行，可选

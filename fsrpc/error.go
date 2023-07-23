@@ -14,15 +14,13 @@ var (
 
 	ErrInvalidHeader = errors.New("invalid Header")
 
-	ErrInvalidCode = errors.New("invalid error code")
+	ErrInvalidCode = errors.New("invalid closedErr code")
 
 	ErrCannotWritePayload = errors.New("cannot write payload")
 
 	ErrMethodNotFound = errors.New("method not found")
 
 	ErrClosed = errors.New("already closed")
-
-	ErrCanceledByDefer = errors.New("canceled by defer")
 
 	ErrNoPayload = errors.New("no payload")
 
@@ -33,3 +31,9 @@ var (
 
 	ErrAuthFailed = errors.New("auth failed")
 )
+
+type stringError string
+
+func (e stringError) Error() string {
+	return string(e)
+}
