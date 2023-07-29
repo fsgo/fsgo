@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/fsgo/fsgo/fsfn"
 	"github.com/fsgo/fsgo/fssync"
 	"github.com/fsgo/fsgo/fssync/fsatomic"
 )
@@ -96,9 +97,8 @@ func (cc *Client) init() {
 }
 
 func (cc *Client) readOnePackage(rd io.Reader) error {
-	if fn := cc.beforeReadLoop.Load(); fn != nil {
-		fn()
-	}
+	fsfn.RunVoid(cc.beforeReadLoop.Load())
+
 	header, err1 := ReadHeader(rd)
 	if err1 != nil {
 		return fmt.Errorf("read Header: %w", err1)
@@ -167,9 +167,7 @@ func (cc *Client) closeWithError(err error) error {
 		value.closeWithError(err)
 		return true
 	})
-	for _, fn := range cc.onClose.Load() {
-		fn()
-	}
+	fsfn.RunVoids(cc.onClose.Load())
 	return nil
 }
 
