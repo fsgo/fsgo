@@ -27,11 +27,14 @@ type RequestWriter interface {
 var _ RequestWriter = (*reqWriter)(nil)
 
 type reqWriter struct {
-	queue        *bufferQueue
+	queue        *bufferQueue // 用于发送消息的队列
 	newResReader func(req *Request) ResponseReader
 }
 
 func (rw *reqWriter) Write(ctx context.Context, req *Request, payloads <-chan *Payload) (ResponseReader, error) {
+	if err := rw.queue.Err(); err != nil {
+		return nil, err
+	}
 	if payloads != nil {
 		req.HasPayload = true
 	}
@@ -58,7 +61,6 @@ func (rw *reqWriter) Write(ctx context.Context, req *Request, payloads <-chan *P
 	}
 
 	reader := rw.newResReader(req)
-
 	if payloads != nil {
 		pw := newPayloadWriter(req.GetID(), rw.queue)
 		err4 := pw.writeChan(ctx, payloads)

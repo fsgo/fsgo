@@ -76,7 +76,7 @@ func RecoverCtxError(ctx context.Context, err *error) {
 
 func runOnRecoverFns(data RecoverData, fns []func(RecoverData)) {
 	defer func() {
-		recover()
+		_ = recover()
 	}()
 	for _, fn := range fns {
 		fn(data)

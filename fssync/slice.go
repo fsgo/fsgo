@@ -13,32 +13,33 @@ type Slice[T any] struct {
 
 func (s *Slice[T]) Add(v ...T) {
 	s.mux.Lock()
-	defer s.mux.Unlock()
 	s.items = append(s.items, v...)
+	s.mux.Unlock()
 }
 
 func (s *Slice[T]) Load() []T {
 	s.mux.RLock()
-	defer s.mux.RUnlock()
-	return s.items
+	val := s.items
+	s.mux.RUnlock()
+	return val
 }
 
 func (s *Slice[T]) Purge() {
 	s.mux.Lock()
-	defer s.mux.Unlock()
 	s.items = nil
+	s.mux.Unlock()
 }
 
 func (s *Slice[T]) Store(all []T) {
 	s.mux.Lock()
-	defer s.mux.Unlock()
 	s.items = append(make([]T, 0, len(all)), all...)
+	s.mux.Unlock()
 }
 
 func (s *Slice[T]) Swap(all []T) []T {
 	s.mux.Lock()
-	defer s.mux.Unlock()
 	old := s.items
 	s.items = append(make([]T, 0, len(all)), all...)
+	s.mux.Unlock()
 	return old
 }

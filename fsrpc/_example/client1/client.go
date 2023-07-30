@@ -78,7 +78,7 @@ func main() {
 			resp, pl, err3 := rr.Response()
 			log.Println("go1 response:", resp, err3)
 			if pl != nil {
-				fsrpc.RangePayloadsDiscard(ctx, pl)
+				fsrpc.PayloadsDiscard(ctx, pl)
 			}
 		}
 	}()
@@ -98,7 +98,7 @@ func main() {
 			resp, pl, err3 := rr.Response()
 			log.Println("go2 rr.Response()", resp, pl, err3)
 			if pl != nil {
-				fsrpc.RangePayloadsDiscard(ctx, pl)
+				fsrpc.PayloadsDiscard(ctx, pl)
 			}
 			log.Println("resp:", resp, err3)
 			time.Sleep(100 * time.Millisecond)

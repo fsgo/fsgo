@@ -6,30 +6,27 @@ package fssync
 
 import (
 	"sync"
-
-	"github.com/fsgo/fsgo/fssync/internal"
 )
 
 type Map[K comparable, V any] struct {
-	_       internal.NoCopy
 	storage sync.Map
 }
 
 func (m *Map[K, V]) Load(key K) (value V, ok bool) {
 	v1, ok1 := m.storage.Load(key)
-	if !ok1 {
-		return value, false
+	if ok1 {
+		v2, ok2 := v1.(V)
+		return v2, ok2
 	}
-	v2, ok2 := v1.(V)
-	return v2, ok2
+	return value, false
 }
 
 func (m *Map[K, V]) LoadAndDelete(key K) (value V, loaded bool) {
 	v, ok := m.storage.LoadAndDelete(key)
-	if !ok {
-		return value, false
+	if ok {
+		return v.(V), true
 	}
-	return v.(V), true
+	return value, false
 }
 
 func (m *Map[K, V]) LoadOrStore(key K, value V) (actual V, loaded bool) {
@@ -43,10 +40,10 @@ func (m *Map[K, V]) Store(key K, value V) {
 
 func (m *Map[K, V]) Swap(key K, value V) (previous V, loaded bool) {
 	p, ok := m.storage.Swap(key, value)
-	if !ok {
-		return previous, false
+	if ok {
+		return p.(V), true
 	}
-	return p.(V), true
+	return previous, false
 }
 
 func (m *Map[K, V]) CompareAndDelete(key K, old V) (deleted bool) {
@@ -59,6 +56,15 @@ func (m *Map[K, V]) CompareAndSwap(key K, old V, new V) bool {
 
 func (m *Map[K, V]) Delete(key K) {
 	m.storage.Delete(key)
+}
+
+func (m *Map[K, V]) DeleteRange(fn func(key K, value V) bool) {
+	m.storage.Range(func(key, value any) bool {
+		if fn(key.(K), value.(V)) {
+			m.storage.Delete(key)
+		}
+		return true
+	})
 }
 
 func (m *Map[K, V]) Range(fn func(key K, value V) bool) {

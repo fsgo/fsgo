@@ -159,6 +159,9 @@ func (pw *payloadWriter) writeChan(ctx context.Context, payloads <-chan *Payload
 }
 
 func (pw *payloadWriter) writePayload(pl *Payload) error {
+	if err := pw.queue.Err(); err != nil {
+		return err
+	}
 	bf1, err1 := proto.Marshal(pl.Meta)
 	if err1 != nil {
 		return err1
@@ -383,8 +386,9 @@ func RangePayloads(ctx context.Context, ps <-chan *Payload, fn func(pl *Payload)
 	}
 }
 
-func RangePayloadsDiscard(ctx context.Context, ps <-chan *Payload) error {
+func PayloadsDiscard(ctx context.Context, ps <-chan *Payload) error {
 	return RangePayloads(ctx, ps, func(pl *Payload) error {
+		_, _ = io.Copy(io.Discard, pl.Data)
 		return nil
 	})
 }

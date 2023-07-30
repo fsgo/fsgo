@@ -5,12 +5,10 @@
 package fsrpc
 
 import (
-	"context"
 	"fmt"
 	"io"
 	"net"
 	"sync"
-	"sync/atomic"
 	"time"
 
 	"github.com/fsgo/fsgo/fsfn"
@@ -27,7 +25,7 @@ func NewClient(rw io.ReadWriter) *Client {
 
 type Client struct {
 	readWriter io.ReadWriter
-	closed     atomic.Bool
+	closed     fsatomic.Once
 
 	writeQueue *bufferQueue
 
@@ -56,44 +54,34 @@ func (cc *Client) LastError() error {
 
 func (cc *Client) init() {
 	cc.writeQueue = newBufferQueue(1024)
-	ctx, cancel := context.WithCancelCause(context.Background())
 
-	var errOnce atomic.Bool
-	storeError := func(err error) {
-		if !errOnce.CompareAndSwap(false, true) {
-			return
-		}
-		cc.lastErr.Store(err)
-		_ = cc.closeWithError(err)
-		cancel(err)
-	}
-
+	running := make(chan struct{}, 2)
 	go func() {
-		if err := ReadProtocol(cc.readWriter); err != nil {
-			storeError(err)
+		running <- struct{}{}
+		var err error
+		defer func() {
+			_ = cc.closeWithError(err)
+		}()
+		if err = ReadProtocol(cc.readWriter); err != nil {
 			return
 		}
-
-		for !cc.closed.Load() {
-			err := cc.readOnePackage(cc.readWriter)
+		for cc.closed.Not() {
+			err = cc.readOnePackage(cc.readWriter)
 			if err != nil {
-				storeError(err)
 				return
 			}
 		}
 	}()
+	<-running
 
 	go func() {
+		running <- struct{}{}
 		err := cc.writeQueue.startWrite(cc.readWriter)
 		if err != nil {
-			storeError(err)
+			_ = cc.closeWithError(err)
 		}
 	}()
-
-	go func() {
-		<-ctx.Done()
-		_ = cc.closeWithError(context.Cause(ctx))
-	}()
+	<-running
 }
 
 func (cc *Client) readOnePackage(rd io.Reader) error {
@@ -117,13 +105,11 @@ func (cc *Client) readOnePackage(rd io.Reader) error {
 		if !ok {
 			return fmt.Errorf("response reader not found, rid=%d", rid)
 		}
-		if err = reader.receiveResponseOnce(resp); err != nil {
-			return err
-		}
 		if !resp.HasPayload {
-			reader.readFinish()
 			cc.respReaders.Delete(rid)
+			defer reader.readFinish()
 		}
+		return reader.receiveResponseOnce(resp)
 	case HeaderTypePayload:
 		payload, err := readPayload(rd, int(header.Length))
 		if err != nil {
@@ -132,17 +118,14 @@ func (cc *Client) readOnePackage(rd io.Reader) error {
 		rid := payload.Meta.RID
 		reader, ok := cc.respReaders.Load(rid)
 		if !ok {
-			return fmt.Errorf("response not found, rid=%d", rid)
-		}
-		if err = reader.receivePayload(payload); err != nil {
-			return err
+			return fmt.Errorf("response reader not found, rid=%d", rid)
 		}
 		if !payload.Meta.More {
-			reader.readFinish()
 			cc.respReaders.Delete(rid)
+			defer reader.readFinish()
 		}
+		return reader.receivePayload(payload)
 	}
-	return nil
 }
 
 func (cc *Client) OpenStream() RequestWriter {
@@ -159,12 +142,13 @@ func (cc *Client) OpenStream() RequestWriter {
 }
 
 func (cc *Client) closeWithError(err error) error {
-	if !cc.closed.CompareAndSwap(false, true) {
+	if !cc.closed.DoOnce() {
 		return nil
 	}
+	cc.lastErr.Store(err)
 	cc.writeQueue.CloseWithErr(err)
-	cc.respReaders.Range(func(_ uint64, value *respReader) bool {
-		value.closeWithError(err)
+	cc.respReaders.Range(func(_ uint64, reader *respReader) bool {
+		reader.closeWithError(err)
 		return true
 	})
 	fsfn.RunVoids(cc.onClose.Load())

@@ -3,7 +3,6 @@
 // Date: 2021/8/10
 
 //go:build !windows
-// +build !windows
 
 package fsos
 

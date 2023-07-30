@@ -6,6 +6,7 @@ package fsrpc
 
 import (
 	"context"
+	"errors"
 	"sync/atomic"
 
 	"google.golang.org/protobuf/proto"
@@ -101,37 +102,33 @@ type ResponseReader interface {
 	Response() (*Response, <-chan *Payload, error)
 }
 
+var respReaderID atomic.Int32
+
 func newRespReader() *respReader {
 	return &respReader{
 		responses:  make(chan *Response, 1),
-		payloads:   make(payloadChan, 1),
+		payloads:   make(payloadChan, 32),
 		closedChan: make(chan struct{}),
+		id:         respReaderID.Add(1),
 	}
 }
 
 var _ ResponseReader = (*respReader)(nil)
 
 type respReader struct {
-	responses     chan *Response
-	payloads      payloadChan
+	responses     chan *Response // 只允许接收一个
+	payloads      payloadChan    // 允许接收 0-n 个
 	closedErr     fsatomic.Error
 	closedChan    chan struct{}
-	closed        atomic.Bool
-	hasResponse   atomic.Bool
-	payloadClosed atomic.Bool
+	closed        fsatomic.Once
+	readResponse  fsatomic.Once
+	payloadClosed fsatomic.Once
+	id            int32
 }
 
 func (rd *respReader) receiveResponseOnce(resp *Response) error {
-	if !rd.hasResponse.CompareAndSwap(false, true) {
-		return stringError("cannot receive response twice")
-	}
 	select {
 	case rd.responses <- resp:
-		if resp.GetHasPayload() {
-			rd.payloads = make(payloadChan, 1)
-		} else {
-			rd.payloads = emptyPayloadChan
-		}
 		return nil
 	case <-rd.closedChan:
 		return stringError("response reader already closed")
@@ -139,17 +136,11 @@ func (rd *respReader) receiveResponseOnce(resp *Response) error {
 }
 
 func (rd *respReader) receivePayload(p *Payload) error {
-	if rd.payloads == emptyPayloadChan {
-		return stringError("should no payload")
-	}
-	if rd.payloadClosed.Load() {
+	if rd.payloadClosed.Done() {
 		return stringError("should no more payload")
 	}
 	select {
 	case rd.payloads <- p:
-		if !p.Meta.More && rd.payloadClosed.CompareAndSwap(false, true) {
-			close(rd.payloads)
-		}
 		return nil
 	case <-rd.closedChan:
 		return stringError("response reader already closed")
@@ -157,12 +148,12 @@ func (rd *respReader) receivePayload(p *Payload) error {
 }
 
 func (rd *respReader) closeWithError(err error) {
-	if !rd.closed.CompareAndSwap(false, true) {
+	if !rd.closed.DoOnce() {
 		return
 	}
 	rd.closedErr.Store(err)
 	close(rd.closedChan)
-	if rd.payloads != emptyPayloadChan && rd.payloadClosed.CompareAndSwap(false, true) {
+	if rd.payloadClosed.DoOnce() {
 		close(rd.payloads)
 	}
 }
@@ -172,6 +163,9 @@ func (rd *respReader) readFinish() {
 }
 
 func (rd *respReader) Response() (s *Response, p <-chan *Payload, e error) {
+	if !rd.readResponse.DoOnce() {
+		return nil, nil, errors.New("cannot Response twice")
+	}
 	select {
 	case s = <-rd.responses:
 		return s, rd.payloads, nil

@@ -29,8 +29,11 @@ type bufferQueue struct {
 	closeOnce sync.Once
 }
 
-func (sc *bufferQueue) startWrite(w io.Writer) error {
-	if err := WriteProtocol(w); err != nil {
+func (sc *bufferQueue) startWrite(w io.Writer) (err error) {
+	defer func() {
+		sc.CloseWithErr(err)
+	}()
+	if err = WriteProtocol(w); err != nil {
 		return err
 	}
 	for {
@@ -70,4 +73,8 @@ func (sc *bufferQueue) CloseWithErr(err error) {
 		sc.closeErr.Store(err)
 		close(sc.done)
 	})
+}
+
+func (sc *bufferQueue) Err() error {
+	return sc.closeErr.Load()
 }
