@@ -68,6 +68,9 @@ func (it *Interval) runFns() {
 					wg.Done()
 					_ = recover()
 				}()
+				if it.stopped.Load() {
+					return
+				}
 				fn()
 			}()
 		}
@@ -85,6 +88,9 @@ func (it *Interval) runFns() {
 				<-limiter
 				_ = recover()
 			}()
+			if it.stopped.Load() {
+				return
+			}
 			fn()
 		}()
 	}

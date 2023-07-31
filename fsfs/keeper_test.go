@@ -64,9 +64,9 @@ func TestKeepFile(t *testing.T) {
 
 	t.Run("stopped", func(t *testing.T) {
 		kp.Stop()
+		time.Sleep(ci * 2)
 		require.NoError(t, os.Remove(fp))
 
-		time.Sleep(ci * 2)
 		// check not exists
 		_, err := os.Stat(fp)
 		require.Error(t, err)
