@@ -24,6 +24,6 @@ jobs:
     - name: Test
       run: go test -v -race ./...
 
-    - name: Go coverage report
-      uses: ncruces/go-coverage-report@v0
+#    - name: Go coverage report
+#      uses: ncruces/go-coverage-report@v0
 
