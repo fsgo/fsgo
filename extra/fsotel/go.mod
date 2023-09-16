@@ -9,7 +9,7 @@ require (
 )
 
 require (
-	github.com/fsgo/fscache v0.0.0-20221106082135-4385911b5ab4 // indirect
+	github.com/fsgo/fscache v0.0.1 // indirect
 	github.com/go-logr/logr v1.2.3 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.3.5 // indirect

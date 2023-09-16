@@ -47,6 +47,18 @@ func TestObject_UnmarshalJSON(t *testing.T) {
 		require.Nil(t, u.Cl)
 	})
 
+	t.Run("empty-obj", func(t *testing.T) {
+		var u *user
+		err := json.Unmarshal([]byte(`{"Cl":{}}`), &u)
+		require.NoError(t, err)
+		require.NotNil(t, u)
+		require.NotNil(t, u.Cl)
+
+		var c *class
+		require.NoError(t, u.Cl.UnmarshalTo(&c))
+		require.NotNil(t, c)
+	})
+
 	t.Run("has value 1", func(t *testing.T) {
 		var u *user
 		content := []byte(`{"Cl":{"Name":"hello"}}`)

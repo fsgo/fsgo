@@ -2,6 +2,7 @@ github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSs
 github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c=
 github.com/fsgo/fscache v0.0.0-20221106082135-4385911b5ab4 h1:bDqC8tLr8aszbX0sZjHSM041o7Cs/VUGDXS3PjDVXII=
 github.com/fsgo/fscache v0.0.0-20221106082135-4385911b5ab4/go.mod h1:KCRB2DyOLTw1rJn8Hd81VYr4lIcAp2Ow/K8vjOVFrUg=
+github.com/fsgo/fscache v0.0.1/go.mod h1:o9+RYYp6a2JprjX+cbOFMRFK3WSTCSaZaPtzXLwbSgw=
 github.com/go-logr/logr v1.2.2/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
 github.com/go-logr/logr v1.2.3 h1:2DntVwHkVopvECVRSlL5PSo9eG+cAkDCuckLubN+rq0=
 github.com/go-logr/logr v1.2.3/go.mod h1:jdQByPbusPIv2/zmleS9BjJVeZ6kBagPoEUsqbVz/1A=
