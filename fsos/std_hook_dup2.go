@@ -2,7 +2,7 @@
 // Author: fsgo
 // Date: 2021/8/10
 
-//go:build !windows
+//go:build !windows && !(linux && arm64) && !(linux && loong64) && !wasm
 
 package fsos
 
