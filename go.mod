@@ -8,7 +8,7 @@ require (
 	github.com/fsgo/fsenv v0.4.0
 	github.com/miekg/dns v1.1.56
 	github.com/stretchr/testify v1.8.4
-	golang.org/x/net v0.16.0
+	golang.org/x/net v0.17.0
 	golang.org/x/sync v0.4.0
 	google.golang.org/protobuf v1.31.0
 )
