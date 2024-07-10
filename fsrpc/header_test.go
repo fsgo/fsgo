@@ -8,7 +8,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestReadHeader(t *testing.T) {
@@ -18,11 +18,11 @@ func TestReadHeader(t *testing.T) {
 			Length: 99,
 		}
 		bf := &bytes.Buffer{}
-		require.NoError(t, h1.Write(bf))
-		require.Equal(t, HeaderLen, bf.Len())
+		fst.NoError(t, h1.Write(bf))
+		fst.Equal(t, HeaderLen, bf.Len())
 
 		h2, err2 := ReadHeader(bf)
-		require.NoError(t, err2)
-		require.Equal(t, h1, h2)
+		fst.NoError(t, err2)
+		fst.Equal(t, h1, h2)
 	})
 }

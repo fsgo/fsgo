@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestDuration(t *testing.T) {
@@ -17,13 +17,13 @@ func TestDuration(t *testing.T) {
 	var d1 Duration
 	fs.Var(&d1, "d1", "")
 
-	require.NoError(t, fs.Parse([]string{"-d1", "1h"}))
-	require.Equal(t, time.Hour, d1.Duration())
-	require.Equal(t, time.Hour.String(), d1.String())
+	fst.NoError(t, fs.Parse([]string{"-d1", "1h"}))
+	fst.Equal(t, time.Hour, d1.Duration())
+	fst.Equal(t, time.Hour.String(), d1.String())
 
-	require.NoError(t, fs.Parse([]string{"-d1", "2"}))
-	require.Equal(t, 2*time.Millisecond, d1.Duration())
+	fst.NoError(t, fs.Parse([]string{"-d1", "2"}))
+	fst.Equal(t, 2*time.Millisecond, d1.Duration())
 
-	require.Error(t, fs.Parse([]string{"-d1", "abc"}))
-	require.Equal(t, time.Duration(0), d1.Duration())
+	fst.Error(t, fs.Parse([]string{"-d1", "abc"}))
+	fst.Equal(t, time.Duration(0), d1.Duration())
 }

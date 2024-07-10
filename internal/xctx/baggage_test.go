@@ -9,7 +9,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 type tkType1 uint8
@@ -36,15 +36,15 @@ func TestWithValues(t *testing.T) {
 	ctx3 := WithValues(ctx2, tk21, d3)
 
 	g1 := Values[tkType1, *net.TCPAddr](ctx3, tk10)
-	require.Len(t, g1, 1)
+	fst.Len(t, g1, 1)
 	w1 := []*net.TCPAddr{d1}
-	require.Equal(t, w1, g1)
+	fst.Equal(t, w1, g1)
 
 	g2 := Values[tkType2, *net.Buffers](ctx3, tk20)
-	require.Len(t, g2, 1)
+	fst.Len(t, g2, 1)
 	w2 := []*net.Buffers{d2}
-	require.Equal(t, w2, g2)
+	fst.Equal(t, w2, g2)
 
-	require.Empty(t, Values[tkType2, *net.Buffers](ctx1, tk21))
-	require.Empty(t, Values[tkType2, *net.Buffers](ctx2, tk21))
+	fst.Empty(t, Values[tkType2, *net.Buffers](ctx1, tk21))
+	fst.Empty(t, Values[tkType2, *net.Buffers](ctx2, tk21))
 }

@@ -7,7 +7,7 @@ package fshtml_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 
 	"github.com/fsgo/fsgo/fshtml"
 )
@@ -23,7 +23,7 @@ func TestTable1(t *testing.T) {
 		fshtml.SetID(tb, "#abc")
 
 		got, err := tb.HTML()
-		require.NoError(t, err)
+		fst.NoError(t, err)
 		want := `<table id="#abc">` + "\n" +
 			"<thead>\n<tr><th>name</th><th>age</th></tr>\n</thead>\n" +
 			"<tbody>\n" +
@@ -32,6 +32,6 @@ func TestTable1(t *testing.T) {
 			"</tbody>\n" +
 			"<tfoot>\n<tr><td>f1</td><td>f2</td></tr>\n</tfoot>\n" +
 			"</table>\n"
-		require.Equal(t, want, string(got))
+		fst.Equal(t, want, string(got))
 	})
 }

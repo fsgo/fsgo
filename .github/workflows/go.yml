@@ -18,7 +18,7 @@ jobs:
     # https://github.com/actions/setup-go/tree/v3s
       uses: actions/setup-go@v3
       with:
-        go-version: '1.20'
+        go-version: '1.21'
         check-latest: true
 
     - name: Test

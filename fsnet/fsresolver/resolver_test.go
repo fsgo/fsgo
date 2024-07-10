@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 
 	"github.com/fsgo/fsgo/internal/number"
 )
@@ -170,7 +170,7 @@ func TestResolverCached(t *testing.T) {
 
 		runTestCases(t, re, tests)
 
-		require.NoError(t, lookupIPNum.Want(len(tests)))
-		require.NoError(t, lookupIPAddrNum.Want(len(tests)))
+		fst.NoError(t, lookupIPNum.Want(len(tests)))
+		fst.NoError(t, lookupIPAddrNum.Want(len(tests)))
 	})
 }

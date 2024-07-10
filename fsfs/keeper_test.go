@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestKeepFile(t *testing.T) {
@@ -28,47 +28,47 @@ func TestKeepFile(t *testing.T) {
 		atomic.AddInt32(&changeNum, 1)
 	})
 
-	require.NoError(t, kp.Start())
+	fst.NoError(t, kp.Start())
 
 	t.Run("after start", func(t *testing.T) {
-		require.Equal(t, int32(1), atomic.LoadInt32(&changeNum))
-		require.NotNil(t, kp.File())
+		fst.Equal(t, int32(1), atomic.LoadInt32(&changeNum))
+		fst.NotNil(t, kp.File())
 	})
 
 	defer kp.Stop()
 
 	checkExists := func() {
 		info, err := os.Stat(fp)
-		require.NoError(t, err)
-		require.NotNil(t, info)
+		fst.NoError(t, err)
+		fst.NotNil(t, info)
 	}
 
 	t.Run("same file not change", func(t *testing.T) {
 		stat1, err := kp.File().Stat()
-		require.NoError(t, err)
+		fst.NoError(t, err)
 		time.Sleep(ci * 2)
 
 		stat2, err := kp.File().Stat()
-		require.NoError(t, err)
+		fst.NoError(t, err)
 
-		require.True(t, os.SameFile(stat1, stat2))
+		fst.True(t, os.SameFile(stat1, stat2))
 	})
 
 	t.Run("rm and create it auto", func(t *testing.T) {
 		checkExists()
-		require.Nil(t, os.Remove(fp))
+		fst.Nil(t, os.Remove(fp))
 		time.Sleep(ci * 2)
 		checkExists()
-		require.Equal(t, int32(2), atomic.LoadInt32(&changeNum))
+		fst.Equal(t, int32(2), atomic.LoadInt32(&changeNum))
 	})
 
 	t.Run("stopped", func(t *testing.T) {
 		kp.Stop()
 		time.Sleep(ci * 2)
-		require.NoError(t, os.Remove(fp))
+		fst.NoError(t, os.Remove(fp))
 
 		// check not exists
 		_, err := os.Stat(fp)
-		require.Error(t, err)
+		fst.Error(t, err)
 	})
 }

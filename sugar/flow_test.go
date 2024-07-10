@@ -7,10 +7,10 @@ package sugar
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestTernary(t *testing.T) {
-	require.Equal(t, 1, Ternary(true, 1, 2))
-	require.Equal(t, 2, Ternary(false, 1, 2))
+	fst.Equal(t, 1, Ternary(true, 1, 2))
+	fst.Equal(t, 2, Ternary(false, 1, 2))
 }

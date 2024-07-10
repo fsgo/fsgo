@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 
 	"github.com/fsgo/fsgo/fstime"
 )
@@ -48,9 +48,9 @@ func TestInterval(t *testing.T) {
 	wg2.Wait()
 
 	it.Reset(time.Millisecond)
-	require.Equal(t, int32(1), atomic.LoadInt32(&num))
-	require.Equal(t, int32(1), atomic.LoadInt32(&f1))
-	require.Equal(t, int32(2), atomic.LoadInt32(&f2))
+	fst.Equal(t, int32(1), atomic.LoadInt32(&num))
+	fst.Equal(t, int32(1), atomic.LoadInt32(&f1))
+	fst.Equal(t, int32(2), atomic.LoadInt32(&f2))
 }
 
 func TestInterval2(t *testing.T) {
@@ -69,5 +69,5 @@ func TestInterval2(t *testing.T) {
 	time.Sleep(time.Millisecond / 2)
 	it.Stop()
 	time.Sleep(time.Millisecond / 2)
-	require.Equal(t, int64(9), num.Load())
+	fst.Equal(t, int64(9), num.Load())
 }

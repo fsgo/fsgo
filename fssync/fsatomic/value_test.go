@@ -10,66 +10,66 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestValue_Load(t *testing.T) {
 	var val Value[time.Time]
-	require.True(t, val.Load().IsZero())
+	fst.True(t, val.Load().IsZero())
 	now := time.Now()
 	val.Store(now)
 	got := val.Load()
-	require.Equal(t, now, got)
+	fst.Equal(t, now, got)
 
 	n2 := time.Now()
 	got1 := val.Swap(n2)
-	require.Equal(t, got, got1)
-	require.False(t, val.CompareAndSwap(time.Now(), time.Now()))
-	require.True(t, val.CompareAndSwap(n2, time.Now()))
+	fst.Equal(t, got, got1)
+	fst.False(t, val.CompareAndSwap(time.Now(), time.Now()))
+	fst.True(t, val.CompareAndSwap(n2, time.Now()))
 }
 
 func TestError(t *testing.T) {
 	t.Run("case 1", func(t *testing.T) {
 		var val Error
-		require.Nil(t, val.Load())
+		fst.Nil(t, val.Load())
 		var e1 error
 		val.Store(e1)
-		require.Nil(t, val.Load())
-		require.Nil(t, val.Swap(io.EOF))
-		require.Error(t, val.Load())
-		require.Error(t, val.Swap(nil))
-		require.NoError(t, val.Swap(nil))
-		require.True(t, val.CompareAndSwap(nil, io.EOF))
-		require.False(t, val.CompareAndSwap(nil, io.EOF))
+		fst.Nil(t, val.Load())
+		fst.Nil(t, val.Swap(io.EOF))
+		fst.Error(t, val.Load())
+		fst.Error(t, val.Swap(nil))
+		fst.NoError(t, val.Swap(nil))
+		fst.True(t, val.CompareAndSwap(nil, io.EOF))
+		fst.False(t, val.CompareAndSwap(nil, io.EOF))
 		err2 := errors.New("some err")
-		require.True(t, val.CompareAndSwap(io.EOF, err2))
+		fst.True(t, val.CompareAndSwap(io.EOF, err2))
 	})
 	t.Run("case 2", func(t *testing.T) {
 		var val2 Error
-		require.True(t, val2.CompareAndSwap(nil, io.EOF))
+		fst.True(t, val2.CompareAndSwap(nil, io.EOF))
 	})
 	t.Run("case 3", func(t *testing.T) {
 		var val2 Error
-		require.False(t, val2.CompareAndSwap(io.EOF, nil))
+		fst.False(t, val2.CompareAndSwap(io.EOF, nil))
 	})
 	t.Run("case 4", func(t *testing.T) {
 		var val2 Error
 		val2.Store(io.EOF)
-		require.True(t, val2.CompareAndSwap(io.EOF, nil))
+		fst.True(t, val2.CompareAndSwap(io.EOF, nil))
 	})
 	t.Run("case 5", func(t *testing.T) {
 		var val2 Error
-		require.NoError(t, val2.Swap(io.EOF))
-		require.True(t, val2.CompareAndSwap(io.EOF, nil))
+		fst.NoError(t, val2.Swap(io.EOF))
+		fst.True(t, val2.CompareAndSwap(io.EOF, nil))
 	})
 }
 
 func TestFuncVoid(t *testing.T) {
 	t.Run("case 1", func(t *testing.T) {
 		var val FuncVoid
-		require.Nil(t, val.Load())
-		require.Nil(t, val.Swap(func() {}))
-		require.NotNil(t, val.Swap(func() {}))
+		fst.Nil(t, val.Load())
+		fst.Nil(t, val.Swap(func() {}))
+		fst.NotNil(t, val.Swap(func() {}))
 	})
 }
 

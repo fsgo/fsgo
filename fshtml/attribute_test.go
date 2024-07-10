@@ -7,7 +7,7 @@ package fshtml_test
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 
 	"github.com/fsgo/fsgo/fshtml"
 )
@@ -28,11 +28,11 @@ func TestAttributes(t *testing.T) {
 
 		attrs := attr.FindAttrs()
 		bf, err := attrs.HTML()
-		require.NoError(t, err)
+		fst.NoError(t, err)
 		want := `id="#abc" name="hello" class="c3 c5" value="\"你好<>\""`
-		require.Equal(t, want, string(bf))
+		fst.Equal(t, want, string(bf))
 
 		wantKeys := []string{"id", "name", "class", "value"}
-		require.Equal(t, wantKeys, attrs.Keys())
+		fst.Equal(t, wantKeys, attrs.Keys())
 	})
 }

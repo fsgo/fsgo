@@ -10,7 +10,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/fsgo/fst"
 
 	"github.com/fsgo/fsgo/fsnet/fsconn"
 )
@@ -25,14 +25,14 @@ func TestDialer_DialContext(t *testing.T) {
 			},
 		}
 		_, err := d.DialContext(context.Background(), "tcp", "127.0.0.1:80")
-		assert.Equal(t, wantErr, err)
+		fst.Equal(t, wantErr, err)
 	})
 
 	t.Run("with many its", func(t *testing.T) {
 		wantErr := errors.New("err must")
 		var num int32
 		checkNum := func(want int32) {
-			assert.Equal(t, want, num)
+			fst.Equal(t, want, num)
 			num++
 		}
 		d := &Simple{
@@ -74,7 +74,7 @@ func TestDialer_DialContext(t *testing.T) {
 			},
 		})
 		_, err := d.DialContext(ctx, "tcp", "127.0.0.1:80")
-		assert.Equal(t, wantErr, err)
+		fst.Equal(t, wantErr, err)
 	})
 }
 
@@ -96,13 +96,13 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 	t.Run("zero dhs", func(t *testing.T) {
 		var dhs interceptors
 		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, 0)
-		assert.Equal(t, td.retErr, err)
+		fst.Equal(t, td.retErr, err)
 	})
 
 	t.Run("one dhs", func(t *testing.T) {
 		var num int32
 		checkNum := func(want int32) {
-			assert.Equal(t, want, num)
+			fst.Equal(t, want, num)
 			num++
 		}
 		dhs := interceptors{
@@ -114,13 +114,13 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 			},
 		}
 		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, 0)
-		assert.Equal(t, td.retErr, err)
+		fst.Equal(t, td.retErr, err)
 		checkNum(1)
 	})
 	t.Run("tow dhs", func(t *testing.T) {
 		var num int32
 		checkNum := func(want int32) {
-			assert.Equal(t, want, num)
+			fst.Equal(t, want, num)
 			num++
 		}
 		dhs := interceptors{
@@ -138,7 +138,7 @@ func Test_dialerHooks_HookDialContext(t *testing.T) {
 			},
 		}
 		_, err := dhs.CallDialContext(context.Background(), "tcp", "127.0.0.1:80", td.DialContext, 0)
-		assert.Equal(t, td.retErr, err)
+		fst.Equal(t, td.retErr, err)
 		checkNum(2)
 	})
 }
@@ -151,7 +151,7 @@ func TestMustRegisterDialerHook(t *testing.T) {
 	hk := TransConnInterceptor(&fsconn.Interceptor{})
 	MustRegisterInterceptor(hk)
 	hks := Default.(*Simple).Interceptors
-	assert.Len(t, hks, 1)
+	fst.Len(t, hks, 1)
 
-	assert.Equal(t, hks[0], hk)
+	fst.Equal(t, hks[0], hk)
 }

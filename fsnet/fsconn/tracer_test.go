@@ -8,7 +8,7 @@ import (
 	"net"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/fsgo/fst"
 )
 
 func TestReadTracer(t *testing.T) {
@@ -18,8 +18,8 @@ func TestReadTracer(t *testing.T) {
 		c2 := Wrap(c1, ch.ConnInterceptor())
 		bf := make([]byte, 1024)
 		_, err := c2.Read(bf)
-		assert.NotNil(t, t, err)
-		assert.Equal(t, len(ch.ReadBytes()), 0)
+		fst.NotNil(t, err)
+		fst.Equal(t, len(ch.ReadBytes()), 0)
 	})
 
 	t.Run("read success", func(t *testing.T) {
@@ -38,13 +38,13 @@ func TestReadTracer(t *testing.T) {
 		}()
 		bf := make([]byte, 1024)
 		n, err := c2.Read(bf)
-		assert.Nil(t, err)
-		assert.Equal(t, want, bf[:n])
+		fst.Nil(t, err)
+		fst.Equal(t, want, bf[:n])
 
-		assert.Equal(t, ch.ReadBytes(), want)
+		fst.Equal(t, ch.ReadBytes(), want)
 
 		ch.Reset()
-		assert.Len(t, ch.ReadBytes(), 0)
+		fst.Len(t, ch.ReadBytes(), 0)
 	})
 }
 
@@ -54,8 +54,8 @@ func TestWriteTracer(t *testing.T) {
 		ch := &WriteTracer{}
 		c2 := Wrap(c1, ch.Interceptor())
 		_, err := c2.Write([]byte("hello"))
-		assert.NotNil(t, err)
-		assert.Len(t, ch.WriteBytes(), 0)
+		fst.NotNil(t, err)
+		fst.Len(t, ch.WriteBytes(), 0)
 	})
 
 	t.Run("write success", func(t *testing.T) {
@@ -75,10 +75,10 @@ func TestWriteTracer(t *testing.T) {
 
 		want := []byte("hello")
 		_, err := c2.Write(want)
-		assert.Nil(t, err)
-		assert.Equal(t, ch.WriteBytes(), want)
+		fst.Nil(t, err)
+		fst.Equal(t, ch.WriteBytes(), want)
 
 		ch.Reset()
-		assert.Len(t, ch.WriteBytes(), 0)
+		fst.Len(t, ch.WriteBytes(), 0)
 	})
 }

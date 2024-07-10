@@ -10,7 +10,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestAsyncWriter(t *testing.T) {
@@ -25,16 +25,16 @@ func TestAsyncWriter(t *testing.T) {
 
 		for i := 0; i < 1000; i++ {
 			_, err := aw.Write([]byte("H"))
-			require.NoError(t, err)
+			fst.NoError(t, err)
 		}
-		require.NoError(t, aw.Close())
+		fst.NoError(t, aw.Close())
 		want := WriteStatus{
 			Wrote: 1,
 		}
-		require.Equal(t, want, aw.LastWriteStatus())
+		fst.Equal(t, want, aw.LastWriteStatus())
 
 		mw.WithRLock(func(_ io.Writer) {
-			require.Equal(t, 1000, b.Len())
+			fst.Equal(t, 1000, b.Len())
 		})
 	})
 
@@ -45,9 +45,9 @@ func TestAsyncWriter(t *testing.T) {
 			ChanSize:   100,
 			NeedStatus: true,
 		}
-		require.NoError(t, aw.Close())
+		fst.NoError(t, aw.Close())
 		want := WriteStatus{}
-		require.Equal(t, want, aw.LastWriteStatus())
+		fst.Equal(t, want, aw.LastWriteStatus())
 	})
 
 	t.Run("with gor", func(t *testing.T) {

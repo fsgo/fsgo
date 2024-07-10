@@ -8,7 +8,7 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestSliceFlag(t *testing.T) {
@@ -35,36 +35,36 @@ func TestSliceFlag(t *testing.T) {
 	var s7 Slice[float32]
 	fs.Var(&s7, "s7", "")
 
-	require.NoError(t, fs.Parse([]string{"-s1", "123"}))
-	require.Equal(t, []int{123}, s1.Value())
+	fst.NoError(t, fs.Parse([]string{"-s1", "123"}))
+	fst.Equal(t, []int{123}, s1.Value())
 
-	require.NoError(t, fs.Parse([]string{"-s1", "123,456,,7"}))
-	require.Equal(t, []int{123, 456, 7}, s1.Value())
+	fst.NoError(t, fs.Parse([]string{"-s1", "123,456,,7"}))
+	fst.Equal(t, []int{123, 456, 7}, s1.Value())
 
-	require.Error(t, fs.Parse([]string{"-s1", "123;456;"}))
-	require.Empty(t, s1.Value())
+	fst.Error(t, fs.Parse([]string{"-s1", "123;456;"}))
+	fst.Empty(t, s1.Value())
 
-	require.NoError(t, fs.Parse([]string{"-s2", "123;456;"}))
-	require.Equal(t, []int{123, 456}, s2.Value())
+	fst.NoError(t, fs.Parse([]string{"-s2", "123;456;"}))
+	fst.Equal(t, []int{123, 456}, s2.Value())
 
-	require.NoError(t, fs.Parse([]string{"-s3=123,45"}))
-	require.Equal(t, []int8{123, 45}, s3.Value())
+	fst.NoError(t, fs.Parse([]string{"-s3=123,45"}))
+	fst.Equal(t, []int8{123, 45}, s3.Value())
 
-	require.Error(t, fs.Parse([]string{"-s3", "123,456"}))
-	require.Equal(t, []int8(nil), s3.Value())
+	fst.Error(t, fs.Parse([]string{"-s3", "123,456"}))
+	fst.Equal(t, []int8(nil), s3.Value())
 
-	require.NoError(t, fs.Parse([]string{"-s4=true,false,"}))
-	require.Equal(t, []bool{true, false}, s4.Value())
+	fst.NoError(t, fs.Parse([]string{"-s4=true,false,"}))
+	fst.Equal(t, []bool{true, false}, s4.Value())
 
-	require.NoError(t, fs.Parse([]string{"-s5=true,false,"}))
-	require.Equal(t, []string{"true", "false"}, s5.Value())
-	require.NotEmpty(t, s5.String())
+	fst.NoError(t, fs.Parse([]string{"-s5=true,false,"}))
+	fst.Equal(t, []string{"true", "false"}, s5.Value())
+	fst.NotEmpty(t, s5.String())
 
-	require.NoError(t, fs.Parse([]string{"-s6", "123,456"}))
-	require.Equal(t, []uint16{123, 456}, s6.Value())
-	require.NotEmpty(t, s6.String())
+	fst.NoError(t, fs.Parse([]string{"-s6", "123,456"}))
+	fst.Equal(t, []uint16{123, 456}, s6.Value())
+	fst.NotEmpty(t, s6.String())
 
-	require.NoError(t, fs.Parse([]string{"-s7", "123,456,0.1"}))
-	require.Equal(t, []float32{123, 456, 0.1}, s7.Value())
-	require.NotEmpty(t, s7.String())
+	fst.NoError(t, fs.Parse([]string{"-s7", "123,456,0.1"}))
+	fst.Equal(t, []float32{123, 456, 0.1}, s7.Value())
+	fst.NotEmpty(t, s7.String())
 }

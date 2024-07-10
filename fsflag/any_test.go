@@ -8,7 +8,7 @@ import (
 	"flag"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestAny(t *testing.T) {
@@ -22,12 +22,12 @@ func TestAny(t *testing.T) {
 	}
 	fs.Var(&a2, "a2", "")
 
-	require.NoError(t, fs.Parse([]string{"-a1", "123"}))
-	require.Equal(t, "123", a1.Value())
+	fst.NoError(t, fs.Parse([]string{"-a1", "123"}))
+	fst.Equal(t, "123", a1.Value())
 
-	require.NoError(t, fs.Parse([]string{"-a2", "hello"}))
-	require.Equal(t, "hello", a2.Value())
+	fst.NoError(t, fs.Parse([]string{"-a2", "hello"}))
+	fst.Equal(t, "hello", a2.Value())
 
-	require.Error(t, fs.Parse([]string{"-a2", "abc"}))
-	require.Equal(t, "", a2.Value())
+	fst.Error(t, fs.Parse([]string{"-a2", "abc"}))
+	fst.Equal(t, "", a2.Value())
 }

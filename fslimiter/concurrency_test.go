@@ -11,14 +11,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestConcurrency(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		var c Concurrency
 		fn := c.Wait()
-		require.Equal(t, fmt.Sprintf("%p", empty), fmt.Sprintf("%p", fn))
+		fst.Equal(t, fmt.Sprintf("%p", empty), fmt.Sprintf("%p", fn))
 	})
 
 	t.Run("limit 1", func(t *testing.T) {
@@ -38,8 +38,8 @@ func TestConcurrency(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 			defer cancel()
 			fn, err := c.WaitContext(ctx)
-			require.Error(t, err)
-			require.Nil(t, fn)
+			fst.Error(t, err)
+			fst.Nil(t, fn)
 		}
 
 		time.Sleep(3 * time.Millisecond)
@@ -48,8 +48,8 @@ func TestConcurrency(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
 			defer cancel()
 			fn, err := c.WaitContext(ctx)
-			require.NoError(t, err)
-			require.NotNil(t, fn)
+			fst.NoError(t, err)
+			fst.NotNil(t, fn)
 			fn()
 		}
 	})
@@ -69,6 +69,6 @@ func TestConcurrency(t *testing.T) {
 		}
 		wg.Wait()
 		cost := time.Since(start)
-		require.GreaterOrEqual(t, int(cost/time.Millisecond), 10)
+		fst.GreaterOrEqual(t, int(cost/time.Millisecond), 10)
 	})
 }

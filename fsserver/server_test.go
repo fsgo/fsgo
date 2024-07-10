@@ -13,15 +13,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 
 	"github.com/fsgo/fsgo/fsserver"
 )
 
 func TestAnyServer(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
-	require.NoError(t, err)
-	require.NotNil(t, l)
+	fst.NoError(t, err)
+	fst.NotNil(t, l)
 	defer l.Close()
 
 	ser := &fsserver.AnyServer{
@@ -34,22 +34,22 @@ func TestAnyServer(t *testing.T) {
 		_ = ser.Serve(l)
 	}()
 	conn, err := net.DialTimeout("tcp", l.Addr().String(), 100*time.Millisecond)
-	require.NoError(t, err)
+	fst.NoError(t, err)
 	rd := bufio.NewReader(conn)
 	for i := 0; i < 10; i++ {
 		t.Run(fmt.Sprintf("loop=%d", i), func(t *testing.T) {
 			_, err = conn.Write([]byte("hello\n"))
-			require.NoError(t, err)
+			fst.NoError(t, err)
 			line, _, err := rd.ReadLine()
-			require.NoError(t, err)
-			require.Equal(t, `resp:"hello"`, string(line))
+			fst.NoError(t, err)
+			fst.Equal(t, `resp:"hello"`, string(line))
 		})
 	}
-	require.NoError(t, conn.Close())
+	fst.NoError(t, conn.Close())
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
-	require.NoError(t, ser.Shutdown(ctx))
-	require.NoError(t, l.Close())
+	fst.NoError(t, ser.Shutdown(ctx))
+	fst.NoError(t, l.Close())
 	wg.Wait()
 }
 

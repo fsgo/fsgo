@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestRunVoid(t *testing.T) {
@@ -19,7 +19,7 @@ func TestRunVoid(t *testing.T) {
 		RunVoid(func() {
 			num.Add(1)
 		})
-		require.Equal(t, int32(1), num.Load())
+		fst.Equal(t, int32(1), num.Load())
 	})
 	t.Run("case 2", func(t *testing.T) {
 		RunVoid(func() {
@@ -36,13 +36,13 @@ func TestRunError(t *testing.T) {
 		err := RunError(func() error {
 			return io.EOF
 		})
-		require.Same(t, io.EOF, err)
+		fst.SamePtr(t, io.EOF, err)
 	})
 	t.Run("case 2", func(t *testing.T) {
 		err := RunError(func() error {
 			panic("hello")
 		})
-		require.Error(t, err)
-		require.True(t, errors.Is(err, ErrPanic))
+		fst.Error(t, err)
+		fst.True(t, errors.Is(err, ErrPanic))
 	})
 }

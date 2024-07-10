@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/fsgo/fst"
 
 	"github.com/fsgo/fsgo/fsnet/fsconn"
 )
@@ -26,7 +26,7 @@ func TestTraces(t *testing.T) {
 	want := []byte("HelloFsNet")
 	rt.HandleFunc("/", func(writer http.ResponseWriter, request *http.Request) {
 		_, err1 := writer.Write(want)
-		assert.Nil(t, err1)
+		fst.Nil(t, err1)
 	})
 	ts := httptest.NewServer(rt)
 	defer ts.Close()
@@ -48,23 +48,23 @@ func TestTraces(t *testing.T) {
 
 	req := httptest.NewRequest("get", ts.URL, nil)
 	resp, err := tr.RoundTrip(req)
-	assert.Nil(t, err)
+	fst.Nil(t, err)
 
 	defer resp.Body.Close()
 
 	t.Run("body", func(t *testing.T) {
 		got, err := io.ReadAll(resp.Body)
-		assert.Nil(t, err)
-		assert.Equal(t, want, got)
+		fst.Nil(t, err)
+		fst.Equal(t, want, got)
 	})
 
 	t.Run("statHK", func(t *testing.T) {
-		assert.NotEqual(t, 0, statHK.ReadCost())
-		assert.NotEqual(t, 0, statHK.WriteCost())
+		fst.NotEqual(t, 0, statHK.ReadCost())
+		fst.NotEqual(t, 0, statHK.WriteCost())
 	})
 
 	t.Run("ReadBytes", func(t *testing.T) {
 		got := readHK.ReadBytes()
-		assert.Contains(t, string(got), string(want))
+		fst.StringContains(t, string(got), string(want))
 	})
 }

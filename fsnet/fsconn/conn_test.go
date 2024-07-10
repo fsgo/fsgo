@@ -10,8 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestNewConn(t *testing.T) {
@@ -29,7 +28,7 @@ func TestNewConn(t *testing.T) {
 				}()
 
 				readIndex++
-				assert.Equal(t, 2, readIndex)
+				fst.Equal(t, 2, readIndex)
 
 				return raw(b)
 			},
@@ -52,7 +51,7 @@ func TestNewConn(t *testing.T) {
 		tr2 := &Interceptor{
 			Read: func(info Info, b []byte, raw func([]byte) (int, error)) (int, error) {
 				readIndex++
-				assert.Equal(t, 1, readIndex)
+				fst.Equal(t, 1, readIndex)
 				return raw(b)
 			},
 		}
@@ -67,17 +66,17 @@ func TestNewConn(t *testing.T) {
 		buf := make([]byte, 128)
 
 		n, err := r1.Read(buf)
-		assert.Nil(t, err)
-		assert.Equal(t, len(msg), n)
-		assert.Equal(t, string(msg), string(buf[:n]))
+		fst.Nil(t, err)
+		fst.Equal(t, len(msg), n)
+		fst.Equal(t, string(msg), string(buf[:n]))
 
-		assert.Equal(t, "pipe", w1.LocalAddr().Network())
-		assert.Equal(t, "tcp", w1.RemoteAddr().Network())
+		fst.Equal(t, "pipe", w1.LocalAddr().Network())
+		fst.Equal(t, "tcp", w1.RemoteAddr().Network())
 
 		t.Run("Close", func(t *testing.T) {
-			assert.Nil(t, w1.Close())
+			fst.Nil(t, w1.Close())
 
-			assert.Equal(t, 1, closeNum)
+			fst.Equal(t, 1, closeNum)
 		})
 	})
 }
@@ -88,12 +87,12 @@ func TestNewConn_merge(t *testing.T) {
 		Read: func(info Info, b []byte, raw func([]byte) (int, error)) (int, error) {
 			// 先注册的先执行
 			id++
-			assert.Equal(t, 1, id)
+			fst.Equal(t, 1, id)
 			return raw(b)
 		},
 		AfterRead: func(info Info, b []byte, readSize int, err error) {
 			id++
-			assert.Equal(t, 4, id)
+			fst.Equal(t, 4, id)
 		},
 	}
 	nc := Wrap(&net.TCPConn{}, hk1)
@@ -101,41 +100,41 @@ func TestNewConn_merge(t *testing.T) {
 	hk2 := &Interceptor{
 		Read: func(info Info, b []byte, raw func([]byte) (int, error)) (int, error) {
 			id++
-			assert.Equal(t, 2, id)
+			fst.Equal(t, 2, id)
 			return raw(b)
 		},
 		AfterRead: func(info Info, b []byte, readSize int, err error) {
 			id++
-			assert.Equal(t, 5, id)
+			fst.Equal(t, 5, id)
 		},
 	}
 
 	hk3 := &Interceptor{
 		Read: func(info Info, b []byte, raw func([]byte) (int, error)) (int, error) {
 			id++
-			assert.Equal(t, 3, id)
+			fst.Equal(t, 3, id)
 			return raw(b)
 		},
 	}
 	hk4 := &Interceptor{
 		AfterRead: func(info Info, b []byte, readSize int, err error) {
 			id++
-			assert.Equal(t, 6, id)
+			fst.Equal(t, 6, id)
 		},
 	}
 	nc1 := Wrap(nc, hk2, hk3, hk4)
-	assert.NotEqual(t, nc, nc1)
+	fst.NotEqual(t, nc, nc1)
 	bf := make([]byte, 1)
 	_, _ = nc1.Read(bf)
-	assert.Equal(t, 6, id)
+	fst.Equal(t, 6, id)
 }
 
 func TestOriginConn(t *testing.T) {
 	c1 := &net.TCPConn{}
 	c2 := Wrap(c1)
 
-	assert.Equal(t, c1, OriginConn(c2))
-	assert.Equal(t, c1, OriginConn(c1))
+	fst.SamePtr(t, c1, OriginConn(c2))
+	fst.SamePtr(t, c1, OriginConn(c1))
 }
 
 func Test_connInterceptors_CallSetDeadline(t *testing.T) {
@@ -144,15 +143,15 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 	var num int32
 	RegisterInterceptor(&Interceptor{
 		SetDeadline: func(info Info, tm time.Time, raw func(tm time.Time) error) error {
-			require.Equal(t, int32(1), atomic.AddInt32(&num, 1))
-			require.Equal(t, want, tm)
+			fst.Equal(t, int32(1), atomic.AddInt32(&num, 1))
+			fst.Equal(t, want, tm)
 			return raw(tm)
 		},
 	})
 	RegisterInterceptor(&Interceptor{
 		SetDeadline: func(info Info, tm time.Time, raw func(t time.Time) error) error {
-			require.Equal(t, int32(2), atomic.AddInt32(&num, 1))
-			require.Equal(t, want, tm)
+			fst.Equal(t, int32(2), atomic.AddInt32(&num, 1))
+			fst.Equal(t, want, tm)
 			return raw(tm)
 		},
 	})
@@ -160,8 +159,8 @@ func Test_connInterceptors_CallSetDeadline(t *testing.T) {
 	c1 := &net.TCPConn{}
 	c2 := Wrap(c1, &Interceptor{
 		SetDeadline: func(info Info, tm time.Time, raw func(t time.Time) error) error {
-			require.Equal(t, int32(3), atomic.AddInt32(&num, 1))
-			require.Equal(t, want, tm)
+			fst.Equal(t, int32(3), atomic.AddInt32(&num, 1))
+			fst.Equal(t, want, tm)
 			return raw(tm)
 		},
 	})

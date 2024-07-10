@@ -7,37 +7,37 @@ package number
 import (
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func Test_parseNumber(t *testing.T) {
 	t.Run("int-1", func(t *testing.T) {
 		got, err := ParseNumber[int](" 123", 0)
-		require.NoError(t, err)
-		require.Equal(t, int(123), got)
+		fst.NoError(t, err)
+		fst.Equal(t, int(123), got)
 	})
 
 	t.Run("int-2-err", func(t *testing.T) {
 		got, err := ParseNumber[int]("123.1", 0)
-		require.Error(t, err)
-		require.Equal(t, int(0), got)
+		fst.Error(t, err)
+		fst.Equal(t, int(0), got)
 	})
 
 	t.Run("int8-err", func(t *testing.T) {
 		got, err := ParseNumber[int8]("65535", int8(0))
-		require.Equal(t, int8(127), got)
-		require.Error(t, err)
+		fst.Equal(t, int8(127), got)
+		fst.Error(t, err)
 	})
 
 	t.Run("uint64-1", func(t *testing.T) {
 		got, err := ParseNumber[uint64](" 123", uint64(0))
-		require.NoError(t, err)
-		require.Equal(t, uint64(123), got)
+		fst.NoError(t, err)
+		fst.Equal(t, uint64(123), got)
 	})
 
 	t.Run("float64-1", func(t *testing.T) {
 		got, err := ParseNumber[float64](" 123.1", float64(0))
-		require.NoError(t, err)
-		require.Equal(t, float64(123.1), got)
+		fst.NoError(t, err)
+		fst.Equal(t, float64(123.1), got)
 	})
 }

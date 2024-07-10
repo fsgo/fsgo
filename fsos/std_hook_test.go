@@ -10,7 +10,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 
 	"github.com/fsgo/fsgo/fsfs"
 )
@@ -23,21 +23,21 @@ func TestHookStderr(t *testing.T) {
 			return fp
 		},
 	}
-	require.Nil(t, kp.Start())
+	fst.Nil(t, kp.Start())
 	defer kp.Stop()
 
-	require.Nil(t, HookStderr(kp.File()))
+	fst.Nil(t, HookStderr(kp.File()))
 
 	checkFile := func(want string) {
 		bf, err := os.ReadFile(fp)
-		require.Nil(t, err)
-		require.Contains(t, string(bf), want)
+		fst.Nil(t, err)
+		fst.StringContains(t, string(bf), want)
 	}
 
 	println("hello")
 	checkFile("hello")
 
-	require.Nil(t, kp.File().Truncate(0))
+	fst.Nil(t, kp.File().Truncate(0))
 
 	log.Println("fsgo")
 	checkFile("fsgo")
@@ -51,15 +51,15 @@ func TestHookStdout(t *testing.T) {
 			return fp
 		},
 	}
-	require.Nil(t, kp.Start())
+	fst.Nil(t, kp.Start())
 	defer kp.Stop()
 
-	require.Nil(t, HookStdout(kp.File()))
+	fst.Nil(t, HookStdout(kp.File()))
 
 	checkFile := func(want string) {
 		bf, err := os.ReadFile(fp)
-		require.Nil(t, err)
-		require.Contains(t, string(bf), want)
+		fst.Nil(t, err)
+		fst.StringContains(t, string(bf), want)
 	}
 	fmt.Fprintf(os.Stdout, "%s", "hello\n")
 	checkFile("hello")

@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
+	"github.com/fsgo/fst"
 )
 
 func TestTransport_RoundTrip(t *testing.T) {
@@ -29,12 +29,12 @@ func TestTransport_RoundTrip(t *testing.T) {
 			Timeout:   time.Second,
 		}
 		resp, err := cli.Get(ts.URL)
-		require.Nil(t, err)
+		fst.NoError(t, err)
 
 		body, err := io.ReadAll(resp.Body)
-		require.Nil(t, err)
-		require.Nil(t, resp.Body.Close())
-		require.Equal(t, "hello", string(body))
+		fst.NoError(t, err)
+		fst.NoError(t, resp.Body.Close())
+		fst.Equal(t, "hello", string(body))
 	})
 
 	t.Run("https server", func(t *testing.T) {
@@ -49,11 +49,11 @@ func TestTransport_RoundTrip(t *testing.T) {
 			Timeout: time.Second,
 		}
 		resp, err := cli.Get(ts.URL)
-		require.Nil(t, err)
+		fst.Nil(t, err)
 
 		body, err := io.ReadAll(resp.Body)
-		require.Nil(t, err)
-		require.Nil(t, resp.Body.Close())
-		require.Equal(t, "hello", string(body))
+		fst.Nil(t, err)
+		fst.Nil(t, resp.Body.Close())
+		fst.Equal(t, "hello", string(body))
 	})
 }
