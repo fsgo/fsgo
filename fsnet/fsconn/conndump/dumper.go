@@ -111,7 +111,7 @@ func (d *Dumper) getDataDir() string {
 	if len(d.DataDir) != 0 {
 		return d.DataDir
 	}
-	return filepath.Join(fsenv.DataRootDir(), "rpcdump")
+	return filepath.Join(fsenv.DataDir(), "rpcdump")
 }
 
 // ClientConnInterceptor 返回 client 的 conn Interceptor

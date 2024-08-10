@@ -1,6 +1,8 @@
 module github.com/fsgo/fsgo/extra/fsotel
 
-go 1.20
+go 1.21
+
+toolchain go1.22.0
 
 require (
 	github.com/fsgo/fsgo v0.0.4
@@ -9,7 +11,7 @@ require (
 )
 
 require (
-	github.com/fsgo/fscache v0.0.2 // indirect
+	github.com/fsgo/fscache v0.0.3 // indirect
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/vmihailenco/msgpack/v5 v5.4.0 // indirect
