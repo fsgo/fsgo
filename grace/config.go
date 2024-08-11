@@ -24,8 +24,8 @@ import (
 // NewSimpleConfig 使用默认配置创建 Config
 func NewSimpleConfig() *Config {
 	return &Config{
-		StatusDir:     filepath.Join(fsenv.AppRootDir(), "var"),
-		LogDir:        fsenv.LogRootDir(),
+		StatusDir:     filepath.Join(fsenv.TempDir(), "var"),
+		LogDir:        fsenv.LogDir(),
 		Keep:          true,
 		StopTimeout:   "10s",
 		CheckInterval: "5s",
