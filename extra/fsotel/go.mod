@@ -1,8 +1,6 @@
 module github.com/fsgo/fsgo/extra/fsotel
 
-go 1.21
-
-toolchain go1.22.0
+go 1.22.0
 
 require (
 	github.com/fsgo/fsgo v0.0.4
