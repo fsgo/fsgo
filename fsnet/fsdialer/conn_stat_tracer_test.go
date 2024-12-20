@@ -65,6 +65,6 @@ func TestTraces(t *testing.T) {
 
 	t.Run("ReadBytes", func(t *testing.T) {
 		got := readHK.ReadBytes()
-		fst.StringContains(t, string(got), string(want))
+		fst.Contains(t, string(got), string(want))
 	})
 }

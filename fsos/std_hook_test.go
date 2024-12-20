@@ -31,7 +31,7 @@ func TestHookStderr(t *testing.T) {
 	checkFile := func(want string) {
 		bf, err := os.ReadFile(fp)
 		fst.Nil(t, err)
-		fst.StringContains(t, string(bf), want)
+		fst.Contains(t, string(bf), want)
 	}
 
 	println("hello")
@@ -59,7 +59,7 @@ func TestHookStdout(t *testing.T) {
 	checkFile := func(want string) {
 		bf, err := os.ReadFile(fp)
 		fst.Nil(t, err)
-		fst.StringContains(t, string(bf), want)
+		fst.Contains(t, string(bf), want)
 	}
 	fmt.Fprintf(os.Stdout, "%s", "hello\n")
 	checkFile("hello")
